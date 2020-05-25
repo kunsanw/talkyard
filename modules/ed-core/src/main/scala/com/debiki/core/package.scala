@@ -95,6 +95,8 @@ package object core {
 
   type SiteTx = SiteTransaction  // renaming it, wip
 
+  type OidcProviderId = Int
+
   sealed abstract class MarkupLang
   object MarkupLang {
     case object Html extends MarkupLang
