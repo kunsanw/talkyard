@@ -1483,13 +1483,6 @@ case class EmailLoginAttempt(  // [306AS13]
 }
 
 
-case class OpenIdLoginAttempt(
-  ip: String,
-  date: ju.Date,
-  openIdDetails: OpenIdDetails) extends MemberLoginAttempt {
-}
-
-
 case class OpenAuthLoginAttempt(
   ip: String,
   date: ju.Date,
