@@ -109,6 +109,7 @@ class SiteDao(
   with CategoriesDao
   with PagesDao
   with PagePathMetaDao
+  with PageLinksDao
   with PageStuffDao
   with PagePopularityDao
   with RenderedPageHtmlDao
@@ -147,16 +148,17 @@ class SiteDao(
   // which automatically knows the right embeddedOriginOrEmpty and followLinks etc,
   // so won't need to always use makePostRenderSettings() below before
   // using textAndHtmlMaker?
-  def textAndHtmlMaker = new TextAndHtmlMaker(this.thePubSiteId(), context.nashorn)
+  def textAndHtmlMaker = new TextAndHtmlMaker(theSite(), context.nashorn)
 
   def makePostRenderSettings(pageType: PageType): PostRendererSettings = {
     val embeddedOriginOrEmpty =
-      if (pageType == PageType.EmbeddedComments) theSiteOrigin()
-      else ""
+          if (pageType == PageType.EmbeddedComments) theSiteOrigin()
+          else ""
     PostRendererSettings(
-      embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-      pageRole = pageType,
-      thePubSiteId())
+          embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+          pageRole = pageType,
+          siteId = siteId,
+          thePubSiteId())
   }
 
   def notfGenerator(tx: SiteTransaction) =
@@ -192,7 +194,27 @@ class SiteDao(
   private def thisSiteCacheKey = siteCacheKey(this.siteId)
 
 
-  // Rename to ...NoRetry, add readWriteTransactionWithRetry
+  def writeTx[R](fn: (SiteTransaction, StaleStuff) => R): R = {
+    writeTx()(fn)
+  }
+
+
+  def writeTx[R](retry: Boolean = false, allowOverQuota: Boolean = false)(
+          fn: (SiteTransaction, StaleStuff) => R): R = {
+    dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
+    val staleStuff = new StaleStuff()
+    val r = readWriteTransaction(tx => {
+      val r = fn(tx, staleStuff)
+      tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
+      r
+    }, allowOverQuota)
+    staleStuff.stalePageIdsInDb foreach refreshPageInMemCache
+    r
+  }
+
+
+  RENAME // to writeTx
+  @deprecated("now", "use writeTx { (tx, staleStuff) => ... } instead")
   def readWriteTransaction[R](fn: SiteTransaction => R, allowOverQuota: Boolean = false): R = {
     // Serialize writes per site. This avoids all? transaction rollbacks because of
     // serialization errors in Postgres (e.g. if 2 people post 2 comments at the same time).
@@ -211,7 +233,11 @@ class SiteDao(
     }
   }
 
+  RENAME // to just readTx
   def readOnlyTransaction[R](fn: SiteTransaction => R): R =
+    readTx(fn)
+
+  def readTx[R](fn: SiteTx => R): R =
     dbDao2.readOnlySiteTransaction(siteId, mustBeSerializable = true) { fn(_) }
 
   def readOnlyTransactionTryReuse[R](anyTx: Option[SiteTransaction])(fn: SiteTransaction => R): R =

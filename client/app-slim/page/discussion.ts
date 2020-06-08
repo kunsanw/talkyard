@@ -674,6 +674,19 @@ const RootPostAndComments = createComponent({
           debiki2.renderer.drawHorizontalArrowFromRootPost(rootPost);
     }
 
+    let linkedFrom;
+    if (nonEmpty(page.intLinkedFrom)) {
+      linkedFrom =
+            r.div({ className: 's_InLns' },
+              r.p({ className: 's_InLns_Ttl' }, "Linked from:"), // I18N
+              r.ol({},
+                page.intLinkedFrom.map((topic: Topic) =>
+                  r.li({ key: topic.pageId },
+                    Link({ to: topic.url, className: 's_InLns_Ln icon-link' },
+                      topic.title))
+              )));
+    }
+
     let repliesAreFlat = false;
     let discOrProgrReplyNrs = rootPost.childNrsSorted.concat(page.parentlessReplyNrsSorted);
 
@@ -964,6 +977,7 @@ const RootPostAndComments = createComponent({
         socialButtons,
         deletedText,
         postActions,
+        linkedFrom,
         debiki2.page.Metabar(),
         anyHorizontalArrowToChildren,
         // try to remove the dw-single-and-multireplies div + the dw-singlereplies class,

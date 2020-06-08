@@ -40,6 +40,8 @@ settings.noDebug = args.nodebug || args.nd;
 
 settings.block3rdPartyCookies = args.block3rdPartyCookies || args.b3c;
 
+settings.only3rdParty = args.only3rdParty || args.o3;
+
 const parallelStr = args.parallel || args.p;
 if (parallelStr) settings.parallel = parseInt(parallelStr);
 

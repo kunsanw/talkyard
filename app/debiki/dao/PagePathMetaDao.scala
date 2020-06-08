@@ -54,7 +54,23 @@ trait PagePathMetaDao {
   }
 
 
+  def checkPagePath2(pathToCheck: PagePath): Option[PagePathWithId] = {
+    // This finds the canonical page path.
+    val path: Option[PagePath] = checkPagePath(pathToCheck: PagePath)
+    path flatMap { pathShouldHaveId =>
+      if (pathShouldHaveId.pageId.isEmpty) {
+        // Could log warning
+        None
+      }
+      else {
+        Some(pathShouldHaveId.toNew(canonical = true))
+      }
+    }
+  }
+
+
   def checkPagePath(pathToCheck: PagePath): Option[PagePath] = {
+    CLEAN_UP // return PagePathWithId, see checkPagePath2 above
     val key = _pathWithIdByPathKey(pathToCheck)
     memCache.lookup[PagePath](key) foreach { path =>
       return Some(path)
@@ -63,7 +79,8 @@ trait PagePathMetaDao {
     readOnlyTransaction(_.checkPagePath(pathToCheck)) map { correctPath =>
       // Don't cache non-exact paths if page id shown, since there are
       // infinitely many such paths.
-      // Performance, caching: COULD let checkPagePath() clarify whether
+      COULD_OPTIMIZE // cache anyway, but in a short expiration bounded size time cache.
+      COULD_OPTIMIZE // caching: Let checkPagePath() clarify whether
       // pathToCheck was actually found in the database (in DW1_PAGE_PATHS),
       // and cache it, if found, regardless of if id shown in url.
       // Or better & much simpler: Cache SitePageId —> correctPath.

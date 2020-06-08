@@ -50,6 +50,9 @@ trait SearchDao {
     */
   def fullTextSearch(searchQuery: SearchQuery, anyRootPageId: Option[PageId],
         user: Option[Participant], addMarkTagClasses: Boolean): Future[Seq[PageAndHits]] = {
+    COULD_OPTIMIZE // cache the most recent N search results for M minutes?
+    // And refresh whenever anything changes anywhere, e.g. gets edited /
+    // permissions changed / moved elsewhere / created / renamed.
     searchEngine.search(searchQuery, anyRootPageId, user,
         addMarkTagClasses = addMarkTagClasses) map { hits: Seq[SearchHit] =>
       groupByPageFilterAndSort(hits, user)

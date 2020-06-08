@@ -64,6 +64,20 @@ trait PagesSiteDaoMixin extends SiteTransaction {
   }
 
 
+  def markPagesHtmlStale(pageIds: Set[PageId]): Unit = {
+    if (pageIds.isEmpty) return
+    // Later, could try to avoid bumping page revisions, if bumped already in
+    // the same tx.
+    UNTESTED
+    val statement = s"""
+          update pages3
+          set version = version + 1, updated_at = now_utc()
+          where site_id = ?
+            and page_id in (${ makeInListFor(pageIds) }) """
+    runUpdate(statement, siteId.asAnyRef :: pageIds.toList)
+  }
+
+
   def markSectionPageContentHtmlAsStale(categoryId: CategoryId) {
     val statement = s"""
       update page_html3 h

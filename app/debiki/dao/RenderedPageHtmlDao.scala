@@ -47,7 +47,7 @@ object RenderedPageHtmlDao {
 trait RenderedPageHtmlDao {
   self: SiteDao =>
 
-  memCache.onPageCreated { _ =>
+  memCache.onPageCreated { case (_, _) =>
     uncacheForums(this.siteId)
   }
 

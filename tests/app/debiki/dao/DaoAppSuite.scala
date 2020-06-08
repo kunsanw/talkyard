@@ -19,13 +19,12 @@ package debiki.dao
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, TextAndHtml, TextAndHtmlMaker}
+import debiki.{Globals, TextAndHtml, TextAndHtmlMaker, TitleSourceAndHtml}
 import ed.server.{EdAppComponents, EdContext}
 import org.scalatest._
 import org.scalatestplus.play.{BaseOneAppPerSuite, FakeApplicationFactory}
 import DaoAppSuite._
 import java.io.File
-
 import play.api.inject.DefaultApplicationLifecycle
 import play.api._
 
@@ -58,7 +57,16 @@ class DaoAppSuite(
 
   lazy val context: EdContext = edAppComponents.context
   lazy val globals: Globals = context.globals
-  lazy val textAndHtmlMaker: TextAndHtmlMaker = new TextAndHtmlMaker("testsiteid", context.nashorn)
+
+
+  val dummyNoSite: SiteIdHostnames = new SiteIdHostnames {
+    val id: SiteId = NoSiteId
+    val pubId = "testsiteid"
+    val canonicalHostnameStr = Some("forum.example.com")
+    val allHostnames: Seq[String] = canonicalHostnameStr.toSeq
+  }
+
+  lazy val textAndHtmlMaker = new TextAndHtmlMaker(dummyNoSite, context.nashorn)
 
 
   override def fakeApplication: Application = {
@@ -300,17 +308,27 @@ class DaoAppSuite(
       categoryData, permissions.to[immutable.Seq], request.who)
   } */
 
-
-  def createPage(pageRole: PageType, titleTextAndHtml: TextAndHtml,
+  REMOVE; CLEAN_UP // use createPage2 instead, and rename it to createPage().
+  def createPage(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,
         bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
         dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
         extId: Option[ExtId] = None, discussionIds: Set[AltPageId] = Set.empty): PageId = {
-    dao.createPage(pageRole, PageStatus.Published, anyCategoryId = anyCategoryId,
+    createPage2(pageRole, titleTextAndHtml = titleTextAndHtml,
+          bodyTextAndHtml = bodyTextAndHtml, authorId = authorId, browserIdData = browserIdData,
+          dao = dao, anyCategoryId = anyCategoryId,
+          extId = extId, discussionIds = discussionIds).id
+  }
+
+  def createPage2(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,
+        bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
+        dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
+        extId: Option[ExtId] = None, discussionIds: Set[AltPageId] = Set.empty): CreatePageResult = {
+    dao.createPage2(
+      pageRole, PageStatus.Published, anyCategoryId = anyCategoryId,
       anyFolder = Some("/"), anySlug = Some(""),
-      titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
+      title = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
       showId = true, deleteDraftNr = None, Who(authorId, browserIdData), dummySpamRelReqStuff,
-      discussionIds = discussionIds, extId = extId
-    ).pageId
+      discussionIds = discussionIds, extId = extId)
   }
 
 

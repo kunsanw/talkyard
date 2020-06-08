@@ -811,6 +811,9 @@ export class TyE2eTestBrowser {
     // Could rename to isInTalkyardIframe.
     // NO, use this.#isWhere instead — just remember in which frame we are, instead of polling. ?
     isInIframe(): boolean {
+      if (this.#isWhere === IsWhere.UnknownIframe)
+        return true;
+
       return this.#br.execute(function() {
         return window['eds'] && window['eds'].isInIframe;
       });
@@ -824,6 +827,13 @@ export class TyE2eTestBrowser {
 
     switchToAnyParentFrame() {
       if (this.isInIframe()) {
+        this.switchToTheParentFrame();
+      }
+    }
+
+
+    switchToTheParentFrame() {
+        dieIf(!this.isInIframe(), 'TyE406RKH2');
         this.#br.switchToParentFrame();
         // Skip, was some other oddity:
         // // Need to wait, otherwise apparently WebDriver can in rare cases run
@@ -833,8 +843,12 @@ export class TyE2eTestBrowser {
         //   message: `Waiting for this.#br to enter parent frame, until window.self === top`
         // });
         logMessage("Switched to parent frame.");
-        this.#isWhere = IsWhere.EmbeddingPage;
-      }
+        if (this.#isWhere === IsWhere.UnknownIframe) {
+          this.#isWhere = IsWhere.Forum;
+        }
+        else {
+          this.#isWhere = IsWhere.EmbeddingPage;
+        }
     }
 
 
@@ -844,6 +858,7 @@ export class TyE2eTestBrowser {
       const iframe = this.$(selector);
       this.#br.switchToFrame(iframe);
       printBoringToStdout(` done, now in frame  ${selector}.\n`);
+      this.#isWhere = IsWhere.UnknownIframe;
     }
 
 
@@ -1236,7 +1251,7 @@ export class TyE2eTestBrowser {
       });
     }
 
-    waitForExist(selector: string, ps: { timeoutMs?: number } = {}) {
+    waitForExist(selector: string, ps: { timeoutMs?: number, howMany?: number } = {}) {
       this.waitUntil(() => {
         const elem = this.$(selector);
         if (elem && elem.isExisting())
@@ -1245,6 +1260,10 @@ export class TyE2eTestBrowser {
         ...ps,
         message: `Waiting until exists:  ${selector}`,
       });
+
+      if (ps.howMany && ps.howMany >= 2) {
+        this.waitForAtLeast(ps.howMany, selector);
+      }
     }
 
     waitForGone(selector: string, ps: { timeoutMs?: number } = {}) {
@@ -4236,31 +4255,78 @@ export class TyE2eTestBrowser {
     };
 
 
-    preview = {
-      __inPagePreviewSelector: '.s_P-Prvw ',
-      __inEditorPreviewSelector: '#t_E_Preview ', // '#debiki-editor-controller .preview ';
-
-      waitForExist: (
-            selector: string, opts: { where: 'InEditor' | 'InPage' }) => {
-        if (opts.where === 'InEditor') {
-          this.switchToEmbEditorIframeIfNeeded();
-          this.waitForExist(this.preview.__inEditorPreviewSelector + selector);
+    linkPreview = {
+      waitUntilLinkPreviewMatches: (ps: { postNr: PostNr, timeoutMs?: number,
+            regex: string | RegExp, whicLinkPreviewSelector?: string,
+            inSandboxedIframe: boolean }) => {
+        const linkPrevwSel = ' .s_LnPv' + (ps.whicLinkPreviewSelector || '');
+        if (ps.inSandboxedIframe) {
+          this.topic.waitForExistsInIframeInPost({ postNr: ps.postNr,
+                iframeSelector: linkPrevwSel + ' iframe', //'.s_LnPv' + (ps.whicLinkPreviewSelector || '')
+                textToMatch: ps.regex,
+                timeoutMs: ps.timeoutMs });
         }
         else {
-          this.switchToEmbCommentsIframeIfNeeded();
-          this.waitForExist(this.preview.__inPagePreviewSelector + selector);
+          const selector = this.topic.postBodySelector(ps.postNr) + linkPrevwSel;
+          this.waitForExist(selector, { timeoutMs: ps.timeoutMs });
+          if (ps.regex) {
+            this.waitUntilTextMatches(selector, ps.regex);
+          }
         }
       },
+    };
 
-      waitUntilPreviewHtmlMatches: (
-            text: string, opts: { where: 'InEditor' | 'InPage' }) => {
+    preview = {  // RENAME to editorPreview  ?
+      __inPagePreviewSelector: '.s_P-Prvw',
+      __inEditorPreviewSelector: '#t_E_Preview',
+
+      exists: (selector: string, opts: { where: 'InEditor' | 'InPage' }): boolean => {
+        return this.preview.__checkPrevw(opts, (prevwSelector: string) => {
+          return this.isExisting(prevwSelector + selector);
+        });
+      },
+
+      waitForExist: (
+            selector: string, opts: { where: 'InEditor' | 'InPage', howMany?: number }) => {
+        this.preview.__checkPrevw(opts, (prevwSelector: string) => {
+          this.waitForExist(prevwSelector + selector, { howMany: opts.howMany });
+        });
+      },
+
+      waitUntilPreviewHtmlMatches: (text: string,
+            opts: { where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string }) => {
+        this.preview.__checkPrevw(opts, (prevwSelector: string) => {
+          this.waitUntilHtmlMatches(prevwSelector, text);
+        });
+      },
+
+      // ^--REMOVE, use --v  instead
+      waitUntilPreviewTextMatches: (
+            regex: string | RegExp, opts: {
+                  where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string,
+                  inSandboxedIframe: boolean }) => {
+        this.preview.__checkPrevw(opts, (prevwSelector: string) => {
+          if (opts.inSandboxedIframe) {
+            this.switchToFrame(`${prevwSelector}.s_LnPv iframe`);
+            this.waitUntilTextMatches('body', regex);
+            this.switchToTheParentFrame();
+          }
+          else {
+            this.waitUntilTextMatches(prevwSelector, regex);
+          }
+        });
+      },
+
+      __checkPrevw: <R>(opts: { where: 'InEditor' | 'InPage',
+              whicLinkPreviewSelector?: string }, fn: (string) => R): R => {
+        const lnPvSelector = opts.whicLinkPreviewSelector || '';
         if (opts.where === 'InEditor') {
           this.switchToEmbEditorIframeIfNeeded();
-          this.waitUntilHtmlMatches(this.preview.__inEditorPreviewSelector, text);
+          return fn(`${this.preview.__inEditorPreviewSelector} ${lnPvSelector}`);
         }
         else {
           this.switchToEmbCommentsIframeIfNeeded();
-          this.waitUntilHtmlMatches(this.preview.__inPagePreviewSelector, text);
+          return fn(`${this.preview.__inPagePreviewSelector} ${lnPvSelector}`);
         }
       },
     };
@@ -4484,8 +4550,39 @@ export class TyE2eTestBrowser {
         }
       },
 
+      waitForExistsInPost: (postNr: PostNr, selector: string,
+            ps: { timeoutMs?: number, howMany?: number } = {}) => {
+        this.waitForExist(this.topic.postBodySelector(postNr) + ' ' + selector, ps);
+      },
+
+      // Enters an <iframe> in a post, looks for sth, then exits the iframe.
+      waitForExistsInIframeInPost: (ps: { postNr: PostNr, iframeSelector: string,
+            thingInIframeSelector?: string, textToMatch?: string | RegExp,
+            timeoutMs?: number, howMany?: number }) => {
+        const complIfrSel = this.topic.postBodySelector(ps.postNr) + ' ' + ps.iframeSelector;
+        this.switchToFrame(complIfrSel);
+        const thingInIframeSelector = ps.thingInIframeSelector || 'body';
+        this.waitForExist(thingInIframeSelector, { timeoutMs: ps.timeoutMs });
+        if (ps.textToMatch) {
+          this.waitUntilTextMatches(thingInIframeSelector, ps.textToMatch);
+        }
+        this.switchToTheParentFrame();
+      },
+
       postNrContains: (postNr: PostNr, selector: string) => {
         return this.isExisting(this.topic.postBodySelector(postNr) + ' ' + selector);
+      },
+
+      assertPostNrContains: (postNr: PostNr, selector: string) => {
+        if (!this.topic.postNrContains(postNr, selector)) {
+          assert.fail(`Post ${postNr} doesn't contain selector:  ${selector}`);
+        }
+      },
+
+      assertPostNrNotContains: (postNr: PostNr, selector: string) => {
+        if (this.topic.postNrContains(postNr, selector)) {
+          assert.fail(`Post ${postNr} contains, but should not, selector:  ${selector}`);
+        }
       },
 
       postNrContainsVisible: (postNr: PostNr, selector: string) => {
@@ -4504,9 +4601,12 @@ export class TyE2eTestBrowser {
         return this.waitAndGetVisibleHtml(this.topic.postBodySelector(postNr));
       },
 
-      waitUntilPostTextMatches: (postNr: PostNr, regex: string | RegExp) => {
+      waitUntilPostTextMatches: (postNr: PostNr, regex: string | RegExp,
+              opts: { thingInPostSelector?: string } = {}) => {
         this.switchToEmbCommentsIframeIfNeeded();
-        this.waitUntilTextMatches(this.topic.postBodySelector(postNr), regex);
+        const selector =
+            `${this.topic.postBodySelector(postNr)} ${opts.thingInPostSelector || ''}`;
+        this.waitUntilTextMatches(selector, regex);
       },
 
       refreshUntilPostNrAppears: (postNr: PostNr,

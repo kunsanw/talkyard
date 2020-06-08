@@ -23,7 +23,7 @@ import scala.collection.immutable
 import Prelude._
 
 
-trait SiteTransaction {
+trait SiteTransaction {   RENAME // to SiteTx — already started with a type SiteTx = this
   def commit(): Unit
   def rollback(): Unit
   def hasBeenRolledBack: Boolean
@@ -86,6 +86,7 @@ trait SiteTransaction {
   def loadTitleAndOrigPost(pageId: PageId): Seq[Post] =
     loadPostsByNrs(Seq(PagePostNr(pageId, PageParts.TitleNr), PagePostNr(pageId, PageParts.BodyNr)))
 
+  /** Also see: [[loadTitlesPreferApproved()]]  */
   def loadTitle(pageId: PageId): Option[Post] =
     loadPostsByNrs(Seq(PagePostNr(pageId, PageParts.TitleNr))).headOption
 
@@ -126,6 +127,7 @@ trait SiteTransaction {
 
   def loadEmbeddedCommentsApprovedNotDeleted(limit: Int, orderBy: OrderBy): immutable.Seq[Post]
 
+  /** Also see: [[loadTitle()]] and [[loadTitleAndOrigPost()]]. */
   def loadTitlesPreferApproved(pageIds: Iterable[PageId]): Map[PageId, String] = {
     val titlePosts = loadPostsByNrs(pageIds.map(PagePostNr(_, PageParts.TitleNr)))
     Map(titlePosts.map(post => {
@@ -146,6 +148,9 @@ trait SiteTransaction {
   def insertPost(newPost: Post): Unit
   def updatePost(newPost: Post): Unit
 
+  /** We index any approed text, and also any unapproved source, see:
+    * [[ed.server.search.makeElasticSearchJsonDocFor]]. [ix_unappr]
+    */
   def indexPostsSoon(posts: Post*): Unit
   def indexAllPostsOnPage(pageId: PageId): Unit
   def indexPagesSoon(pageMeta: PageMeta*): Unit
@@ -282,6 +287,7 @@ trait SiteTransaction {
         markSectionPageStale: Boolean): Unit
 
   def markPagesWithUserAvatarAsStale(userId: UserId): Unit
+  def markPagesHtmlStale(pageIds: Set[PageId]): Unit
   def markSectionPageContentHtmlAsStale(categoryId: CategoryId): Unit
   def loadCachedPageContentHtml(pageId: PageId, renderParams: PageRenderParams)
         : Option[(String, CachedPageVersion)]
@@ -330,7 +336,10 @@ trait SiteTransaction {
     */
   def updateUploadedFileReferenceCount(uploadRef: UploadRef): Unit
 
-  /** Remembers that an uploaded file is referenced from this post. */
+  /** Remembers that an uploaded file is referenced from this post.
+    * This needs to be done also for not-yet-approved posts — otherwise,
+    * the uploaded things might look unused, and get deleted and would
+    * then be missing, if the post gets approved, later.  */
   def insertUploadedFileReference(postId: PostId, uploadRef: UploadRef, addedById: UserId): Unit
   def deleteUploadedFileReference(postId: PostId, uploadRef: UploadRef): Boolean
   def loadUploadedFileReferences(postId: PostId): Set[UploadRef]
@@ -350,6 +359,21 @@ trait SiteTransaction {
   def filterUploadRefsInUse(uploadRefs: Iterable[UploadRef]): Set[UploadRef]
   def updateUploadQuotaUse(uploadRef: UploadRef, wasAdded: Boolean): Unit
 
+  def upsertLinkPreview(linkPreview: LinkPreview): Unit
+  def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String): Option[LinkPreview]
+  /** Deletes for all download urls (e.g. downloaded for different screen sizes) */
+  def deleteLinkPreviews(linkUrl: String): Boolean
+
+  def upsertLink(link: Link): Boolean
+  def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int
+  def deleteAllLinksFromPost(postId: PostId): Boolean
+  def loadLinksFromPost(postId: PostId): Seq[Link]
+  def loadLinksToPage(pageId: PageId): Seq[Link]
+  def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId]
+  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]
+  def loadPageIdsLinkedFromPost(postId: PostId): Set[PageId] =
+        loadPageIdsLinkedFromPosts(Set(postId))
+  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId]
 
   def insertInvite(invite: Invite): Unit
   def updateInvite(invite: Invite): Boolean

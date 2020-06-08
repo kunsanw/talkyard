@@ -1,15 +1,54 @@
 
+.s_LnPv
+  background: hsl(0, 0%, 91.6%);
+  margin: 9px 25px;
+  padding: 19px 0 9px;
+  &.s_LnPv-Err
+    padding: 12px 18px;
+    color: hsl(0, 0%, 15%);
+    .s_LnPv_L-Err
+      margin-left: 5px;
+    code
+      background: inherit;
+      color: hsl(0, 0%, 23%);
+    // So won't span the whole page — it's not so interesting, since broken.
+    display: inline-block;
 
-.dw-ob-youtube iframe
+.s_LnPv iframe
+  margin: 0 auto;
+  display: block;
+  width: calc(100% - 40px);
+  border: none;
+  // Gets corrected quickly by this iframe srcdoc=.. script: [OEMBHGHT],
+  // however, for other iframes, e.g. Telegram, can a bit too tall. [TELEGRIFR]
+  height: auto;
+  overflow: hidden;
+
+// Height: The default is 390px, see:
+// https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player
+.s_LnPv-YouTube iframe
+  height: 390px;
+
+
+.s_LnPv_ViewAt
+  display: block;
+  margin: 9px auto 5px;
+  text-align: center;
+
+.s_LnPv-oEmb.s_LnPv_ViewAt
+  margin: 7px auto 7px;  // already 10px extra margin-top: [oemb_extr_height]
+
+
+.s_LnPv-YouTube iframe
   width: 100%;
   max-width: 480px;
   height: 270px;
 
-.dw-ob-image > a
+.s_LnPv-Img > a
   float: left;  // makes Utterscroll work on any whitespace to the right of the image
   max-width: 100%;
 
-aside.onebox
+xx_aside.onebox
   margin: 1.5em 0 9px;
   + p,
   + ol,

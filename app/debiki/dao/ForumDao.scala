@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
-import talkyard.server.CommonMarkSourceAndHtml
+import debiki.{StaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
 
 
 case class CreateForumOptions(
@@ -62,10 +62,10 @@ trait ForumDao {
 
 
   def createForum(options: CreateForumOptions, byWho: Who): Option[CreateForumResult] = {
-    val titleHtmlSanitized = context.nashorn.sanitizeHtml(options.title, followLinks = false)
+    val titleSourceAndHtml = TitleSourceAndHtml(options.title)
     val isForEmbCmts = options.isForEmbeddedComments
 
-    val result = readWriteTransaction { tx =>
+    val result = writeTx { (tx, staleStuff) =>
       val oldForumPagePath = tx.checkPagePath(PagePath(
         siteId = siteId, folder = options.folder, pageId = None, showId = false, pageSlug = ""))
       if (oldForumPagePath.isDefined) {
@@ -97,20 +97,19 @@ trait ForumDao {
       // If is the first forum for this site, we're also creating the first category, id = 1. [8UWKQXN45]
       val isFirstForumForThisSite = rootCategoryId == 1
 
-      // Create forum page.
-      val introText = isForEmbCmts ? EmbeddedCommentsIntroText | ForumIntroText
+      // Create forum page.  ZZZ
+      val introText: TextAndHtml = isForEmbCmts ? EmbeddedCommentsIntroText | ForumIntroText
       val forumPagePath = createPageImpl(
-        PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
-        anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
-        titleSource = options.title, titleHtmlSanitized = titleHtmlSanitized,
-        bodySource = introText.source, bodyHtmlSanitized = introText.html,
-        pinOrder = None, pinWhere = None,
-        byWho, spamRelReqStuff = None, tx, layout = Some(options.topicListStyle))._1
+            PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
+            anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
+            title = titleSourceAndHtml, body = introText,
+            byWho = byWho, spamRelReqStuff = None, tx = tx, staleStuff = staleStuff,
+            layout = Some(options.topicListStyle))._1
 
       val forumPageId = forumPagePath.pageId
 
       val partialResult: CreateForumResult = createDefaultCategoriesAndTopics(
-        forumPageId, rootCategoryId, options, byWho, tx)
+        forumPageId, rootCategoryId, options, byWho, tx, staleStuff)
 
       // Delaying configuration of these settings until here, instead of here: [493MRP1],
       // lets us let people choose to create embedded comments sites, also
@@ -157,7 +156,7 @@ trait ForumDao {
 
 
   private def createDefaultCategoriesAndTopics(forumPageId: PageId, rootCategoryId: CategoryId,
-        options: CreateForumOptions, byWho: Who, tx: SiteTransaction)
+        options: CreateForumOptions, byWho: Who, tx: SiteTransaction, staleStuff: StaleStuff)
         : CreateForumResult = {
 
     val staffCategoryId = rootCategoryId + 1
@@ -198,21 +197,21 @@ trait ForumDao {
         includeInSummaries = IncludeInSummaries.Default),
       immutable.Seq[PermsOnPages](
         makeStaffCategoryPerms(staffCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     if (options.isForEmbeddedComments)
       createEmbeddedCommentsCategory(forumPageId, rootCategoryId, defaultCategoryId,
-        staffCategoryId, options, bySystem, tx)
+            staffCategoryId, options, bySystem, tx, staleStuff)
     else
       createForumCategories(forumPageId, rootCategoryId, defaultCategoryId,
-        staffCategoryId, options, bySystem, tx)
+            staffCategoryId, options, bySystem, tx, staleStuff)
   }
 
 
   private def createEmbeddedCommentsCategory(
     forumPageId: PageId, rootCategoryId: CategoryId, defaultCategoryId: CategoryId,
     staffCategoryId: CategoryId, options: CreateForumOptions,
-    bySystem: Who, tx: SiteTransaction): CreateForumResult = {
+    bySystem: Who, tx: SiteTransaction, staleStuff: StaleStuff): CreateForumResult = {
 
     dieIf(!options.isForEmbeddedComments, "TyE7HQT42")
 
@@ -242,7 +241,7 @@ trait ForumDao {
         makeEveryonesDefaultCategoryPerms(defaultCategoryId),
         makeFullMembersDefaultCategoryPerms(defaultCategoryId),
         makeStaffCategoryPerms(defaultCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     CreateForumResult(null, defaultCategoryId = defaultCategoryId,
       staffCategoryId = staffCategoryId)
@@ -252,7 +251,7 @@ trait ForumDao {
   private def createForumCategories(
     forumPageId: PageId, rootCategoryId: CategoryId, defaultCategoryId: CategoryId,
     staffCategoryId: CategoryId, options: CreateForumOptions,
-    bySystem: Who, tx: SiteTransaction): CreateForumResult = {
+    bySystem: Who, tx: SiteTransaction, staleStuff: StaleStuff): CreateForumResult = {
 
     dieIf(options.isForEmbeddedComments, "TyE2PKQ9")
 
@@ -287,7 +286,7 @@ trait ForumDao {
         makeEveryonesDefaultCategoryPerms(generalCategoryId),
         makeFullMembersDefaultCategoryPerms(generalCategoryId),
         makeStaffCategoryPerms(generalCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     // Talkyard is advertised as Question-Answers and crowdsource ideas forum software,
     // so makes sense to create Questions and Ideas categories?
@@ -314,7 +313,7 @@ trait ForumDao {
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeFullMembersDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     }
 
     // Create an Ideas category.
@@ -339,7 +338,7 @@ trait ForumDao {
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeFullMembersDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     }
 
     /*
@@ -369,23 +368,24 @@ trait ForumDao {
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeFullMembersDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     } */
+
+    def makeTitle(safeText: String) =
+      TitleSourceAndHtml(safeText, safeHtml = safeText)
 
     // Create forum welcome topic.
     createPageImpl(
       PageType.Discussion, PageStatus.Published,
       anyCategoryId = Some(generalCategoryId),
       anyFolder = None, anySlug = Some("welcome"), showId = true,
-      titleSource = WelcomeTopicTitle,
-      titleHtmlSanitized = WelcomeTopicTitle,
-      bodySource = welcomeTopic.source,
-      bodyHtmlSanitized = welcomeTopic.html,
+      title = makeTitle(WelcomeTopicTitle),
+      body = welcomeTopic,
       pinOrder = Some(WelcomeToForumTopicPinOrder),
       pinWhere = Some(PinPageWhere.Globally),
       bySystem,
       spamRelReqStuff = None,
-      tx)
+      tx, staleStuff)
 
     if (options.createSampleTopics) {
       def wrap(text: String) = textAndHtmlMaker.wrapInParagraphNoMentionsOrLinks(text, isTitle = false)
@@ -395,25 +395,27 @@ trait ForumDao {
         PageType.Discussion, PageStatus.Published,
         anyCategoryId = Some(generalCategoryId), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-discussion"), showId = true,
-        titleSource = SampleThreadedDiscussionTitle,
-        titleHtmlSanitized = SampleThreadedDiscussionTitle,
-        bodySource = SampleThreadedDiscussionText,
-        bodyHtmlSanitized = s"<p>$SampleThreadedDiscussionText</p>",
+        title = makeTitle(SampleThreadedDiscussionTitle),
+        body = StaticSourceAndHtml(SampleThreadedDiscussionText,
+                s"<p>$SampleThreadedDiscussionText</p>"),
         pinOrder = None,
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with a brief discussion.
       insertReplyImpl(wrap(SampleDiscussionReplyOne),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleDiscussionReplyTwo),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleDiscussionReplyThree),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
 
       /*
       // Create sample problem. — maybe it's enough, with a sample Idea.
@@ -421,71 +423,73 @@ trait ForumDao {
         PageType.Problem, PageStatus.Published,
         anyCategoryId = anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-problem"), showId = true,
-        titleSource = SampleProblemTitle,
-        titleHtmlSanitized = SampleProblemTitle,
-        bodySource = SampleProblemText.source,
-        bodyHtmlSanitized = SampleProblemText.html,
+        title = makeTitle(SampleProblemTitle),
+        body = SampleProblemText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx) */
+        tx, staleStuff) */
 
       // Create sample idea.
       val ideaPagePath = createPageImpl(
         PageType.Idea, PageStatus.Published,
         anyCategoryId = anyIdeasCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-idea"), showId = true,
-        titleSource = SampleIdeaTitle,
-        titleHtmlSanitized = SampleIdeaTitle,
-        bodySource = SampleIdeaText.source,
-        bodyHtmlSanitized = SampleIdeaText.html,
+        title = makeTitle(SampleIdeaTitle),
+        body = SampleIdeaText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with some sample Discussion and Progress replies.
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyOne),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyTwo),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyThree),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaProgressReplyOne),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.BottomComment,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.BottomComment, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaProgressReplyTwo),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.BottomComment,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.BottomComment, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
 
       // Create sample question.
       val questionPagePath = createPageImpl(
         PageType.Question, PageStatus.Published,
         anyCategoryId = anyQuestionsCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-question"), showId = true,
-        titleSource = SampleQuestionTitle,
-        titleHtmlSanitized = SampleQuestionTitle,
-        bodySource = SampleQuestionText.source,
-        bodyHtmlSanitized = SampleQuestionText.html,
+        title = makeTitle(SampleQuestionTitle),
+        body = SampleQuestionText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with two answers and a comment:
       insertReplyImpl(wrap(SampleAnswerText),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleAnswerCommentText),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleAnswerText2),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
     }
 
     // Create staff chat.
@@ -495,15 +499,13 @@ trait ForumDao {
       PageType.OpenChat, PageStatus.Published,
       anyCategoryId = Some(staffCategoryId),
       anyFolder = None, anySlug = Some("staff-chat"), showId = true,
-      titleSource = StaffChatTopicTitle,
-      titleHtmlSanitized = StaffChatTopicTitle,
-      bodySource = StaffChatTopicText,
-      bodyHtmlSanitized = s"<p>$StaffChatTopicText</p>",
+      title = makeTitle(StaffChatTopicTitle),
+      body = StaticSourceAndHtml(StaffChatTopicText, s"<p>$StaffChatTopicText</p>"),
       pinOrder = None,
       pinWhere = None,
       bySystem,
       spamRelReqStuff = None,
-      tx)
+      tx, staleStuff)
 
     CreateForumResult(null, defaultCategoryId = defaultCategoryId,
       staffCategoryId = staffCategoryId)
@@ -529,22 +531,22 @@ object ForumDao {
   private val DefaultCategoryPosition = 1000
 
 
-  private val ForumIntroText: CommonMarkSourceAndHtml = {
+  private val ForumIntroText: StaticSourceAndHtml = {
     val source = o"""[ Edit this to tell people what they can do here. ]"""
-    CommonMarkSourceAndHtml(source, html = s"<p>$source</p>")
+    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
-  private val EmbeddedCommentsIntroText: CommonMarkSourceAndHtml = {
+  private val EmbeddedCommentsIntroText: StaticSourceAndHtml = {
     val source = o"""Here are comments posted at your website. One topic here,
          for each blog post that got any comments, over at your website."""
-    CommonMarkSourceAndHtml(source, html = s"<p>$source</p>")
+    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
   private val WelcomeTopicTitle = "Welcome to this community"
 
-  private val welcomeTopic: CommonMarkSourceAndHtml = {
+  private val welcomeTopic: StaticSourceAndHtml = {
     val para1Line1 = "[ Edit this to clarify what this community is about. This first paragraph"
     val para1Line2 = "is shown to everyone, on the forum homepage. ]"
     val para2Line1 = "Here, below the first paragraph, add details like:"
@@ -552,7 +554,7 @@ object ForumDao {
     val listItem2 = "What can they do or find here?"
     val listItem3 = "Link to additional info, for example, any FAQ, or main website of yours."
     val toEditText = """To edit this, click the <b class="icon-edit"></b> icon below."""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1Line1
         |$para1Line2
@@ -564,7 +566,7 @@ object ForumDao {
         |
         |$toEditText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1Line1 $para1Line2</p>
         |<p>$para2Line1</p>
         |<ol><li>$listItem1</li><li>$listItem2</li><li>$listItem3</li></ol>
@@ -604,7 +606,7 @@ object ForumDao {
     val para3 = o"""In the topic list, people see if a problem is new, or if it's been solved:
       the <span class="icon-attention-circled"></span> and
       <span class="icon-check"></span> icons."""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -614,7 +616,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |<p>$para3</p>
@@ -631,7 +633,7 @@ object ForumDao {
     val para2 = o"""In the topic list, everyone sees the status of the idea at a glance
       — the status icon is shown to the left (e.g.
       <span class="icon-idea"></span> or <span class="icon-check"></span>).</div>"""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -639,7 +641,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |<p>$ToDeleteText</p>
@@ -675,7 +677,7 @@ object ForumDao {
       and then choose "Only waiting", look:"""
     // (You'll find /-/media/ in the Nginx config [NGXMEDIA] and submodule ty-media.)
     val para3 = """<img class="no-lightbox" src="/-/media/tips/how-click-show-waiting-680px.jpg">"""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -685,7 +687,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |$para3

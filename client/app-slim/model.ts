@@ -24,6 +24,11 @@ type HttpRequest = XMLHttpRequest;
 type UseBeacon = 'UseBeacon';
 
 
+interface LinkTitleUrl {
+  title: string;
+  url: string;
+}
+
 interface CheckboxEvent {
   target: {
     checked: boolean;
@@ -756,6 +761,8 @@ interface Page
   forumId?: string;
   ancestorsRootFirst?: Ancestor[];
   categoryId?: number;
+  intLinkedFrom?: Topic[];
+  extLinkedFrom?: LinkTitleUrl[];
   pageRole: PageRole;
   pagePath: PagePath;
   pageLayout?: PageLayout;  // REMOVE, move to TopicInterfaceSettings
