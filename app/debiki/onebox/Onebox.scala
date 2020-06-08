@@ -22,9 +22,10 @@ import com.debiki.core.Prelude._
 import debiki.{Globals, Nashorn}
 import debiki.onebox.engines._
 import javax.{script => js}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 import talkyard.server.TyLogger
@@ -151,13 +152,14 @@ class Onebox(val globals: Globals, val nashorn: Nashorn) {
   private val PlaceholderPrefix = "onebox-"
   private val NoEngineException = new DebikiException("DwE3KEF7", "No matching onebox engine")
 
-  private implicit val executionContext = globals.executionContext
+  private val executionContext: ExecutionContext = globals.executionContext
 
   private val engines = Seq[OneboxEngine](
     new ImageOnebox(globals, nashorn),
     new VideoOnebox(globals, nashorn),
     new GiphyOnebox(globals, nashorn),
-    new YouTubeOnebox(globals, nashorn))
+    new YouTubeOnebox(globals, nashorn),
+    new OEmbedOneboxEngine(globals, nashorn))
 
   def loadRenderSanitize(url: String, javascriptEngine: Option[js.Invocable])
         : Future[String] = {
@@ -182,10 +184,10 @@ class Onebox(val globals: Globals, val nashorn: Nashorn) {
 
     // Later: Have waitForDownloadsToFinish() return when all futures completed,
     // and remember the resulting html so placeholders can be replaced. And cache it.
-    futureSafeHtml onComplete {
+    futureSafeHtml.onComplete({
       case Success(safeHtml) =>
       case Failure(throwable) =>
-    }
+    })(executionContext)
 
     RenderOnboxResult.Loading(futureSafeHtml, placeholder)
   }

@@ -222,8 +222,12 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
   }
 
 
-  /** Downloads the linked resource via an external request to the URL (assuming it's
-    * a trusted safe site) then creates and returns sanitized onebox html.
+  /** Returns html for embedding the contents at the url in a Talkyard post.
+    * Does this by sending a request to the content provider, for example, if the url
+    * is a Twitter tweet, then, calls:
+    *   https://publish.twitter.com/oembed?url=the_url
+    * and gets back from Twitter json that shows how to embed the tweet (incl
+    * html in the json), then creates and returns sanitized onebox html.
     */
   def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(RateLimits.LoadOnebox) { request =>
     context.oneboxes.loadRenderSanitize(url, javascriptEngine = None).transform(
