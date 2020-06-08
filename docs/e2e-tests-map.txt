@@ -399,6 +399,7 @@ editor -
   edit post:
           - drafts-reply-edit-dir-msg.2browsers.test.ts   TyT5A2HSL8
   maximize editor:
+          - embed-twitter-tweets-etc.test.ts  TyT0JSM8PF68.TyT033SKHWW73M
   preview:
   upload things:  (7KFC2)
   other buttons -
@@ -429,6 +430,15 @@ mentions:
   no dupl mentions when combining @channel, @member, @group:
   when really many members:
           - many-users-mention-list-join-group.2browsers.test.ts  TyT2602SKJJ356
+
+
+onebox,  # deprecated name
+link previews:
+  editor maximized, split, noraml,
+  innline-in-page,
+  in-editor:
+          - embed-twitter-tweets-etc.test.ts  TyT0JSM8PF68   RENAME to link-preview-twitter?
+
 
 discussion -
   users on page:

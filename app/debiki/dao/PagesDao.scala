@@ -249,7 +249,7 @@ trait PagesDao {
         bodyHiddenById = ifThenSome(hidePageBody, authorId),
         bodyHiddenReason = None) // add `hiddenReason` function parameter?
 
-    val uploadPaths = findUploadRefsInPost(bodyPost)
+    val uploadPaths = findUploadRefsInPost(bodyPost)  // WHAT, why? use TextAndHtml instead?
 
     val pageMeta = PageMeta.forNewPage(pageId, pageRole, authorId,
       extId = extId,
@@ -349,6 +349,7 @@ trait PagesDao {
     uploadPaths foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
+    // saveDeleteLinks(newPost, authorId, tx)
 
     discussionIds.foreach(id => tx.insertAltPageId("diid:" + id, realPageId = pageId))
 

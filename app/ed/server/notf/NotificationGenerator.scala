@@ -40,6 +40,8 @@ case class NotificationGenerator(
   nashorn: Nashorn,
   config: debiki.Config) {
 
+  dieIf(tx.siteId != dao.siteId && Globals.isDevOrTest, "TyE603RSKHAN3")
+
   private var notfsToCreate = mutable.ArrayBuffer[Notification]()
   private var notfsToDelete = mutable.ArrayBuffer[NotificationToDelete]()
 
@@ -52,6 +54,7 @@ case class NotificationGenerator(
   private var anyAuthor: Option[Participant] = None
   private def author: Participant = anyAuthor getOrDie "TyE5RK2WAG8"
   private def siteId = tx.siteId
+  private lazy val site: SiteIdHostnames = dao.theSite()
 
   def generatedNotifications =
     Notifications(
@@ -141,8 +144,8 @@ case class NotificationGenerator(
     BUG // harmless. If a mention is removed, and added back, a new notf is sent. TyT2ABKS057
     // Probably don't want that?
     if (!skipMentions) {
-      val mentionedUsernames = anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(
-        newPost.approvedSource getOrDie "DwE82FK4", nashorn)
+      val mentionedUsernames = anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(  // [nashorn_in_tx]
+            newPost.approvedSource getOrDie "DwE82FK4", site, nashorn)
 
       var mentionedMembers: Set[Participant] = mentionedUsernames.flatMap(tx.loadMemberByUsername)
 
@@ -586,9 +589,12 @@ case class NotificationGenerator(
         s"appr.HtmlSan.: ${newPost.approvedHtmlSanitized}, safeHtml: ${textAndHtml.safeHtml} [TyE4WB78]")
     }
 
-    val oldMentions: Set[String] = findMentions(oldPost.approvedSource getOrDie "TyE0YKW3", nashorn)
-    val newMentions: Set[String] = anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(
-        newPost.approvedSource getOrDie "DwE2BF81", nashorn)
+    val oldMentions: Set[String] =
+          findMentions(oldPost.approvedSource getOrDie "TyE0YKW3", site, nashorn)
+
+    val newMentions: Set[String] =
+          anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(
+                newPost.approvedSource getOrDie "DwE2BF81", site, nashorn)
 
     val deletedMentions = oldMentions -- newMentions
     val createdMentions = newMentions -- oldMentions
@@ -704,16 +710,16 @@ object NotificationGenerator {
     "(?s)^(.*[^a-zA-Z0-9_])?@[a-zA-Z0-9_][a-zA-Z0-9_.-]*[a-zA-Z0-9].*".r  // [UNPUNCT]
 
 
-  def findMentions(text: String, nashorn: Nashorn): Set[String] = {
+  def findMentions(text: String, site: SiteIdHostnames, nashorn: Nashorn): Set[String] = {
     // Try to avoid rendering Commonmark source via Nashorn, if cannot possibly be any mentions:
     if (!MaybeMentionsRegex.matches(text))
       return Set.empty
 
-    val result = nashorn.renderAndSanitizeCommonMark(
+    val result = nashorn.renderAndSanitizeCommonMark_new(
       // BUG? COULD incl origin here, so links won't be interpreted relative any
       // web browser client's address? — Right now, no images incl in reply notf emails
       // anyway, so need not fix now.
-      text, pubSiteId = "dummy", embeddedOriginOrEmpty = "",
+      text, site, embeddedOriginOrEmpty = "",
       allowClassIdDataAttrs = false, followLinks = false)
 
     result.mentions

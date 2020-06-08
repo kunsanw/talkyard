@@ -166,6 +166,7 @@ package object core {
     pageId.length == 10 && pageId.startsWith("2000") // good enough for now
 
   type Tag = String
+  type TagDefId = Int
   type TagLabelId = Int
   type TagLabel = String
   val NoTagId: TagLabelId = 0
@@ -1174,6 +1175,9 @@ package object core {
     futureResults.map(_.reverse)(execCtx)  // because of  ::  above
   }
 
+  def FutGood[T](t: T): Future[Good[T]] = Future.successful(Good(t))
+  def FutBad[T](t: T): Future[Bad[T]] = Future.successful(Bad(t))
+
 
   /** If you're short of time, add e.g. an UNTESTED statement. The compiler
     * ensures you don't do a typo. Then, before a release:
@@ -1207,6 +1211,7 @@ package object core {
   def SLOW_QUERY = ()
   def SHOULD_OPTIMIZE = ()
   def COULD_OPTIMIZE = () // Also see [On2] but typically O(n^2) is intentional (because simpler).
+  def WOULD_OPTIMIZE = () // Unimportant thing that could be optimized.
   def BLOCKING_REQ = ()
   def EDIT_INDEX = ()     // Database index could be simplified. Or investigate if it's getting used?
   def AVOID_RERENDER = ()

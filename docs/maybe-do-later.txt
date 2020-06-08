@@ -9,6 +9,12 @@ Instead of this file, maybe use a combination of:
  (- https://git-scm.com/docs/git-notes? )
  (- https://github.com/google/git-appraise )
 
+[ty_themes]
+Primary button colors, secondary, background, arrows,
+and embedded widgets, e.g. Twitter's oEmbed has a 'link_color: #223344' attr,
+                            and  theme=light/dark.
+
+
 [immutable]
 Make all js objs "light weight immutable", via Typescript's 'readonly' properties:
 https://www.typescriptlang.org/docs/handbook/interfaces.html#readonly-properties
@@ -280,6 +286,16 @@ But rename useParams to useUrlParams !?
 Nice API for writing bots, e.g. chat bots or a Usability Testing Exchange external
 server / bot.
 
+[site_conf_vals]
+Generate target=_blank links?
+Generate https://host/page/path links, or /page/path links,  for in site rel links?
+
+[nashorn_in_tx]  COULD_OPTIMIZE
+Do outside tx.
+
+[double_tx]  COULD_OPTIMIZE
+Read-only tx in tx is ok but unnecessary, a tiny bit slower & more mem.
+
 [Scala_213]
 Try —> Using
 
@@ -297,3 +313,19 @@ And cannot be 100% there are no bugs causing problems when running DDL data-def-
    "PostgreSQL instance was unrecoverably corrupted after the virtual machine running it was powered off"  https://dev.t-matix.com/blog/postgresql-as-a-time-series-database/
 https://news.ycombinator.com/item?id=20760324
 TimescaleDB = pg extentsion, nice, no need to learn a completely new db & storage type.
+
+[typesafe_lua]
+Maybe: https://github.com/teal-language/tl  Teal, a typed dialect of Lua  ?
+  by https://github.com/hishamhm  works at Kong. FOSDEM2020, VSCode & Vim support.
+https://github.com/emilk/sol — no longer in active development
+
+[content_filter]
+E.g. disallow toxic speech, or pics of zebras if that's against the community's rules.
+
+[blake3]  COULD_OPTIMIZE
+Blake3 is ~ 10x faster than SHA2:
+  https://news.ycombinator.com/item?id=22021769
+  https://news.ycombinator.com/item?id=22003315
+Wait until there's a well tested Java lib available?
+Then use Blake3 instead e.g. to hash long Redis keys (and just delete the old
+cached things, it's a cache).

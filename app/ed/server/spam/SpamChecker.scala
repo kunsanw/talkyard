@@ -19,13 +19,15 @@ package ed.server.spam
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{AllSettings, Config, TextAndHtml, TextAndHtmlMaker}
+import debiki.{AllSettings, Config, Nashorn, TextAndHtml, TextAndHtmlMaker}
 import debiki.EdHttp.throwForbidden
 import debiki.JsonUtils.readOptString
 import java.{net => jn}
 import java.net.UnknownHostException
+
 import play.api.libs.ws._
 import play.api.libs.json.{JsArray, JsObject, Json}
+
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -116,12 +118,14 @@ object BadSpamCheckResponseException extends QuickException
 class SpamChecker(
   config: Config,
   isDevTest: Boolean,
-  originOfSiteId: Function[SiteId, Option[String]],
-  settingsBySiteId: Function[SiteId, AllSettings],
+  // Maybe clean up this a bit, too many params?
+  siteById: SiteId => Option[Site],
+  originOfSiteId: SiteId => Option[String],
+  settingsBySiteId: SiteId => AllSettings,
   executionContext: ExecutionContext,
   playConf: play.api.Configuration,
   wsClient: WSClient,
-  textAndHtmlMaker: TextAndHtmlMaker) {
+  nashorn: Nashorn) {
 
   private val logger = TyLogger("SpamChecker")
 
@@ -315,6 +319,12 @@ class SpamChecker(
 
     val siteSettings: AllSettings = settingsBySiteId(spamCheckTask.siteId)
 
+    val site: Site = siteById(spamCheckTask.siteId) getOrElse {
+      logger.warn(s"Site gone? id: ${spamCheckTask.siteId}, [TyE03KSUJ6M]")
+      return Future.successful(Nil)
+    }
+
+    val textAndHtmlMaker = new TextAndHtmlMaker(site, nashorn)
     val textAndHtml = textAndHtmlMaker.forHtmlAlready(postToSpamCheck.htmlToSpamCheck)
 
     val spamTestFutures: Vector[Future[SpamCheckResult]] =
@@ -470,7 +480,7 @@ class SpamChecker(
     // recognize the top level domain.
     import org.apache.commons.validator.routines.{UrlValidator, RegexValidator}
     val urlValidator = new UrlValidator(new RegexValidator(".*"), UrlValidator.ALLOW_2_SLASHES)
-    val validUrls = textAndHtml.links.filter(urlValidator.isValid)
+    val validUrls = textAndHtml.externalLinks.filter(urlValidator.isValid)
     if (validUrls.isEmpty)
       return None
 

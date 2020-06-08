@@ -447,7 +447,7 @@ case class SimpleSitePatch(
           textAndHtml.safeHtml
         }
 
-      val titleHtmlSanitized = Jsoup.clean(titleHtmlUnsafe, Whitelist.basic)
+      val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(titleHtmlUnsafe)
 
       nextPostId += 1
       val titlePost = Post(  // dupl code, use Post.create() instead [DUPPSTCRT]

@@ -539,10 +539,10 @@ object RateLimits {
 
 
   object LoadOnebox extends RateLimits {
-    val key = "LdOb"
-    val what = "loaded too many oneboxes"
+    val key = "LdPv"
+    val what = "loaded too many link previews"
     def maxPerFifteenSeconds = 10
-    def maxPerFifteenMinutes: Int = Unlimited
+    def maxPerFifteenMinutes: Int = 75  // 5 per minute is a lot?
     def maxPerDay: Int = Unlimited
     def maxPerDayNewUser: Int = Unlimited
   }

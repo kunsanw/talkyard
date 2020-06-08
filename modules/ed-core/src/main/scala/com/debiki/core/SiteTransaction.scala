@@ -350,6 +350,15 @@ trait SiteTransaction {
   def filterUploadRefsInUse(uploadRefs: Iterable[UploadRef]): Set[UploadRef]
   def updateUploadQuotaUse(uploadRef: UploadRef, wasAdded: Boolean): Unit
 
+  def upsertLinkPreview(linkPreview: LinkPreview): Unit
+  def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String): Option[LinkPreview]
+  /** Deletes for all download urls (e.g. downloaded for different screen sizes) */
+  def deleteLinkPreviews(linkUrl: String): Boolean
+
+  def upsertLink(link: Link): Boolean
+  def deleteLinkFromPost(postId: PostId, url: String): Boolean
+  def deleteAllLinksFromPost(postId: PostId): Boolean
+  def loadLinksToPage(pageId: PageId): Seq[Link]
 
   def insertInvite(invite: Invite): Unit
   def updateInvite(invite: Invite): Boolean

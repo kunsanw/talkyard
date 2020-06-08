@@ -37,9 +37,11 @@ import talkyard.server.JsX._
 case class PostExcerpt(text: String, firstImageUrls: immutable.Seq[String])
 
 
-private case class RendererWithSettings(renderer: PostRenderer, settings: PostRendererSettings) {
+private case class RendererWithSettings(
+  renderer: PostRenderer, settings: PostRendererSettings, site: SiteIdHostnames) {
+
   def renderAndSanitize(post: Post, ifCached: IfCached): String = {
-    renderer.renderAndSanitize(post, settings, ifCached)
+    renderer.renderAndSanitize(post, settings, ifCached, site)
   }
 }
 
@@ -589,7 +591,7 @@ class JsonMaker(dao: SiteDao) {
     val postRenderSettings = dao.makePostRenderSettings(page.pageType)
 
     val renderer = RendererWithSettings(
-      dao.context.postRenderer, postRenderSettings)
+          dao.context.postRenderer, postRenderSettings, dao.theSite())
 
     postToJsonNoDbAccess(post, showHidden = showHidden, includeUnapproved = includeUnapproved,
       tags = tags, howRender, renderer)
@@ -599,7 +601,9 @@ class JsonMaker(dao: SiteDao) {
   def postToJsonOutsidePage(post: Post, pageRole: PageType, showHidden: Boolean, includeUnapproved: Boolean,
         tags: Set[TagLabel]): JsObject = {
     val postRenderSettings = dao.makePostRenderSettings(pageRole)
-    val renderer = RendererWithSettings(dao.context.postRenderer, postRenderSettings)
+    val renderer = RendererWithSettings(
+          dao.context.postRenderer, postRenderSettings, dao.theSite())
+
     postToJsonNoDbAccess(post, showHidden = showHidden, includeUnapproved = includeUnapproved,
       tags = tags, new HowRenderPostInPage(false, JsNull, false, Nil), renderer)
   }
@@ -925,7 +929,8 @@ class JsonMaker(dao: SiteDao) {
       val tags = tagsByPostId(post.id)
       val postRenderSettings = dao.makePostRenderSettings(pageMeta.pageType)
       val renderer = RendererWithSettings(
-        dao.context.postRenderer, postRenderSettings)
+            dao.context.postRenderer, postRenderSettings, dao.theSite())
+
       post.nr.toString ->
         postToJsonNoDbAccess(post, showHidden = true, includeUnapproved = true,
           tags = tags, new HowRenderPostInPage(false, JsNull, false,
@@ -1717,7 +1722,7 @@ object JsonMaker {
     def isInFirstParagraph = numParagraphBlocks == 0 && numOtherBlocks == 0
     def canStillBeSingleParagraph = numOtherBlocks == 0 && numParagraphBlocks <= 1
 
-    val nodeTraversor = new NodeTraversor(new NodeVisitor() {
+    val nodeVisitor = new NodeVisitor() {
       override def head(node: Node, depth: Int): Unit = {
         node match {
           case textNode: TextNode =>
@@ -1759,12 +1764,12 @@ object JsonMaker {
           case _ => ()
         }
       }
-    })
+    }
 
     val jsoupDoc = Jsoup.parse(htmlText)
-    try nodeTraversor.traverse(jsoupDoc.body)
+    try NodeTraversor.traverse(nodeVisitor, jsoupDoc.body)
     catch {
-      case _: ControlThrowable => ()
+      case _: ControlThrowable => () // thrown above
     }
 
     (ToTextResult(text = result.toString().trim, isSingleParagraph = canStillBeSingleParagraph),

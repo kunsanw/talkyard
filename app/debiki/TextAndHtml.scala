@@ -24,6 +24,8 @@ import play.api.libs.json.JsArray
 import scala.collection.{immutable, mutable}
 import scala.util.matching.Regex
 import TextAndHtmlMaker._
+import org.jsoup.Jsoup
+import org.jsoup.safety.Whitelist
 
 
 
@@ -38,7 +40,9 @@ sealed trait TextAndHtml {
 
   def usernameMentions: Set[String]
 
-  def links: immutable.Seq[String]
+  def externalLinks: immutable.Seq[String]
+
+  def internalLinks: Set[String]
 
   /** Domain names used in links. Check against a domain block list.
     */
@@ -53,7 +57,7 @@ sealed trait TextAndHtml {
 
   def htmlLinksOnePerLine: String = {
     TESTS_MISSING
-    links map { href =>
+    externalLinks map { href =>
       val hrefAttrEscaped = org.owasp.encoder.Encode.forHtmlAttribute(href)
       val hrefContentEscaped = org.owasp.encoder.Encode.forHtmlContent(href)
       s"""<a href="$hrefAttrEscaped">$hrefContentEscaped</a>"""
@@ -67,15 +71,70 @@ sealed trait TextAndHtml {
 
 object TextAndHtml {
 
+  /** The result can be incl in html anywhere: As html tags contents,
+    * or in a html attribute.
+    */
+  def safeEncodeForHtml(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtml(unsafe)
+  }
+
+  /** Can *only* be incl in html attributes — not as tags contents.
+    */
+  def safeEncodeForHtmlAttrOnly(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtmlAttribute(unsafe)
+  }
+
+  /** Can *only* be incl as html tags contents — *not* in an attribute.
+    */
+  def safeEncodeForHtmlContentOnly(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtmlContent(unsafe)
+  }
+
+  /** Removes bad tags and attributes from a html string.
+    * The result is html tags content — and can *not* be incl in an attribute.
+    */
+  def sanitizeTitleText(unsafe: String): String = {
+    // Tested here: TyT6RKKDJ563
+    Jsoup.clean(unsafe, titleHtmlTagsWhitelist)
+  }
+
+  /** More restrictive than Jsoup's basic() whitelist.
+    */
+  def titleHtmlTagsWhitelist: org.jsoup.safety.Whitelist = {
+    new Whitelist().addTags(
+          "b", "code", "em",
+          "i", "q", "small", "span", "strike", "strong", "sub",
+          "sup", "u")
+  }
+
+  /** Links will have rel=nofollow. Images, pre, div allowed.
+    */
+  def sanitizeAllowLinksAndBlocks(unsafeTags: String,
+        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    var whitelist = org.jsoup.safety.Whitelist.basic()
+    whitelist = amendWhitelistFn(whitelist)
+    Jsoup.clean(unsafeTags, whitelist)
+  }
+
+  def sanitizeRelaxed(unsafeTags: String,
+        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    var whitelist = org.jsoup.safety.Whitelist.relaxed()
+    whitelist = amendWhitelistFn(whitelist)
+    Jsoup.clean(unsafeTags, whitelist)
+  }
+
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
   // But it's slow, if importing a whole site. How deal with this?
   // Maybe just let admins-that-import-a-site set a flag that everything has been
   // sanitized already?_ COULD move server side js to external Nodejs or V8
   // processes? So as not to block a thread here, running Nashorn? [external-server-js]
   def relaxedHtmlTagWhitelist: org.jsoup.safety.Whitelist = {
-    // The caller need to insert  rel=nofollow  henself, see the docs:
-    // https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed--
-    org.jsoup.safety.Whitelist.relaxed().addAttributes("a", "rel")
+    // Tested here: TyT03386KTDGR
+
+    // rel=nofollow not included by default, in the relaxed() whitelist,
+    // see: https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed()
+    BUG // this removes  noopener
+    org.jsoup.safety.Whitelist.relaxed().addEnforcedAttribute("a", "rel", "nofollow")
   }
 }
 
@@ -125,13 +184,14 @@ object TextAndHtmlMaker {
 
 /** Thread safe.
   */
-class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
+class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
   private class TextAndHtmlImpl(
     val text: String,
     val safeHtml: String,
     val usernameMentions: Set[String],
-    val links: immutable.Seq[String],
+    val externalLinks: immutable.Seq[String],
+    val internalLinks: Set[String],
     val linkDomains: immutable.Set[String],
     val linkIpAddresses: immutable.Seq[String],
     val embeddedOriginOrEmpty: String,
@@ -140,7 +200,7 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
     val allowClassIdDataAttrs: Boolean) extends TextAndHtml {
 
     def append(text: String): TextAndHtml = {
-      append(new TextAndHtmlMaker(pubSiteId = pubSiteId, nashorn).apply(
+      append(new TextAndHtmlMaker(site = site, nashorn).apply(
         text, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
         isTitle = isTitle, followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs))
@@ -157,9 +217,10 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
         text + "\n" + more.text,
         safeHtml + "\n" + more.safeHtml,
         usernameMentions = usernameMentions ++ more.usernameMentions,
-        (links.toSet ++ more.links.toSet).to[immutable.Seq],
+        externalLinks = (externalLinks.toSet ++ more.externalLinks.toSet).to[immutable.Seq],
+        internalLinks = internalLinks ++ more.internalLinks,
         linkDomains ++ more.linkDomains,
-        (linkIpAddresses.toSet ++ more.linkIpAddresses.toSet).to[immutable.Seq],
+        linkIpAddresses = (linkIpAddresses.toSet ++ more.linkIpAddresses.toSet).to[immutable.Seq],
         embeddedOriginOrEmpty = embeddedOriginOrEmpty,
         isTitle = isTitle && more.isTitle,
         followLinks = followLinks,
@@ -174,7 +235,7 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
           // Don't let people @mention anyone when submitting forms?  (5LKATS0)
           // @mentions are only for members who post comments & topics to each other, right.
           usernameMentions = Set.empty,
-          links = Nil, linkDomains = Set.empty,
+          externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
           linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
           isTitle = false, followLinks = false, allowClassIdDataAttrs = false)
     }
@@ -184,8 +245,9 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
   def withCompletedFormData(formInputs: JsArray): TextAndHtml Or ErrorMessage = {
     CompletedFormRenderer.renderJsonToSafeHtml(formInputs) map { htmlString =>
       new TextAndHtmlImpl(text = formInputs.toString, safeHtml = htmlString,
-          usernameMentions = Set.empty, // (5LKATS0)
-          Nil, Set.empty, Nil, embeddedOriginOrEmpty = "", false, false, false)
+            usernameMentions = Set.empty, // (5LKATS0)
+            externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
+            linkIpAddresses = Nil, embeddedOriginOrEmpty = "", false, false, false)
     }
   }
 
@@ -220,36 +282,48 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
 
     TESTS_MISSING
     if (isTitle) {
-      val safeHtml = nashorn.sanitizeHtml(text, followLinks = false)
-      new TextAndHtmlImpl(text, safeHtml, links = Nil, usernameMentions = Set.empty,
-        linkDomains = Set.empty,
-        linkIpAddresses = Nil,
-        embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        isTitle = true, followLinks = followLinks,
-        allowClassIdDataAttrs = allowClassIdDataAttrs)
+      val safeHtml = TextAndHtml.sanitizeTitleText(text)
+      new TextAndHtmlImpl(text = text, safeHtml = safeHtml,
+            externalLinks = Nil, internalLinks = Set.empty,
+            usernameMentions = Set.empty,
+            linkDomains = Set.empty,
+            linkIpAddresses = Nil,
+            embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+            isTitle = true, followLinks = followLinks,
+            allowClassIdDataAttrs = allowClassIdDataAttrs)
     }
     else {
-      val renderResult = nashorn.renderAndSanitizeCommonMark(
-        text, pubSiteId = pubSiteId,
-        embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
+      // Rel links whiting same site: https://moz.com/blog/relative-vs-absolute-urls-whiteboard-friday
+      val renderResult = nashorn.renderAndSanitizeCommonMark_new(
+            text, site, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+            allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
       findLinksEtc(text, renderResult, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
+            followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
     }
   }
 
   private def findLinksEtc(text: String, renderResult: RenderCommonmarkResult,
         embeddedOriginOrEmpty: String,
         followLinks: Boolean, allowClassIdDataAttrs: Boolean): TextAndHtmlImpl = {
-      val links = findLinks(renderResult.safeHtml)
-      var linkDomains = Set[String]()
-      var linkAddresses = Vector[String]()
-      links foreach { link =>
+
+    val allLinks = findLinks(renderResult.safeHtml)
+
+    var externalLinks = Vector[String]()
+    var internalLinks = Set[String]()
+    var linkDomains = Set[String]()
+    var linkAddresses = Vector[String]()
+
+    allLinks foreach { link =>
         try {
           val uri = new java.net.URI(link)
           val domainOrAddress = uri.getHost
+
+          if (domainOrAddress ne null) {
+            externalLinks :+= link
+          }
+
           if (domainOrAddress eq null) {
-            // Relative link? Ignore.
+            internalLinks += link
           }
           else if (domainOrAddress.startsWith("[")) {
             if (domainOrAddress.endsWith("]")) {
@@ -277,13 +351,14 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
           case _: Exception =>
             // ignore, the href isn't a valid link, it seems
         }
-      }
-      new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
-        links = links, linkDomains = linkDomains,
-        linkIpAddresses = linkAddresses,
-        embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        isTitle = false, followLinks = followLinks,
-        allowClassIdDataAttrs = allowClassIdDataAttrs)
+    }
+    new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
+          externalLinks = externalLinks, internalLinks = internalLinks,
+          linkDomains = linkDomains,
+          linkIpAddresses = linkAddresses,
+          embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+          isTitle = false, followLinks = followLinks,
+          allowClassIdDataAttrs = allowClassIdDataAttrs)
   }
 
 
@@ -293,10 +368,11 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
     */
   def test(text: String, isTitle: Boolean): TextAndHtml = {
     dieIf(Globals.isProd, "EsE7GPM2")
-    new TextAndHtmlImpl(text, text, links = Nil, usernameMentions = Set.empty,
-      linkDomains = Set.empty, linkIpAddresses = Nil,
-      embeddedOriginOrEmpty = "", isTitle = isTitle, followLinks = false,
-      allowClassIdDataAttrs = false)
+    new TextAndHtmlImpl(text, text, externalLinks = Nil, internalLinks = Set.empty,
+          usernameMentions = Set.empty,
+          linkDomains = Set.empty, linkIpAddresses = Nil,
+          embeddedOriginOrEmpty = "", isTitle = isTitle, followLinks = false,
+          allowClassIdDataAttrs = false)
   }
 
   def testTitle(text: String): TextAndHtml = test(text, isTitle = true)
@@ -304,10 +380,10 @@ class TextAndHtmlMaker(pubSiteId: PubSiteId, nashorn: Nashorn) {
 
   def wrapInParagraphNoMentionsOrLinks(text: String, isTitle: Boolean): TextAndHtml = {
     new TextAndHtmlImpl(text, s"<p>$text</p>", usernameMentions = Set.empty,
-      links = Nil, linkDomains = Set.empty,
-      linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
-      isTitle = isTitle, followLinks = false,
-      allowClassIdDataAttrs = false)
+          externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
+          linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
+          isTitle = isTitle, followLinks = false,
+          allowClassIdDataAttrs = false)
   }
 
 }
