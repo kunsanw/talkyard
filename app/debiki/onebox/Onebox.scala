@@ -159,7 +159,7 @@ class Onebox(val globals: Globals, val nashorn: Nashorn) {
     new VideoOnebox(globals, nashorn),
     new GiphyOnebox(globals, nashorn),
     new YouTubeOnebox(globals, nashorn),
-    new OEmbedOneboxEngine(globals, nashorn))
+    new TwitterOneboxEngine(globals, nashorn))
 
   def loadRenderSanitize(url: String, javascriptEngine: Option[js.Invocable])
         : Future[String] = {

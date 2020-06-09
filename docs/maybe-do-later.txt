@@ -6,6 +6,12 @@ Instead of this file, maybe use a combination of:
  (- https://git-scm.com/docs/git-notes? )
  (- https://github.com/google/git-appraise )
 
+[ty_themes]
+Primary button colors, secondary, background, arrows,
+and embedded widgets, e.g. Twitter's oEmbed has a 'link_color: #223344' attr,
+                            and  theme=light/dark.
+
+
 [immutable]
 Make all js objs "light weight immutable", via Typescript's 'readonly' properties:
 https://www.typescriptlang.org/docs/handbook/interfaces.html#readonly-properties
