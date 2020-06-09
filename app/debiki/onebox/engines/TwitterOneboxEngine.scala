@@ -261,6 +261,8 @@ class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
     */
   override val alreadySanitized = true
 
+  override val alreadyWrappedInAside = true
+
 
   def loadAndRender(url: String): Future[String] = {
     val providerEndpoint: String =
@@ -305,6 +307,7 @@ class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
       }
       else {
         val html = anyHtml.getOrDie("TyE6986SK")
+        val providerNameOrUrl = (r.json \ "provider_name").asOpt[String] getOrElse url
           /* Example response json, this from Twitter:
             {
               "url": "https://twitter.com/Interior/status/507185938620219395",
@@ -320,53 +323,109 @@ class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
               "version": "1.0"
             } */
 
-          // Nice:
-          // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
+        // Nice:
+        // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
 
-          // Hmm:
-          // https://stackoverflow.com/questions/31184505/sandboxing-iframe-and-allow-same-origin
+        // Hmm:
+        // https://stackoverflow.com/questions/31184505/sandboxing-iframe-and-allow-same-origin
 
-          // org.owasp.encoder.Encode.forHtmlContent(html); — currently using Scala's
-          // html/xml support instead, see below (it html-escapes).
-          // See: https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc
-          // Some oEmbed:s want to run scripts (e.g. FB, Twitter); let them do that,
-          // but in a sandboxed iframe. But do *not* allow-same-origin  — that'd
-          // let those scripts break out from the sandbox and steal session id cookies etc.
+        // org.owasp.encoder.Encode.forHtmlContent(html); — currently using Scala's
+        // html/xml support instead, see below (it html-escapes).
+        // See: https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-srcdoc
+        // Some oEmbed:s want to run scripts (e.g. FB, Twitter); let them do that,
+        // but in a sandboxed iframe. But do *not* allow-same-origin  — that'd
+        // let those scripts break out from the sandbox and steal session id cookies etc.
 
-          // EDIT: Hmm srcdoc, what domain do they "have"?
-          // Both allow-scripts and allow-same-origin should be fine? The iframes
-          // don't show contents from the same Talkyard site, and in any case
-          // Talkyard doesn't use any unsafe scripts that attacks the same site itself?
-          // The Whatwg docs:
-          // > Setting both the allow-scripts and allow-same-origin keywords together
-          // > when the embedded page has the same origin as the page containing
-          // > the iframe allows the embedded page to simply remove the sandbox
-          // > attribute and then reload itself, effectively breaking out of the
-          // > sandbox altogether.
-          // https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element
+        // EDIT: Hmm srcdoc, what domain do they "have"?
+        // Both allow-scripts and allow-same-origin should be fine? The iframes
+        // don't show contents from the same Talkyard site, and in any case
+        // Talkyard doesn't use any unsafe scripts that attacks the same site itself?
+        // The Whatwg docs:
+        // > Setting both the allow-scripts and allow-same-origin keywords together
+        // > when the embedded page has the same origin as the page containing
+        // > the iframe allows the embedded page to simply remove the sandbox
+        // > attribute and then reload itself, effectively breaking out of the
+        // > sandbox altogether.
+        // https://html.spec.whatwg.org/multipage/iframe-embed-object.html#the-iframe-element
 
-          // Don't allow window.top redirects, except for maybe from trusted
-          // providers. Otherwise, someone could show some type of fake login and
-          // then redirect to a pishing site.
+        // Don't allow window.top redirects, except for maybe from trusted
+        // providers. Otherwise, someone could show some type of fake login and
+        // then redirect to a pishing site.
 
-          // Hack ex:
-          //   https://medium.com/@jonathanbouman/stored-xss-unvalidated-embed-at-medium-com-528b0d6d4982
-          // Medium bounty prog:
-          //   https://policy.medium.com/mediums-bug-bounty-disclosure-program-34b1c80764c2
+        // Hack ex:
+        //   https://medium.com/@jonathanbouman/stored-xss-unvalidated-embed-at-medium-com-528b0d6d4982
+        // Medium bounty prog:
+        //   https://policy.medium.com/mediums-bug-bounty-disclosure-program-34b1c80764c2
 
-          // https://github.com/beefproject/beef
+        // https://github.com/beefproject/beef
 
-          COULD // incl Ty Javascript that messages the parent with the height
-          // & width of the contents?
-          <iframe sandbox="xxallow-scripts xxallow-same-origin" seamless=""
-                   srcdoc={html}></iframe>.toString
-          // + width: calc(100% - 30px);  max-width: 700px;
-          // border: none;  ?
-          // background: hsl(0, 0%, 91%);
+        COULD // incl Ty Javascript that messages the parent with the height
+        // & width of the contents?
+
+        // Iframe sandbox permissions.
+        val permissions = (
+              // Most? oEmbeds execute Javascript to render themselves — ok, in a sandbox.
+              "allow-scripts " +
+
+              // This makes:  <a href=... target=_blank>  work — opens a new
+              // browser tab. But since we don't  allow-same-origin,  cookies won't work
+              // in that new tab.
+              "allow-popups " +
+
+              // So we need this too — makes cookies work in the above-mentioned new tab.
+              "allow-popups-to-escape-sandbox " +
+
+              // This makes links work, but only if the user actually clicks the links.
+              // Javascript in the iframe cannot change the top win location when
+              // the user is inactive (that would have made pishing attacks possible,
+              // if the iframe could silently replace the whole page with another
+              // page on another domain but that looks the same).
+              "allow-top-navigation-by-user-activation")
+
+        <aside class="s_Ob s_Ob-Twitter s_Ob-oEmb"
+          ><iframe seamless=""
+                   sandbox={permissions}
+                   srcdoc={html + OneboxIframe.iframeHeightScript}
+          ></iframe
+          ><div class="s_Ob_Lnk"
+          ><a href={url} target="_blank">{ "View at " + providerNameOrUrl /* I18N */
+          } <span class="icon-link-ext"></span></a
+          ></div>
+        ></aside>.toString
+
+        // + width: calc(100% - 30px);  max-width: 700px;
+        // border: none;  ?
+        // background: hsl(0, 0%, 91%);
       }
 
       safeHtmlResult
 
     })(globals.executionContext)
   }
+}
+
+
+object OneboxIframe {
+
+  /** The embedding parent window doesn't know how tall this iframe with oEmbed
+    * stuff inside wants to be — so let's tell it.
+    */
+  val iframeHeightScript: String = """
+    |
+    |<!-- Talkyard script [OEMBHGHT] -->
+    |<script>
+    |var numHeightMessagesSent = 0;
+    |function sendHeightMessage() {
+    |  const height = document.body.clientHeight;
+    |  console.debug(`Telling parent the height of this oEmbed iframe: ${height} [TyMOEMBHGHT]`);
+    |  window.parent.postMessage(['oEmbHeight', height], '*');
+    |  if (numHeightMessagesSent < 3) {
+    |    numHeightMessagesSent += 1;
+    |    setTimeout(sendHeightMessage, numHeightMessagesSent * 1000 + 500);
+    |  }
+    |}
+    |setTimeout(sendHeightMessage, 500);
+    |</script>
+    |""".stripMargin
+
 }

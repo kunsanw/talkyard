@@ -70,6 +70,8 @@ abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
     */
   protected def alreadySanitized = false
 
+  protected def alreadyWrappedInAside = false
+
   // (?:...) is a non-capturing group.  (for local dev search: /-/u/ below.)
   val uploadsLinkRegex: Regex =
     """=['"](?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)['"]""".r
@@ -98,7 +100,10 @@ abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
         safeHtml = safeHtml.replaceAllLiterally("http:", "https:")
       }
       safeHtml = pointUrlsToCdn(safeHtml)
-      s"""<aside class="onebox $cssClassName clearfix">$safeHtml</aside>"""
+      if (!alreadyWrappedInAside) {
+        safeHtml = s"""<aside class="onebox $cssClassName clearfix">$safeHtml</aside>"""
+      }
+      safeHtml
     }
     // futureHtml.map apparently isn't executed directly, even if the future has been
     // completed already.
