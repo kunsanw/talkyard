@@ -680,7 +680,7 @@ object NotificationGenerator {
       // BUG? COULD incl origin here, so links won't be interpreted relative any
       // web browser client's address? — Right now, no images incl in reply notf emails
       // anyway, so need not fix now.
-      text, pubSiteId = "dummy", embeddedOriginOrEmpty = "",
+      text, siteId = NoSiteId, pubSiteId = "dummy", embeddedOriginOrEmpty = "",
       allowClassIdDataAttrs = false, followLinks = false)
 
     result.mentions

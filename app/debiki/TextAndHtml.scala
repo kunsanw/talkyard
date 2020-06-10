@@ -24,6 +24,8 @@ import play.api.libs.json.JsArray
 import scala.collection.{immutable, mutable}
 import scala.util.matching.Regex
 import TextAndHtmlMaker._
+import org.jsoup.Jsoup
+import org.jsoup.safety.Whitelist
 
 
 
@@ -67,15 +69,31 @@ sealed trait TextAndHtml {
 
 object TextAndHtml {
 
+  def sanitizeTitleText(text: String): String = {
+    // Tested here: TyT6RKKDJ563
+    Jsoup.clean(text, titleHtmlTagsWhitelist)
+  }
+
+  /** More restrictive than Jsoup's basic() whitelist.
+    */
+  def titleHtmlTagsWhitelist: org.jsoup.safety.Whitelist = {
+    new Whitelist().addTags(
+          "b", "code", "em",
+          "i", "q", "small", "span", "strike", "strong", "sub",
+          "sup", "u")
+  }
+
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
   // But it's slow, if importing a whole site. How deal with this?
   // Maybe just let admins-that-import-a-site set a flag that everything has been
   // sanitized already?_ COULD move server side js to external Nodejs or V8
   // processes? So as not to block a thread here, running Nashorn? [external-server-js]
   def relaxedHtmlTagWhitelist: org.jsoup.safety.Whitelist = {
-    // The caller need to insert  rel=nofollow  henself, see the docs:
-    // https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed--
-    org.jsoup.safety.Whitelist.relaxed().addAttributes("a", "rel")
+    // Tested here: TyT03386KTDGR
+
+    // rel=nofollow not included by default, in the relaxed() whitelist,
+    // see: https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed()
+    org.jsoup.safety.Whitelist.relaxed().addEnforcedAttribute("a", "rel", "nofollow")
   }
 }
 
@@ -125,7 +143,7 @@ object TextAndHtmlMaker {
 
 /** Thread safe.
   */
-class TextAndHtmlMaker(pubSiteId: PublSiteId, nashorn: Nashorn) {
+class TextAndHtmlMaker(val siteId: SiteId, val pubSiteId: PublSiteId, nashorn: Nashorn) {
 
   private class TextAndHtmlImpl(
     val text: String,
@@ -140,7 +158,7 @@ class TextAndHtmlMaker(pubSiteId: PublSiteId, nashorn: Nashorn) {
     val allowClassIdDataAttrs: Boolean) extends TextAndHtml {
 
     def append(text: String): TextAndHtml = {
-      append(new TextAndHtmlMaker(pubSiteId = pubSiteId, nashorn).apply(
+      append(new TextAndHtmlMaker(siteId = siteId, pubSiteId = pubSiteId, nashorn).apply(
         text, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
         isTitle = isTitle, followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs))
@@ -220,21 +238,21 @@ class TextAndHtmlMaker(pubSiteId: PublSiteId, nashorn: Nashorn) {
 
     TESTS_MISSING
     if (isTitle) {
-      val safeHtml = nashorn.sanitizeHtml(text, followLinks = false)
+      val safeHtml = TextAndHtml.sanitizeTitleText(text)
       new TextAndHtmlImpl(text, safeHtml, links = Nil, usernameMentions = Set.empty,
-        linkDomains = Set.empty,
-        linkIpAddresses = Nil,
-        embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        isTitle = true, followLinks = followLinks,
-        allowClassIdDataAttrs = allowClassIdDataAttrs)
+            linkDomains = Set.empty,
+            linkIpAddresses = Nil,
+            embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+            isTitle = true, followLinks = followLinks,
+            allowClassIdDataAttrs = allowClassIdDataAttrs)
     }
     else {
       val renderResult = nashorn.renderAndSanitizeCommonMark(
-        text, pubSiteId = pubSiteId,
-        embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
+            text, siteId = siteId, pubSiteId = pubSiteId,
+            embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+            allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
       findLinksEtc(text, renderResult, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
+            followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
     }
   }
 

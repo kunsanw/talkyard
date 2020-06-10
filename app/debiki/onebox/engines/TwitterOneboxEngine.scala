@@ -242,8 +242,10 @@ object TwitterOneboxEngine {
   * Later: oEmbed works for FB, Insta, Mediumm, Reddit, "everything" — just change
   * the regex, + map urls to the correct oEmbed provider endpoints.
   */
-class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
-  extends OneboxEngine(globals, nashorn) {
+class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
+        mayHttpFetchData: Boolean)
+  extends ExternalRequestLinkPreviewEngine(
+        globals, siteId = siteId, mayHttpFetchData = mayHttpFetchData) {
 
   def regex: Regex = TwitterOneboxEngine.regex
 
@@ -281,9 +283,11 @@ class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
     // Wants:  theme: light / dark.  Primary color / link color.
     // And device:  mobile / tablet / laptop ?  for maxwidth.
     val requestUrl = providerEndpoint +
-          "?maxwidth=500" +
+          "?maxwidth=600" +  // Twitter tweets are 598 px over at Twitter.com
           "&align=center" +
           s"&url=$url"
+
+    // Cache!
 
     val request: WSRequest = globals.wsClient.url(requestUrl)
 
@@ -369,28 +373,28 @@ class TwitterOneboxEngine(globals: Globals, nashorn: Nashorn)
 
               // This makes:  <a href=... target=_blank>  work — opens a new
               // browser tab. But since we don't  allow-same-origin,  cookies won't work
-              // in that new tab.
+              // in that new tab — it "inherits" the sandbox, ...
               "allow-popups " +
 
-              // So we need this too — makes cookies work in the above-mentioned new tab.
+              // So need this too — makes cookies work in the above-mentioned new tab.
               "allow-popups-to-escape-sandbox " +
 
               // This makes links work, but only if the user actually clicks the links.
               // Javascript in the iframe cannot change the top win location when
-              // the user is inactive (that would have made pishing attacks possible,
-              // if the iframe could silently replace the whole page with another
-              // page on another domain but that looks the same).
+              // the user is inactive — that would have made pishing attacks possible,
+              // if the iframe could silently replace the whole page with [a similar
+              // looking page on the attacker's domain].
               "allow-top-navigation-by-user-activation")
 
         <aside class="s_Ob s_Ob-Twitter s_Ob-oEmb"
           ><iframe seamless=""
                    sandbox={permissions}
-                   srcdoc={html + OneboxIframe.iframeHeightScript}
+                   srcdoc={html + OneboxIframe.adjustOEmbedIframeHeightScript}
           ></iframe
           ><div class="s_Ob_Lnk"
           ><a href={url} target="_blank">{ "View at " + providerNameOrUrl /* I18N */
           } <span class="icon-link-ext"></span></a
-          ></div>
+          ></div
         ></aside>.toString
 
         // + width: calc(100% - 30px);  max-width: 700px;
@@ -409,22 +413,50 @@ object OneboxIframe {
 
   /** The embedding parent window doesn't know how tall this iframe with oEmbed
     * stuff inside wants to be — so let's tell it.
+    *
+    * We set body.margin = 0, otherwise e.g. Chrome has 8px default margin.
+    *
+    * We set the top-bottom-margin of elems directly in < body > to '0 auto'
+    * to avoid scrollbars. E.g. Twitter otherwise include 10px top & bottom margin.
+    * ('auto' to place in the middle.)
+    *
+    * Need to postMessage(...) to '*', because the domain of this srcdoc=...
+    * iframe is "null", i.e. different from the parent frame domain.
+    *
+    * We don't really know when the oEmbed contents is done loading.
+    * So, we send a few messages — and if, after that, if the oEmbed still
+    * doesn't have its final size, then, that's a weird oEmbed and someone
+    * else's problem, we shouldn't try to fix that.
     */
-  val iframeHeightScript: String = """
-    |
-    |<!-- Talkyard script [OEMBHGHT] -->
-    |<script>
-    |var numHeightMessagesSent = 0;
-    |function sendHeightMessage() {
-    |  const height = document.body.clientHeight;
-    |  console.debug(`Telling parent the height of this oEmbed iframe: ${height} [TyMOEMBHGHT]`);
-    |  window.parent.postMessage(['oEmbHeight', height], '*');
-    |  if (numHeightMessagesSent < 3) {
-    |    numHeightMessagesSent += 1;
-    |    setTimeout(sendHeightMessage, numHeightMessagesSent * 1000 + 500);
+  // TESTS_MISSING  // create a LinkPrevwRendrEng that creates a 432 px tall div,
+  // with 20 px body margin, 20 px child div padding & margin,
+  // should become 432 px tall? (margin & padding removed)
+  val adjustOEmbedIframeHeightScript: String = """
+    |<script>(function(d) { // Talkyard [OEMBHGHT]
+    |d.body.style.margin = '0';
+    |var nSent = 0;
+    |function sendH() {
+    |  var h = d.body.clientHeight;
+    |  console.debug("Sending oEmbed height: " + h + " [TyMOEMBHGHT]");
+    |  try {
+    |    var cs = d.querySelectorAll('body > *');
+    |    for (var i = 0; i < cs.length; ++i) {
+    |      var c = cs[i];
+    |      c.style.margin = '0 auto';
+    |      c.style.padding = '0';
+    |    }
+    |  }
+    |  catch (ex) {
+    |    console.warn("Error removing margin [TyEOEMBMARG]");
+    |  }
+    |  window.parent.postMessage(['oEmbHeight', h], '*');
+    |  nSent += 1;
+    |  if (nSent < 4) {
+    |    setTimeout(sendH, nSent * 500);
     |  }
     |}
-    |setTimeout(sendHeightMessage, 500);
+    |setTimeout(sendH, 500);
+    |})(document);
     |</script>
     |""".stripMargin
 

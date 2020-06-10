@@ -21,6 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
+import debiki.TextAndHtml
 import talkyard.server.CommonMarkSourceAndHtml
 
 
@@ -62,7 +63,7 @@ trait ForumDao {
 
 
   def createForum(options: CreateForumOptions, byWho: Who): Option[CreateForumResult] = {
-    val titleHtmlSanitized = context.nashorn.sanitizeHtml(options.title, followLinks = false)
+    val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
     val isForEmbCmts = options.isForEmbeddedComments
 
     val result = readWriteTransaction { tx =>

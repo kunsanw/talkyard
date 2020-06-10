@@ -162,6 +162,7 @@ package object core {
     pageId.length == 10 && pageId.startsWith("2000") // good enough for now
 
   type Tag = String
+  type TagDefId = Int
   type TagLabelId = Int
   type TagLabel = String
   val NoTagId: TagLabelId = 0

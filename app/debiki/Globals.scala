@@ -1132,7 +1132,8 @@ class Globals(
       config,
       isDevTest = isOrWasTest, originOfSiteId, settingsBySiteId,
       executionContext, appLoaderContext.initialConfiguration, wsClient,
-      new TextAndHtmlMaker("dummysiteid", edContext.nashorn))
+      new TextAndHtmlMaker(
+            siteId = NoSiteId, pubSiteId =  "dummysiteid", edContext.nashorn))
 
     spamChecker.start()
 

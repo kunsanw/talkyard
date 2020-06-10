@@ -28,8 +28,9 @@ import javax.inject.Inject
 import play.api.mvc.{Action, ControllerComponents}
 import play.api.libs.json._
 import EditController._
+import debiki.onebox.LinkPreviewRenderer
 import scala.concurrent.ExecutionContext
-import talkyard.server.JsX.{JsStringOrNull, JsDraft, JsDraftOrNull}
+import talkyard.server.JsX.{JsDraft, JsDraftOrNull, JsStringOrNull}
 
 
 /** Edits pages and posts.
@@ -229,8 +230,15 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
     * and gets back from Twitter json that shows how to embed the tweet (incl
     * html in the json), then creates and returns sanitized onebox html.
     */
-  def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(RateLimits.LoadOnebox) { request =>
-    context.oneboxes.loadRenderSanitize(url, javascriptEngine = None).transform(
+  def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(RateLimits.LoadOnebox) {
+        request =>
+    import edContext.globals
+    import request.siteId
+
+    val renderer = new LinkPreviewRenderer(
+          globals, siteId = siteId, mayHttpFetchData = true)
+
+    renderer.loadRenderSanitize(url).transform(
       html => Ok(html),
       throwable => throwable match {
         case ex: DebikiException =>

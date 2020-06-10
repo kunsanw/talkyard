@@ -27,22 +27,27 @@ import com.debiki.core.Prelude._
 import debiki.{Globals, Nashorn}
 import debiki.onebox._
 import scala.util.Success
+import scala.util.matching.Regex
 
 
 
-class VideoOnebox(globals: Globals, nashorn: Nashorn)
-  extends InstantOneboxEngine(globals, nashorn) {
+class VideoPrevwRendrEng(globals: Globals)
+  extends InstantLinkPreviewEngine(globals) {
 
-  val regex = """^(https?:)?\/\/.*\.(mov|mp4|m4v|webm|ogv)(\?.*)?$""".r
+  val regex: Regex = """^(https?:)?\/\/.*\.(mov|mp4|m4v|webm|ogv)(\?.*)?$""".r
 
   val cssClassName = "dw-ob-video"
 
-  // (rel=nofollow not needed – will be sanitized. Incl anyway.)
-  def renderInstantly(url: String) = Success(o"""
-     <video width='100%' height='100%' controls src='$url'>
-       <a href='$url' rel='nofollow'>$url</a>
+  override def alreadySanitized = true
+
+  def renderInstantly(unsafeUrl: String): Success[String] = {
+    val safeUrl = sanitizeUrl(unsafeUrl)
+    Success(o"""
+     <video width='100%' height='100%' controls src='$safeUrl'>
+       <a href='$safeUrl' target='_blank' rel='nofollow'>$safeUrl</a>
      </video>
     """)
+  }
 
 }
 

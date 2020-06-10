@@ -15,49 +15,46 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.onebox
+package debiki.onebox   // RENAME to talkyard.server.links
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn}
+import debiki.{Globals, TextAndHtml}
 import debiki.onebox.engines._
-import javax.{script => js}
-
+import org.jsoup.Jsoup
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
-import talkyard.server.TyLogger
+import talkyard.server.TyLogging
 
 
 
-sealed abstract class RenderOnboxResult
+sealed abstract class RenderPreviewResult
 
 
-object RenderOnboxResult {
+object RenderPreviewResult {
 
   /** The URL is not to a trusted site, or the HTTP request failed, or whatever went wrong.
     */
-  case object NoOnebox extends RenderOnboxResult
+  case object NoPreview extends RenderPreviewResult
 
-  /** If the onebox HTML was cached already, or if no HTTP request is needed to construct
-    * the onebox.
+  /** If a preview was cached already (in link_previews_t),
+    * or no external HTTP request needed.
     */
-  case class Done(safeHtml: String, placeholder: String) extends RenderOnboxResult
+  case class Done(safeHtml: String, placeholder: String) extends RenderPreviewResult
 
-  /** If we had to start a HTTP request to fetch the linked page and extract title and excerpt.
+  /** If we sent a HTTP request to download a preview, e.g. an oEmbed request.
     */
   case class Loading(futureSafeHtml: Future[String], placeholder: String)
-    extends RenderOnboxResult
+    extends RenderPreviewResult
 }
 
 
 /**
-  * @param globals
-  * @param nashorn Needed for sanitizing the resulting onebox (unless alreadySanitized = true).
   */
-abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
+abstract class LinkPreviewRenderEngine(globals: Globals) {
 
   def regex: Regex
 
@@ -83,14 +80,14 @@ abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
     uploadsLinkRegex.replaceAllIn(safeHtml, s"""="$prefix$$1"""")
   }
 
-  final def loadRenderSanitize(url: String, javascriptEngine: Option[js.Invocable])
-        : Future[String] = {
+  final def loadRenderSanitize(url: String): Future[String] = {
+
     def sanitizeAndWrap(html: String): String = {
       var safeHtml =
         if (alreadySanitized) html
         else {
           // COULD pass info to here so can follow links sometimes? [WHENFOLLOW]
-          nashorn.sanitizeHtmlReuseEngine(html, followLinks = false, javascriptEngine)
+          Jsoup.clean(html, TextAndHtml.relaxedHtmlTagWhitelist)
         }
       // Don't link to any HTTP resources from safe HTTPS pages, e.g. don't link  [1BXHTTPS]
       // to <img src="http://...">, change to https instead even if the image then breaks.
@@ -105,9 +102,11 @@ abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
       }
       safeHtml
     }
+
     // futureHtml.map apparently isn't executed directly, even if the future has been
     // completed already.
     val futureHtml = loadAndRender(url)
+
     if (futureHtml.isCompleted) {
       Future.fromTry(futureHtml.value.get.map(sanitizeAndWrap))
     }
@@ -118,104 +117,120 @@ abstract class OneboxEngine(globals: Globals, val nashorn: Nashorn) {
 
   protected def loadAndRender(url: String): Future[String]
 
-  def sanitizeUrl(url: String) = org.owasp.encoder.Encode.forHtml(url)
+  def sanitizeUrl(url: String): String = org.owasp.encoder.Encode.forHtml(url)
 
 }
 
 
-abstract class InstantOneboxEngine(globals: Globals, nashorn: Nashorn)
-  extends OneboxEngine(globals, nashorn) {
-
-  protected def loadAndRender(url: String): Future[String] =
-    Future.fromTry(renderInstantly(url))
-
-  protected def renderInstantly(url: String): Try[String]
+abstract class ExternalRequestLinkPreviewEngine(globals: Globals, siteId: SiteId,
+        mayHttpFetchData: Boolean)
+  extends LinkPreviewRenderEngine(globals) {
 }
 
 
-/** What is onebox? If you post a comment that contains a link in a paragraph of its own,
-  * and the link is to a trusted site, onebox will create a short snippet of the linked page,
-  * for example, a title and short excerpt of a Wikipedia article, or a video player
-  * if you link to YouTube.
+abstract class InstantLinkPreviewEngine(globals: Globals)
+  extends LinkPreviewRenderEngine(globals) {
+
+  protected def loadAndRender(unsafeUrl: String): Future[String] = {
+    Future.fromTry(renderInstantly(unsafeUrl))
+  }
+
+  protected def renderInstantly(unsafeUrl: String): Try[String]
+}
+
+
+/** What is a link preview? If you type a link to a Twitter tweet or Wikipedia page,
+  * Talkyard might download some html from that page, e.g. title, image, description.
+  * Or oEmbed html.
   *
   * This usually requires the server to download the linked page from the target website,
   * and extract the relevant parts. When rendering client side, the client sends a request
-  * to the server and asks it to create a onebox. We create oneboxes server side, so that we'll
-  * be able to re-render comments server side, should this be needed for whatever reason.
+  * to the Talkyard server and asks it to create a preview. This needs to be done
+  * server side, e.g. for security reasons (cannot trust the client to provide
+  * the correct html preview).
   *
-  * Inspired by Discourse's onebox, see: https://meta.discourse.org/t/what-is-a-onebox/4546
-  *
-  * The name comes from Google's search result box in which they sometimes show a single
-  * answer directly.
+  * If !mayHttpFetchData, only creates previews if link preview data
+  * has been downloaded and saved already in link_previews_t.
   */
-class Onebox(val globals: Globals, val nashorn: Nashorn) {
+class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
+    mayHttpFetchData: Boolean) extends TyLogging {
 
-  private val logger = TyLogger("Onebox")
   private val pendingRequestsByUrl = mutable.HashMap[String, Future[String]]()
   private val oneboxHtmlByUrl = mutable.HashMap[String, String]()
   private val failedUrls = mutable.HashSet[String]()
   private val PlaceholderPrefix = "onebox-"
-  private val NoEngineException = new DebikiException("DwE3KEF7", "No matching onebox engine")
+  private val NoEngineException = new DebikiException("DwE3KEF7", "No matching preview engine")
 
   private val executionContext: ExecutionContext = globals.executionContext
 
-  private val engines = Seq[OneboxEngine](
-    new ImageOnebox(globals, nashorn),
-    new VideoOnebox(globals, nashorn),
-    new GiphyOnebox(globals, nashorn),
-    new YouTubeOnebox(globals, nashorn),
-    new TwitterOneboxEngine(globals, nashorn))
+  private val engines = Seq[LinkPreviewRenderEngine](
+    // COULD_OPTIMIZE These are, or can be made trhead safe — no need to recreate all the time.
+    new ImagePrevwRendrEng(globals),
+    new VideoPrevwRendrEng(globals),
+    new GiphyPrevwRendrEng(globals),
+    new YouTubePrevwRendrEng(globals),
+    new TwitterPrevwRendrEng(globals, siteId, mayHttpFetchData))
 
-  def loadRenderSanitize(url: String, javascriptEngine: Option[js.Invocable])
-        : Future[String] = {
-    for (engine <- engines) {
-      if (engine.handles(url))
-        return engine.loadRenderSanitize(url, javascriptEngine)
+  def loadRenderSanitize(url: String): Future[String] = {
+    def loadPreiewFromDatabase(): Option[LinkPreview] = {
+      val siteDao = globals.siteDao(siteId)
+      // Don't create a write tx — could cause deadlocks, because unfortunately
+      // we might be insside a tx already: [nashorn_in_tx] (will fix later)
+      siteDao.readOnlyTransaction { tx =>
+        tx.loadLinkPreview(url)
+      }
     }
+
+    for (engine <- engines) {
+      if (engine.handles(url)) {
+        return engine.loadRenderSanitize(url)
+      }
+    }
+
     Future.failed(NoEngineException)
   }
 
 
-  def loadRenderSanitizeInstantly(url: String, javascriptEngine: Option[js.Invocable])
-        : RenderOnboxResult = {
+  def loadRenderSanitizeInstantly(url: String): RenderPreviewResult = {
     def placeholder = PlaceholderPrefix + nextRandomString()
 
-    val futureSafeHtml = loadRenderSanitize(url, javascriptEngine)
+    val futureSafeHtml = loadRenderSanitize(url)
     if (futureSafeHtml.isCompleted)
       return futureSafeHtml.value.get match {
-        case Success(safeHtml) => RenderOnboxResult.Done(safeHtml, placeholder)
-        case Failure(throwable) => RenderOnboxResult.NoOnebox
+        case Success(safeHtml) => RenderPreviewResult.Done(safeHtml, placeholder)
+        case Failure(throwable) => RenderPreviewResult.NoPreview
       }
 
-    // Later: Have waitForDownloadsToFinish() return when all futures completed,
-    // and remember the resulting html so placeholders can be replaced. And cache it.
     futureSafeHtml.onComplete({
       case Success(safeHtml) =>
       case Failure(throwable) =>
     })(executionContext)
 
-    RenderOnboxResult.Loading(futureSafeHtml, placeholder)
+    RenderPreviewResult.Loading(futureSafeHtml, placeholder)
   }
 
 }
 
 
 
-/** Used when rendering oneboxes from inside Javascript code run by Nashorn.
+/** Used when rendering link previwes from inside Javascript code run by Nashorn.
   */
-class InstantOneboxRendererForNashorn(val oneboxes: Onebox) {
+// CHANGE to  LinkPreviewCache(siteTx: ReadOnlySiteTransaction) ?
+// But sometimes Nashorn is used inside a tx — would mean we'd open a *read-only*
+// tx inside a posibly write tx. Should be fine, right.
+// Or construct the LinkPreviewCache outside Nashorn, with any tx already in use,
+// and give to Nashorn?
+class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer)
+  extends TyLogging {
 
-  private val pendingDownloads: ArrayBuffer[RenderOnboxResult.Loading] = ArrayBuffer()
-  private val doneOneboxes: ArrayBuffer[RenderOnboxResult.Done] = ArrayBuffer()
-  private def globals = oneboxes.globals
+  private val donePreviews: ArrayBuffer[RenderPreviewResult.Done] = ArrayBuffer()
+  private def globals = linkPreviewRenderer.globals
 
-  // Should be set to the Nashorn engine that calls this class, so that we can call
-  // back out to the same engine, when sanitizing html, so we won't have to ask for
-  // another engine, that'd create unnecessarily many engines.
-  var javascriptEngine: Option[js.Invocable] = None
-
+  /** Called from javascript running server side in Nashorn.  [js_scala_interop]
+    */
   def renderAndSanitizeOnebox(unsafeUrl: String): String = {
     lazy val safeUrl = org.owasp.encoder.Encode.forHtml(unsafeUrl)
+
     if (!globals.isInitialized) {
       // Also see the comment for Nashorn.startCreatingRenderEngines()
       return o"""<p style="color: red; outline: 2px solid orange; padding: 1px 5px;">
@@ -227,29 +242,29 @@ class InstantOneboxRendererForNashorn(val oneboxes: Onebox) {
            soft-restarts the server in development mode. [DwE4KEPF72]</p>"""
     }
 
-    oneboxes.loadRenderSanitizeInstantly(unsafeUrl, javascriptEngine) match {
-      case RenderOnboxResult.NoOnebox =>
-        s"""<a href="$safeUrl">$safeUrl</a>"""
-      case doneOnebox: RenderOnboxResult.Done =>
-        doneOneboxes.append(doneOnebox)
+    linkPreviewRenderer.loadRenderSanitizeInstantly(unsafeUrl) match {
+      case RenderPreviewResult.NoPreview =>
+        UX; COULD // target=_blank?
+        s"""<a href="$safeUrl" rel="nofollow">$safeUrl</a>"""
+      case donePreview: RenderPreviewResult.Done =>
+        donePreviews.append(donePreview)
         // Return a placeholder because `doneOnebox.html` might be an iframe which would
         // be removed by the sanitizer. So replace the placeholder with the html later, when
         // the sanitizer has been run.
-        doneOnebox.placeholder
-      case pendingOnebox: RenderOnboxResult.Loading =>
-        pendingDownloads.append(pendingOnebox)
-        pendingOnebox.placeholder
+        donePreview.placeholder
+      case pendingPreview: RenderPreviewResult.Loading =>
+        // We cannot call out to external servers from here. That should have been
+        // done already, and the results saved in link_previews_t.
+        logger.warn(s"No cached preview for: '$unsafeUrl' [TyE306KUT5]")
+        s"""<a href="$safeUrl" rel="nofollow" class="s_LnPvErr">$safeUrl</a>"""
     }
   }
 
-  def waitForDownloadsToFinish() = ??? // and make pendingDownloads thread safe if needed
-                                      // and assert javascriptEngine has been reset to None
 
   def replacePlaceholders(html: String): String = {
-    dieIf(pendingDownloads.nonEmpty, "DwE4FKEW3", "Not implemented: Waiting for oneboxes to load")
     var htmlWithBoxes = html
-    for (doneOnebox <- doneOneboxes) {
-      htmlWithBoxes = htmlWithBoxes.replace(doneOnebox.placeholder, doneOnebox.safeHtml)
+    for (donePreview <- donePreviews) {
+      htmlWithBoxes = htmlWithBoxes.replace(donePreview.placeholder, donePreview.safeHtml)
     }
     htmlWithBoxes
   }

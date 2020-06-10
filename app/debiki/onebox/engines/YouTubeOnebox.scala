@@ -27,15 +27,17 @@ import com.debiki.core.Prelude._
 import debiki.onebox._
 import java.{net => jn, util => ju}
 import scala.util.{Failure, Success, Try}
-import YouTubeOnebox._
 import debiki.{Globals, Nashorn}
+import scala.util.matching.Regex
 
 
 
-class YouTubeOnebox(globals: Globals, nashorn: Nashorn)
-  extends InstantOneboxEngine(globals, nashorn) {
+class YouTubePrevwRendrEng(globals: Globals)
+  extends InstantLinkPreviewEngine(globals) {
 
-  val regex = """^https?:\/\/(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/.+$""".r
+  import YouTubePrevwRendrEng._
+
+  val regex: Regex = """^https?:\/\/(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/.+$""".r
 
   val cssClassName = "dw-ob-youtube"
 
@@ -82,7 +84,7 @@ class YouTubeOnebox(globals: Globals, nashorn: Nashorn)
 }
 
 
-object YouTubeOnebox {
+object YouTubePrevwRendrEng {
 
   private val SlashVideoIdRegex = """\/([^\/]+)""".r
   private val SlashEmbedSlashVideoIdRegex = """\/embed\/([^\/]+)""".r

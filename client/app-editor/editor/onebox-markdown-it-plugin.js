@@ -17,7 +17,7 @@
 
 (function() {
 
-var pluginId = 'Onebox';
+var pluginId = 'LnPvRndr';  // means LinkPreviewRenderer
 
 
 /**
@@ -40,9 +40,14 @@ function parseOnebox(state, startLineIndex, endLineIndex, whatIsThis) {
   if (nextLine)
     return false;
 
+  // SHOULD require only its own line, not its own paragraph! (Otherwise,
+  // people don't "discover" the link preview functionality).
+  // Maybe just remove this?
+  /*
   if (state.parentType !== 'root' &&     // works with markdown-it 7
       state.parentType !== 'paragraph')  // works with markdown-it 8
     return false; // not a top level block
+    */
 
   var match = startLine.match(/^https?:\/\/[^\s]+\s*$/);
   if (!match)
@@ -70,7 +75,7 @@ function renderOnebox(tokens, index, options, env, renderer) {
     // We're running server side then? In case the string is a Nashorn ConsString,
     // which won't work now when calling back out to Scala/Java code:
     var linkAsJavaString = String(token.link);
-    oneboxHtml = renderer.renderAndSanitizeOnebox(linkAsJavaString);
+    oneboxHtml = renderer.renderAndSanitizeOnebox(linkAsJavaString); // [js_scala_interop]
   }
   else {
     var randomClass = 'onebox-' + Math.random().toString(36).slice(2);

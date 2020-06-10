@@ -27,29 +27,31 @@ import com.debiki.core.Prelude._
 import debiki.{Globals, Nashorn}
 import debiki.onebox._
 import scala.util.Success
+import scala.util.matching.Regex
 
 
 
-class ImageOnebox(globals: Globals, nashorn: Nashorn)
-  extends InstantOneboxEngine(globals, nashorn) {
+class ImagePrevwRendrEng(globals: Globals)
+  extends InstantLinkPreviewEngine(globals) {
 
-  val regex = """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
+  val regex: Regex = """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
 
   val cssClassName = "dw-ob-image"
 
-  def renderInstantly(url: String) = {
+  override val alreadySanitized = true
+
+  def renderInstantly(url: String): Success[String] = {
     var betterUrl = url
     // Fix Dropbox image links.
     if (url startsWith "https://www.dropbox.com/") {
       betterUrl = url.replaceAllLiterally(
         "https://www.dropbox.com", "https://dl.dropboxusercontent.com")
     }
-    // COULD modify the sanitizer to allow _blank,
-    // see: https://code.google.com/p/google-caja/issues/detail?id=1296
-    // and: client/.../html-css-sanitizer-bundle.js
-    // (rel=nofollow not needed – will be sanitized. Incl anyway.)
+
+    val safeUrl = sanitizeUrl(url)
+
     Success(
-      s"<a href='$betterUrl' rel='nofollow' target='_blank'><img src='$betterUrl'></a>")
+          s"<a href='$safeUrl' rel='nofollow' target='_blank'><img src='$safeUrl'></a>")
   }
 
 }

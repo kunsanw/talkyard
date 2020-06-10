@@ -14,6 +14,60 @@ Root categories are Talkyard internal things — end users never see them;
 they never see the phrase "Root category".
 
 
+
+### Database tables, columns etc
+
+Table names ends with `_t`, e.g. `links_t`. Otherwise it'd take long to find
+all occurrences of e.g. the links table — example: if you search for "links"
+you find 99% off-topic matches, but "links_t" gives you close to 100%
+on-topic search results.
+
+Column names end with `_c` for the same reason, e.g. `site_c`.
+
+"Participant" is abbreviated with "pp", or "..._by". E.g. `links_t.to_pp_c` means
+a link to the tparticipant with the id in the `to_pp_c` column.
+Or e.g. `written_by_c`.
+
+Constraints and indexes:
+
+ - Primary keys: `tablename_p` or `tablename_p_column1_col2_etc`.
+ - Foreign keys: `tablename_r_othertable` or `table_col1_col2_r_otherable`
+   ('r' means "references").
+ - Check constraints: `tablename_c_columnname` e.g. `linkpreviews_c_linkurl_len` — checks the
+   length of the `link_previews_t.link_url_c` column.
+ - Unique indexes: `tablename_u_col1_col2_etc`.
+ - Other indexes: `tablename_i_col1_col2_etc`.
+
+When adding a foreign key, always include a comment on the line above
+about which index indexes that foreign key. Example:
+
+```
+create table links_t(
+  ...
+  to_post_c int,
+  ...
+
+  -- fk index: links_i_topost
+  constraint links_topost_r_posts foreign key (site_c, to_post_c)
+      references posts3 (site_id, unique_post_id),
+  ...
+);
+
+...
+
+create index links_i_topost on links_t (site_c, to_post_c);
+```
+
+(Need not include "site" in the index name — there's always a site id in all indexes (almost).)
+
+
+(Old table names look like `sometable3` for historical reasons,
+but nowadays it's `sometable_t` instead.
+And old columns: `site_id` or `post_id` but now it's `site_c` and `post_c` instead
+— it's obvious that the columns are ids?)
+
+
+
 ### Cookies
 
 Names like `tyCo...` so you can: `grep -r tyCo ./` and find all cookies.

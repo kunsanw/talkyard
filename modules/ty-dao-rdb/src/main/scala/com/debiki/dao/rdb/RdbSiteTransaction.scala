@@ -44,6 +44,7 @@ class RdbSiteTransaction(var siteId: SiteId, val daoFactory: RdbDaoFactory, val 
   with TagsSiteDaoMixin
   with PageUsersSiteDaoMixin
   with UploadsSiteDaoMixin
+  with LinksSiteTxMixin
   with CategoriesSiteDaoMixin
   with SearchSiteDaoMixin
   with SpamCheckQueueDaoMixin

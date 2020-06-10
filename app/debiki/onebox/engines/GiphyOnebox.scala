@@ -21,31 +21,39 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.{Globals, Nashorn}
 import debiki.onebox._
+import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 
-class GiphyOnebox(globals: Globals, nashorn: Nashorn)
-  extends InstantOneboxEngine(globals, nashorn) {
+class GiphyPrevwRendrEng(globals: Globals)
+  extends InstantLinkPreviewEngine(globals) {
 
-  val regex = """^(https?:)?\/\/giphy\.com\/(gifs|embed)/[a-zA-Z0-9-]*-?[a-zA-Z0-9]+(/html5)?$""".r
+  val regex: Regex =
+    """^(https?:)?\/\/giphy\.com\/(gifs|embed)/[a-zA-Z0-9-]*-?[a-zA-Z0-9]+(/html5)?$""".r
 
   // (?:...) is a non capturing group.
   // *? is like * but non greedy.
-  val findIdRegex = """(?:https?:)\/\/[^/]+\/[a-z]+\/[a-zA-Z0-9-]*?-?([a-zA-Z0-9]+)""".r
+  val findIdRegex: Regex =
+    """(?:https?:)\/\/[^/]+\/[a-z]+\/[a-zA-Z0-9-]*?-?([a-zA-Z0-9]+)""".r
 
   val cssClassName = "esOb-Giphy"
 
   override val alreadySanitized = true
 
-  def renderInstantly(url: String): Try[String] = {
-    val id = findIdRegex.findGroupIn(url) getOrElse {
+  def renderInstantly(unsafeUrl: String): Try[String] = {
+    val unsafeId = findIdRegex.findGroupIn(unsafeUrl) getOrElse {
       return Failure(new QuickMessageException("Cannot find Giphy video id in URL"))
     }
+
+    // The id is [a-zA-Z0-9] so need not be sanitized, but do anyway.
+    val safeId = sanitizeUrl(unsafeId)
+
+    COULD // find out if this still works? Or use oEmbed?
 
     // The hardcoded width & height below are probably incorrect. They can be retrieved
     // via Giphys API: https://github.com/Giphy/GiphyAPI#get-gif-by-id-endpoint
     Success(o"""
-     <iframe src="//giphy.com/embed/$id"
+     <iframe src="https://giphy.com/embed/$safeId"
        width="480" height="400" frameBorder="0" class="giphy-embed" allowFullScreen>
      </iframe>
       """)
