@@ -25,9 +25,10 @@ package debiki.onebox.engines
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.onebox._
-import java.{net => jn, util => ju}
-import scala.util.{Failure, Success, Try}
-import debiki.{Globals, Nashorn}
+import java.{net => jn}
+import debiki.Globals
+import debiki.TextAndHtml.safeEncodeForHtml
+import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 
 
@@ -48,36 +49,36 @@ class YouTubePrevwRendrEng(globals: Globals)
 
   override val alreadySanitized = true
 
-  def renderInstantly(safeUrl: String): Try[String] = {
+  def renderInstantly(safeUrl: String): String Or ErrorMessage = {
     javaUri = new jn.URI(safeUrl)
     findVideoId(javaUri) match {
       case Some(videoId) =>
         // We must sanitize here because alreadySanitized above is true, so that
         // the iframe below won't be removed.
         // (Better sanitize, also if seems to be no werird chars in the id.)
-        if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _))
-          return Failure(com.debiki.core.DebikiException(
-            "EdE2URKT04", "Bad YouTube video ID, cannot create onebox"))
-        val safeId = sanitizeUrl(videoId)
-        val unsafeParams = findParams(javaUri) getOrElse {
-          return Failure(com.debiki.core.DebikiException(
-            "EdE7DI60", "Bad YouTube video URL, cannot create onebox"))
+        if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
+          return Bad("Bad YouTube video ID, cannot create preview [TyE2URKT04]")
         }
-        val safeParams = sanitizeUrl(unsafeParams)
+
+        val safeId = safeEncodeForHtml(videoId)
+        val unsafeParams = findParams(javaUri) getOrElse {
+          return Bad("Bad YouTube video URL, cannot create preview [TyE7DI60J2]")
+        }
+
+        val safeParams = safeEncodeForHtml(unsafeParams)
         // wmode=opaque makes it possible to cover the iframe with a transparent div,
         // which Utterscroll needs so the iframe won't steal mouse move events.
         // The default wmode is windowed which in effect places it above everything.
         // See http://stackoverflow.com/questions/3820325/overlay-opaque-div-over-youtube-iframe
         // Seems wmode might not be needed in Chrome today (June 2015) but feels better to
         // add it anyway.
-        Success(o"""
+        Good(o"""
           <iframe src="https://www.youtube.com/embed/$safeId?wmode=opaque&$safeParams"
               frameborder="0" allowfullscreen></iframe>""")
       case None =>
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
-        Failure(com.debiki.core.DebikiException(
-          "DwE45kFE2", "Cannot currently onebox this YouTube URL"))
+        Bad("Cannot currently onebox this YouTube URL [TyE45kFE2]")
     }
   }
 

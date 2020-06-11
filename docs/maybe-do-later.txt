@@ -268,5 +268,10 @@ But rename useParams to useUrlParams !?
 Nice API for writing bots, e.g. chat bots or a Usability Testing Exchange external
 server / bot.
 
+[site_conf_vals]
+Generate target=_blank links?
+Generate https://host/page/path links, or /page/path links,  for in site rel links?
+
+
 [Scala_213]
 Try —> Using

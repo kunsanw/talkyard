@@ -21,7 +21,9 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.{Globals, TextAndHtml}
 import debiki.onebox.engines._
+import debiki.TextAndHtml.safeEncodeForHtml
 import org.jsoup.Jsoup
+import org.scalactic.{ErrorMessage, Or}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
@@ -52,7 +54,17 @@ object RenderPreviewResult {
 }
 
 
+class RenderPreviewParams(
+  val unsafeUrl: String,
+  val requesterId: UserId,
+  val mayHttpFetchData: Boolean,
+  val loadPreviewFromDb: String => Option[LinkPreview],
+  val savePreviewInDb: Option[LinkPreview => Unit])
+
+
+
 /**
+  * - globals — that's s a bit much — COULD instead, incl only what's needed:
   */
 abstract class LinkPreviewRenderEngine(globals: Globals) {
 
@@ -73,6 +85,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
   val uploadsLinkRegex: Regex =
     """=['"](?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)['"]""".r
 
+
   private def pointUrlsToCdn(safeHtml: String): String = {
     val prefix = globals.config.cdn.uploadsUrlPrefix getOrElse {
       return safeHtml
@@ -80,9 +93,21 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
     uploadsLinkRegex.replaceAllIn(safeHtml, s"""="$prefix$$1"""")
   }
 
-  final def loadRenderSanitize(url: String): Future[String] = {
 
-    def sanitizeAndWrap(html: String): String = {
+  protected def safeBoringLinkTag(unsafeUrl: String, extraClass: String = ""): String = {
+    dieIf(safeEncodeForHtml(extraClass) != extraClass, "TyE602RKDJ4")
+    val safeUrl = safeEncodeForHtml(unsafeUrl)
+    s"""<a href="$safeUrl" rel="nofollow" class="$extraClass">$safeUrl</a>"""
+  }
+
+  final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
+
+    def sanitizeAndWrap(htmlOrError: String Or ErrorMessage): String = {
+      val html = htmlOrError getOrIfBad { unsafeError =>
+        return i"""
+              |<!-- Link preview error: ${safeEncodeForHtml(unsafeError)} -->
+              |${safeBoringLinkTag(urlAndFns.unsafeUrl, extraClass = "s_LnPvErr")}"""
+      }
       var safeHtml =
         if (alreadySanitized) html
         else {
@@ -97,16 +122,17 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
         safeHtml = safeHtml.replaceAllLiterally("http:", "https:")
       }
       safeHtml = pointUrlsToCdn(safeHtml)
+      dieIf(safeEncodeForHtml(cssClassName) != cssClassName, "TyE06RKTDH2")
       if (!alreadyWrappedInAside) {
         safeHtml = s"""<aside class="onebox $cssClassName clearfix">$safeHtml</aside>"""
       }
       safeHtml
     }
 
-    // futureHtml.map apparently isn't executed directly, even if the future has been
-    // completed already.
-    val futureHtml = loadAndRender(url)
+    val futureHtml = loadAndRender(urlAndFns)
 
+    // Use if-isCompleted to get an instant result, if possible — Future.map()
+    // apparently isn't executed directly, even if the future is completed.
     if (futureHtml.isCompleted) {
       Future.fromTry(futureHtml.value.get.map(sanitizeAndWrap))
     }
@@ -115,11 +141,11 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
     }
   }
 
-  protected def loadAndRender(url: String): Future[String]
 
-  def sanitizeUrl(url: String): String = org.owasp.encoder.Encode.forHtml(url)
+  protected def loadAndRender(urlAndFns: RenderPreviewParams): Future[String Or ErrorMessage]
 
 }
+
 
 
 abstract class ExternalRequestLinkPreviewEngine(globals: Globals, siteId: SiteId,
@@ -128,14 +154,16 @@ abstract class ExternalRequestLinkPreviewEngine(globals: Globals, siteId: SiteId
 }
 
 
+
 abstract class InstantLinkPreviewEngine(globals: Globals)
   extends LinkPreviewRenderEngine(globals) {
 
-  protected def loadAndRender(unsafeUrl: String): Future[String] = {
-    Future.fromTry(renderInstantly(unsafeUrl))
+  protected def loadAndRender(urlAndFns: RenderPreviewParams)
+        : Future[String Or ErrorMessage] = {
+    Future.successful(renderInstantly(urlAndFns.unsafeUrl))
   }
 
-  protected def renderInstantly(unsafeUrl: String): Try[String]
+  protected def renderInstantly(unsafeUrl: String): String Or ErrorMessage
 }
 
 
@@ -153,7 +181,7 @@ abstract class InstantLinkPreviewEngine(globals: Globals)
   * has been downloaded and saved already in link_previews_t.
   */
 class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
-    mayHttpFetchData: Boolean) extends TyLogging {
+    mayHttpFetchData: Boolean, requesterId: UserId) extends TyLogging {
 
   private val pendingRequestsByUrl = mutable.HashMap[String, Future[String]]()
   private val oneboxHtmlByUrl = mutable.HashMap[String, String]()
@@ -164,7 +192,7 @@ class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
   private val executionContext: ExecutionContext = globals.executionContext
 
   private val engines = Seq[LinkPreviewRenderEngine](
-    // COULD_OPTIMIZE These are, or can be made trhead safe — no need to recreate all the time.
+    // COULD_OPTIMIZE These are, or can be made thread safe — no need to recreate all the time.
     new ImagePrevwRendrEng(globals),
     new VideoPrevwRendrEng(globals),
     new GiphyPrevwRendrEng(globals),
@@ -172,22 +200,37 @@ class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
     new TwitterPrevwRendrEng(globals, siteId, mayHttpFetchData))
 
   def loadRenderSanitize(url: String): Future[String] = {
-    def loadPreiewFromDatabase(): Option[LinkPreview] = {
-      val siteDao = globals.siteDao(siteId)
-      // Don't create a write tx — could cause deadlocks, because unfortunately
-      // we might be insside a tx already: [nashorn_in_tx] (will fix later)
-      siteDao.readOnlyTransaction { tx =>
-        tx.loadLinkPreview(url)
-      }
-    }
-
     for (engine <- engines) {
       if (engine.handles(url)) {
-        return engine.loadRenderSanitize(url)
+        val args = new RenderPreviewParams(
+              unsafeUrl = url,
+              requesterId = requesterId,
+              mayHttpFetchData = mayHttpFetchData,
+              loadPreviewFromDb = loadPreiewInfoFromDatabase,
+              savePreviewInDb =
+                    if (!mayHttpFetchData) None
+                    else Some(savePreiewInfoToDatabase))
+        return engine.loadRenderSanitize(args)
       }
     }
 
     Future.failed(NoEngineException)
+  }
+
+  private def loadPreiewInfoFromDatabase(url: String): Option[LinkPreview] = {
+    // Don't create a write tx — could cause deadlocks, because unfortunately
+    // we might be inside a tx already: [nashorn_in_tx] (will fix later)
+    val siteDao = globals.siteDao(siteId)
+    siteDao.readOnlyTransaction { tx =>
+      tx.loadLinkPreview(url)
+    }
+  }
+
+  private def savePreiewInfoToDatabase(linkPreview: LinkPreview): Unit = {
+    val siteDao = globals.siteDao(siteId)
+    siteDao.readWriteTransaction { tx =>
+      tx.upsertLinkPreview(linkPreview)
+    }
   }
 
 
@@ -244,7 +287,7 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
 
     linkPreviewRenderer.loadRenderSanitizeInstantly(unsafeUrl) match {
       case RenderPreviewResult.NoPreview =>
-        UX; COULD // target=_blank?
+        UX; COULD // target="_blank" — maybe site conf val? [site_conf_vals]
         s"""<a href="$safeUrl" rel="nofollow">$safeUrl</a>"""
       case donePreview: RenderPreviewResult.Done =>
         donePreviews.append(donePreview)
@@ -256,7 +299,9 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
         // We cannot call out to external servers from here. That should have been
         // done already, and the results saved in link_previews_t.
         logger.warn(s"No cached preview for: '$unsafeUrl' [TyE306KUT5]")
-        s"""<a href="$safeUrl" rel="nofollow" class="s_LnPvErr">$safeUrl</a>"""
+        i"""
+          |<!-- No cached preview -->
+          |<a href="$safeUrl" rel="nofollow" class="s_LnPvErr">$safeUrl</a>"""
     }
   }
 

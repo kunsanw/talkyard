@@ -69,9 +69,31 @@ sealed trait TextAndHtml {
 
 object TextAndHtml {
 
-  def sanitizeTitleText(text: String): String = {
+  /** The result can be incl in html anywhere: As html tags contents,
+    * or in a html attribute.
+    */
+  def safeEncodeForHtml(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtml(unsafe)
+  }
+
+  /** Can *only* be incl in html attributes — not as tags contents.
+    */
+  def safeEncodeForHtmlAttrOnly(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtmlAttribute(unsafe)
+  }
+
+  /** Can *only* be incl as html tags contents — *not* in an attribute.
+    */
+  def safeEncodeForHtmlContentOnly(unsafe: String): String = {
+    org.owasp.encoder.Encode.forHtmlContent(unsafe)
+  }
+
+  /** Removes bad tags and attributes from a html string.
+    * The result is html tags content — and can *not* be incl in an attribute.
+    */
+  def sanitizeTitleText(unsafe: String): String = {
     // Tested here: TyT6RKKDJ563
-    Jsoup.clean(text, titleHtmlTagsWhitelist)
+    Jsoup.clean(unsafe, titleHtmlTagsWhitelist)
   }
 
   /** More restrictive than Jsoup's basic() whitelist.
@@ -81,6 +103,12 @@ object TextAndHtml {
           "b", "code", "em",
           "i", "q", "small", "span", "strike", "strong", "sub",
           "sup", "u")
+  }
+
+  /** Links will have rel=nofollow. Images, pre, div allowed.
+    */
+  def sanitizeAllowLinksAndBlocks(unsafeTags: String): String = {
+    Jsoup.clean(unsafeTags, org.jsoup.safety.Whitelist.basic())
   }
 
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?

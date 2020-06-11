@@ -19,8 +19,10 @@ package debiki.onebox.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn}
+import debiki.Globals
+import debiki.TextAndHtml.safeEncodeForHtml
 import debiki.onebox._
+import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
@@ -40,19 +42,19 @@ class GiphyPrevwRendrEng(globals: Globals)
 
   override val alreadySanitized = true
 
-  def renderInstantly(unsafeUrl: String): Try[String] = {
+  def renderInstantly(unsafeUrl: String): String Or ErrorMessage = {
     val unsafeId = findIdRegex.findGroupIn(unsafeUrl) getOrElse {
-      return Failure(new QuickMessageException("Cannot find Giphy video id in URL"))
-    }
+      return Bad("Cannot find Giphy video id in URL")
+     }
 
     // The id is [a-zA-Z0-9] so need not be sanitized, but do anyway.
-    val safeId = sanitizeUrl(unsafeId)
+    val safeId = safeEncodeForHtml(unsafeId)
 
     COULD // find out if this still works? Or use oEmbed?
 
     // The hardcoded width & height below are probably incorrect. They can be retrieved
     // via Giphys API: https://github.com/Giphy/GiphyAPI#get-gif-by-id-endpoint
-    Success(o"""
+    Good(o"""
      <iframe src="https://giphy.com/embed/$safeId"
        width="480" height="400" frameBorder="0" class="giphy-embed" allowFullScreen>
      </iframe>

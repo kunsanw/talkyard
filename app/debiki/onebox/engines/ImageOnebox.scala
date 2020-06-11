@@ -22,11 +22,10 @@
 
 package debiki.onebox.engines
 
-import com.debiki.core._
-import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn}
+import debiki.Globals
 import debiki.onebox._
-import scala.util.Success
+import debiki.TextAndHtml.safeEncodeForHtml
+import org.scalactic.Good
 import scala.util.matching.Regex
 
 
@@ -40,7 +39,7 @@ class ImagePrevwRendrEng(globals: Globals)
 
   override val alreadySanitized = true
 
-  def renderInstantly(url: String): Success[String] = {
+  def renderInstantly(url: String): Good[String] = {
     var betterUrl = url
     // Fix Dropbox image links.
     if (url startsWith "https://www.dropbox.com/") {
@@ -48,10 +47,9 @@ class ImagePrevwRendrEng(globals: Globals)
         "https://www.dropbox.com", "https://dl.dropboxusercontent.com")
     }
 
-    val safeUrl = sanitizeUrl(url)
+    val safeUrl = safeEncodeForHtml(url)
 
-    Success(
-          s"<a href='$safeUrl' rel='nofollow' target='_blank'><img src='$safeUrl'></a>")
+    Good(s"<a href='$safeUrl' rel='nofollow' target='_blank'><img src='$safeUrl'></a>")
   }
 
 }

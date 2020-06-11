@@ -233,18 +233,21 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
   def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(RateLimits.LoadOnebox) {
         request =>
     import edContext.globals
-    import request.siteId
+    import request.{siteId, requesterOrUnknown}
 
     val renderer = new LinkPreviewRenderer(
-          globals, siteId = siteId, mayHttpFetchData = true)
+          globals, siteId = siteId, mayHttpFetchData = true,
+          requesterId = requesterOrUnknown.id)
 
     renderer.loadRenderSanitize(url).transform(
       html => Ok(html),
       throwable => throwable match {
         case ex: DebikiException =>
-          ResultException(BadReqResult("EdE4PKE0", s"Cannot onebox that link: ${ex.getMessage}"))
+          ResultException(BadReqResult(
+                "TyELNKPVWEXC", s"Cannot preview that link: ${ex.getMessage}"))
         case _ =>
-          ResultException(BadReqResult("DwE4PKE2", "Cannot onebox that link"))
+          ResultException(BadReqResult(
+                "TyELNKPVWUNK", "Cannot preview that link"))
       })(execCtx)
   }
 

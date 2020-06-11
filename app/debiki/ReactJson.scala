@@ -1715,7 +1715,7 @@ object JsonMaker {
     def isInFirstParagraph = numParagraphBlocks == 0 && numOtherBlocks == 0
     def canStillBeSingleParagraph = numOtherBlocks == 0 && numParagraphBlocks <= 1
 
-    val nodeTraversor = new NodeTraversor(new NodeVisitor() {
+    val nodeVisitor = new NodeVisitor() {
       override def head(node: Node, depth: Int): Unit = {
         node match {
           case textNode: TextNode =>
@@ -1757,12 +1757,12 @@ object JsonMaker {
           case _ => ()
         }
       }
-    })
+    }
 
     val jsoupDoc = Jsoup.parse(htmlText)
-    try nodeTraversor.traverse(jsoupDoc.body)
+    try NodeTraversor.traverse(nodeVisitor, jsoupDoc.body)
     catch {
-      case _: ControlThrowable => ()
+      case _: ControlThrowable => () // thrown above
     }
 
     (ToTextResult(text = result.toString().trim, isSingleParagraph = canStillBeSingleParagraph),

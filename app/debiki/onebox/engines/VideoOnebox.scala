@@ -24,9 +24,10 @@ package debiki.onebox.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn}
+import debiki.Globals
+import debiki.TextAndHtml.safeEncodeForHtml
 import debiki.onebox._
-import scala.util.Success
+import org.scalactic.Good
 import scala.util.matching.Regex
 
 
@@ -40,9 +41,9 @@ class VideoPrevwRendrEng(globals: Globals)
 
   override def alreadySanitized = true
 
-  def renderInstantly(unsafeUrl: String): Success[String] = {
-    val safeUrl = sanitizeUrl(unsafeUrl)
-    Success(o"""
+  def renderInstantly(unsafeUrl: String): Good[String] = {
+    val safeUrl = safeEncodeForHtml(unsafeUrl)
+    Good(o"""
      <video width='100%' height='100%' controls src='$safeUrl'>
        <a href='$safeUrl' target='_blank' rel='nofollow'>$safeUrl</a>
      </video>

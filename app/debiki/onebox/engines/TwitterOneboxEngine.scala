@@ -25,10 +25,13 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.{Globals, Nashorn}
 import debiki.onebox._
+import debiki.TextAndHtml.sanitizeAllowLinksAndBlocks
+import org.scalactic.{Bad, ErrorMessage, Good, Or}
+import play.api.libs.json.JsObject
 import play.api.libs.ws.WSRequest
-
 import scala.concurrent.Future
 import scala.util.matching.Regex
+import talkyard.server.TyLogging
 
 
 
@@ -245,7 +248,8 @@ object TwitterOneboxEngine {
 class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
         mayHttpFetchData: Boolean)
   extends ExternalRequestLinkPreviewEngine(
-        globals, siteId = siteId, mayHttpFetchData = mayHttpFetchData) {
+        globals, siteId = siteId, mayHttpFetchData = mayHttpFetchData)
+  with TyLogging {
 
   def regex: Regex = TwitterOneboxEngine.regex
 
@@ -266,10 +270,13 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
   override val alreadyWrappedInAside = true
 
 
-  def loadAndRender(url: String): Future[String] = {
+  def loadAndRender(params: RenderPreviewParams): Future[String Or ErrorMessage] = {
+    def FutBad(message: String) = Future.successful(Bad(message))
+
+    val unsafeUrl: String = params.unsafeUrl
     val providerEndpoint: String =
-          TwitterOneboxEngine.getOEmbedProviderEndpoint(url) getOrElse {
-            return Future.successful("Ooops unimpl [43987626576]")
+          TwitterOneboxEngine.getOEmbedProviderEndpoint(unsafeUrl) getOrElse {
+            return Future.successful(Bad("Ooops unimpl [43987626576]"))
           }
 
     // omit_script=1  ?
@@ -285,33 +292,103 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
     val requestUrl = providerEndpoint +
           "?maxwidth=600" +  // Twitter tweets are 598 px over at Twitter.com
           "&align=center" +
-          s"&url=$url"
+          s"&url=$unsafeUrl"
 
-    // Cache!
+    params.loadPreviewFromDb(requestUrl) foreach { cachedPreview =>
+      val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
+        return FutBad("No link preview json [TyE0LNPVJSN]")
+      }
+      val unsafeProviderName = (cachedPreview.content_json_c \ "provider_name").asOpt[String]
+      makeSafePreviewHtml(
+            unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
+            unsafeProviderName = unsafeProviderName)
+    }
+
+    if (!params.mayHttpFetchData) {
+      // This can happen if one types and saves a new post really fast, before
+      // preview data has been downloaded? (so not yet found in cache above)
+      return FutBad("No cached preview data, may not fetch [TyE0FETCHLNPV]")
+    }
 
     val request: WSRequest = globals.wsClient.url(requestUrl)
 
     request.get().map({ r: request.Response =>
+      // These can be problems with Twitter, rather than Talkyard? E.g. if the tweet
+      // is gone, that's interesting to know for the site visitors.
       var problem = r.status match {
         case 404 => s"Tweet gone: "
         case 429 => s"Rate limited by Twitter, cannot show: "
         case 200 => "" // continue below
-        case x => s"Unexpecte Twitter oEmbed status code: $x, url: "
+        case x => s"Unexpected Twitter oEmbed status code: $x, url: "
       }
 
-      val anyHtml = if (problem.isEmpty) (r.json \ "html").asOpt[String] else None
+      CLEAN_UP // later
 
-      if (problem.isEmpty && anyHtml.isEmpty) {
+      val unsafeJsObj: JsObject = {
+        if (problem.nonEmpty) JsObject(Nil)
+        else {
+          // What does r.json do if the response wasn't json?
+          try {
+            r.json match {
+              case jo: JsObject => jo
+              case _ =>
+                problem = "Got json but it's not a js obj, request url: "
+                JsObject(Nil)
+            }
+          }
+          catch {
+            case ex: Exception =>
+              problem = "Response not json, request url: "
+              JsObject(Nil)
+          }
+        }
+      }
+
+      val anyUnsafeHtml =
+            if (problem.isEmpty) (r.json \ "html").asOpt[String]
+            else None
+
+      if (problem.isEmpty && anyUnsafeHtml.isEmpty) {
         problem = s"No html in Twitter oEmbed, url: "
       }
 
-      val safeHtmlResult = if (problem.nonEmpty) {
-        // Escape, in case the url is evil.
-        org.owasp.encoder.Encode.forHtmlContent(problem + s"<tt>$url</tt>")
+      val safeHtmlResult = {
+        if (problem.nonEmpty) {
+          sanitizeAllowLinksAndBlocks(
+                problem + safeBoringLinkTag(unsafeUrl))
+        }
+        else {
+          val unsafeHtml = anyUnsafeHtml.getOrDie("TyE6986SK")
+          val unsafeProviderName = (unsafeJsObj \ "provider_name").asOpt[String]
+          val safeHtml = makeSafePreviewHtml(
+                unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
+                unsafeProviderName = unsafeProviderName)
+
+          params.savePreviewInDb foreach { fn =>
+            fn(LinkPreview(  // mabye Ty SCRIPT tag instead?
+                  link_url_c = unsafeUrl,
+                  downloaded_from_url_c = requestUrl,
+                  downloaded_at_c = globals.now(),
+                  preview_type_c = LinkPreviewTypes.OEmbed,
+                  first_linked_by_c = params.requesterId,
+                  content_json_c = unsafeJsObj))
+          }
+          safeHtml
+        }
       }
-      else {
-        val html = anyHtml.getOrDie("TyE6986SK")
-        val providerNameOrUrl = (r.json \ "provider_name").asOpt[String] getOrElse url
+
+      Good(safeHtmlResult)
+
+    })(globals.executionContext).recover({
+      case ex: Exception =>
+        logger.warn("Error creating oEmbed link preview [TyEOEMB897235]", ex)
+        Bad(ex.getMessage)
+    })(globals.executionContext)
+  }
+
+
+  def makeSafePreviewHtml(unsafeUrl: String, unsafeHtml: String,
+        unsafeProviderName: Option[String]): String = {
           /* Example response json, this from Twitter:
             {
               "url": "https://twitter.com/Interior/status/507185938620219395",
@@ -363,9 +440,6 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
         // https://github.com/beefproject/beef
 
-        COULD // incl Ty Javascript that messages the parent with the height
-        // & width of the contents?
-
         // Iframe sandbox permissions.
         val permissions = (
               // Most? oEmbeds execute Javascript to render themselves — ok, in a sandbox.
@@ -389,22 +463,14 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
         <aside class="s_Ob s_Ob-Twitter s_Ob-oEmb"
           ><iframe seamless=""
                    sandbox={permissions}
-                   srcdoc={html + OneboxIframe.adjustOEmbedIframeHeightScript}
+                   srcdoc={unsafeHtml + OneboxIframe.adjustOEmbedIframeHeightScript}
           ></iframe
           ><div class="s_Ob_Lnk"
-          ><a href={url} target="_blank">{ "View at " + providerNameOrUrl /* I18N */
+          ><a href={unsafeUrl} target="_blank">{
+              "View at " + unsafeProviderName.getOrElse(unsafeUrl) /* I18N */
           } <span class="icon-link-ext"></span></a
           ></div
         ></aside>.toString
-
-        // + width: calc(100% - 30px);  max-width: 700px;
-        // border: none;  ?
-        // background: hsl(0, 0%, 91%);
-      }
-
-      safeHtmlResult
-
-    })(globals.executionContext)
   }
 }
 

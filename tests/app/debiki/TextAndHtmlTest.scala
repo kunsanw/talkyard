@@ -33,7 +33,11 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       san("""<script>alert("123")</script>Title""") mustBe "Title"
       san("""Two <script>alert("123") three</script>four""") mustBe "Two four"
       san("""Unterminated <script>alert("123") scr ip t""") mustBe "Unterminated"
-      san("""very </script> terminated""") mustBe "very  terminated  666"
+      san("""very </script> terminated""") mustBe "very  terminated"
+
+      // But does not sanitize for inclusion in html *attributes*, e.g. this is ok:
+      // (from https://hackerone.com/reports/197914)
+      // san("""descr' onerror='alert(/XSS by skavans/)""")
     }
 
     def checkRemovesScriptAttributes(fn: String => String, keepTag: Boolean): Unit = {
@@ -75,14 +79,13 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       "allow some tags" in {
         val okTitles = Seq(
               "",
-              "() {} [] , ! ?",
+              """() {} [] . , - + * ' " ` ! ? $ % #""",
               """Nice Title Wow""",
               """<code>nice with the source</code>""",
               """<small>but not tiny</small>""",
               """<b>bold</b> and <i>it</i> is <strong>ok</strong>""")
         for (title <- okTitles) {
-          // Don't know why Jsoup adds these newlines — without them, the test fails.
-          san(title).replaceAllLiterally("\n", "") mustBe title
+          san(title) mustBe title
         }
       }
 
@@ -100,8 +103,8 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       }
 
       "handle missing tags" in {
-        san("""why </b> this""").replaceAllLiterally("\n", "") mustBe "why  this"
-        san("""why <b>this""").replaceAllLiterally("\n", "") mustBe "why <b>this</b>"
+        san("""why </b> this""") mustBe "why  this"
+        san("""why <b>this""") mustBe "why <b>this</b>"
       }
 
       "delete block elems" in {

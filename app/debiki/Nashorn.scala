@@ -234,7 +234,10 @@ class Nashorn(
 
     val prevwRenderer = new LinkPreviewRendererForNashorn(
             new LinkPreviewRenderer(
-                  globals, siteId = siteId, mayHttpFetchData = false))
+                  globals, siteId = siteId, mayHttpFetchData = false,
+                  // (The requester doesn't matter here, since we won't
+                  // download any external data.)
+                  requesterId = SystemUserId))
 
     val (safeHtmlNoOneboxes, mentions) = withJavascriptEngine(engine => {
       val resultObj: Object = engine.invokeFunction("renderAndSanitizeCommonMark",
