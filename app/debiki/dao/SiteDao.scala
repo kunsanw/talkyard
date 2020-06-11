@@ -147,8 +147,7 @@ class SiteDao(
   // which automatically knows the right embeddedOriginOrEmpty and followLinks etc,
   // so won't need to always use makePostRenderSettings() below before
   // using textAndHtmlMaker?
-  def textAndHtmlMaker = new TextAndHtmlMaker(
-        siteId = siteId, pubSiteId = this.thePubSiteId(), context.nashorn)
+  def textAndHtmlMaker = new TextAndHtmlMaker(theSite(), context.nashorn)
 
   def makePostRenderSettings(pageType: PageType): PostRendererSettings = {
     val embeddedOriginOrEmpty =

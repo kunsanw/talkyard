@@ -177,6 +177,14 @@ case class SiteIdOrigins(
   siteId: SiteId, pubId: PublSiteId, siteOrigin: String, uploadsOrigin: String)
 
 
+trait SiteIdHostnames {
+  def id: SiteId
+  def pubId: PublSiteId
+  def canonicalHostnameStr: Option[String]
+  def allHostnames: Seq[String]
+}
+
+
 /** A website.
   */
 case class Site(  // delete? Use only SiteInclDetails instead?
@@ -187,12 +195,16 @@ case class Site(  // delete? Use only SiteInclDetails instead?
   createdAt: When,
   creatorIp: String,
   hostnames: List[Hostname],
-  superStaffNotes: Option[String] = None) {
+  superStaffNotes: Option[String] = None) extends SiteIdHostnames {
 
   // Reqiure at most 1 canonical host.
   //require((0 /: hosts)(_ + (if (_.isCanonical) 1 else 0)) <= 1)
 
   def canonicalHostname: Option[Hostname] = hostnames.find(_.role == Hostname.RoleCanonical)
+  def canonicalHostnameStr: Option[String] = canonicalHostname.map(_.hostname)
+
+  def allHostnames: Seq[String] = hostnames.map(_.hostname)
+
   def isTestSite: Boolean = id <= MaxTestSiteId
 
   def brief =

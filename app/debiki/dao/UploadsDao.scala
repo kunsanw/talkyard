@@ -208,15 +208,15 @@ trait UploadsDao {
   }
 
 
-  def findUploadRefsInPost(post: Post): Set[UploadRef] = {   // find mentions at the same time? [4WKAB02]
+  def findUploadRefsInPost(post: Post): Set[UploadRef] = {   // find mentions at the same time? [4WKAB02]  move to TextAndHtml?
     val pubId = thePubSiteId()
     val approvedRefs = post.approvedHtmlSanitized.map(
       h => findUploadRefsInText(h, pubId)) getOrElse Set.empty
     val currentRefs =
       if (post.nr == PageParts.TitleNr) Nil
       else {
-        val renderResult = context.nashorn.renderAndSanitizeCommonMark(
-              post.currentSource, siteId = siteId, pubSiteId = pubId,
+        val renderResult = context.nashorn.renderAndSanitizeCommonMark_new(
+              post.currentSource, theSite(),
               embeddedOriginOrEmpty = "",
               allowClassIdDataAttrs = false, followLinks = false)
         findUploadRefsInText(renderResult.safeHtml, pubId)
@@ -361,7 +361,7 @@ object UploadsDao {
   def findUploadRefsInText(html: String, pubSiteId: String): Set[UploadRef] = {
     // Tested here:  tests/app/debiki/dao/UploadsDaoSpec.scala
 
-    val links: Seq[String] = TextAndHtmlMaker.findLinks(html)
+    val links: Seq[String] = TextAndHtmlMaker.findLinks(html)  // gah, use TextAndHtml instead!
     val references = ArrayBuffer[UploadRef]()
 
     links foreach addUrlIfReferencesUploadedFile

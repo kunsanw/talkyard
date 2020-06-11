@@ -194,13 +194,15 @@ class Nashorn(
   }
 
 
-  def renderAndSanitizeCommonMark(
+  def renderAndSanitizeCommonMark_new(
         commonMarkSource: String,
-        siteId: SiteId,
-        pubSiteId: PublSiteId,
+        siteIdHostnames: SiteIdHostnames,
         embeddedOriginOrEmpty: String,
         allowClassIdDataAttrs: Boolean,
         followLinks: Boolean): RenderCommonmarkResult = {
+
+    val siteId = siteIdHostnames.id
+    val pubSiteId = siteIdHostnames.pubId
 
     if (isTestSoDisableScripts)
       return RenderCommonmarkResult("Scripts disabled [EsM5GY52]", Set.empty)

@@ -40,7 +40,8 @@ object IfCached {
 class PostRenderer(private val nashorn: Nashorn) {
 
 
-  def renderAndSanitize(post: Post, settings: PostRendererSettings, ifCached: IfCached): String = {
+  def renderAndSanitize(post: Post, settings: PostRendererSettings, ifCached: IfCached,
+        site: SiteIdHostnames): String = {
     if (ifCached == IfCached.Ignore) {
     }
     else if (post.isCurrentVersionApproved && post.approvedHtmlSanitized.isDefined) {
@@ -64,10 +65,9 @@ class PostRenderer(private val nashorn: Nashorn) {
     }
     else {
       // Reuse @mentions? [4WKAB02]
-      val renderResult = nashorn.renderAndSanitizeCommonMark(
+      val renderResult = nashorn.renderAndSanitizeCommonMark_new(
           post.currentSource,
-          siteId = settings.siteId,
-          pubSiteId = settings.pubSiteId,
+          site,
           embeddedOriginOrEmpty = settings.embeddedOriginOrEmpty,
           allowClassIdDataAttrs = isBody,
           followLinks = followLinks)

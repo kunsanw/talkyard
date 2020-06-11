@@ -239,16 +239,18 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
           globals, siteId = siteId, mayHttpFetchData = true,
           requesterId = requesterOrUnknown.id)
 
-    renderer.loadRenderSanitize(url).transform(
-      html => Ok(html),
-      throwable => throwable match {
-        case ex: DebikiException =>
-          ResultException(BadReqResult(
-                "TyELNKPVWEXC", s"Cannot preview that link: ${ex.getMessage}"))
-        case _ =>
-          ResultException(BadReqResult(
-                "TyELNKPVWUNK", "Cannot preview that link"))
-      })(execCtx)
+    val response = renderer.loadRenderSanitize(url).transform(
+          html => Ok(html),
+          throwable => throwable match {
+            case ex: DebikiException =>
+              ResultException(BadReqResult(
+                    "TyELNKPVWEXC", s"Cannot preview that link: ${ex.getMessage}"))
+            case _ =>
+              ResultException(BadReqResult(
+                    "TyELNKPVWUNK", "Cannot preview that link"))
+          })(execCtx)
+
+    response
   }
 
 

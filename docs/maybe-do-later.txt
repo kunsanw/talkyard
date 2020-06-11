@@ -272,6 +272,11 @@ server / bot.
 Generate target=_blank links?
 Generate https://host/page/path links, or /page/path links,  for in site rel links?
 
+[nashorn_in_tx]  COULD_OPTIMIZE
+Do outside tx.
+
+[double_tx]  COULD_OPTIMIZE
+Read-only tx in tx is ok but unnecessary, a tiny bit slower & more mem.
 
 [Scala_213]
 Try —> Using

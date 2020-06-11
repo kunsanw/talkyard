@@ -200,7 +200,7 @@ trait PostsDao {
       numOrigPostRepliesVisible = page.parts.numOrigPostRepliesVisible + numNewOpRepliesVisible,
       version = oldMeta.version + 1)
 
-    val uploadRefs = findUploadRefsInPost(newPost)
+    val uploadRefs = findUploadRefsInPost(newPost) // NO use TextAndHtml instead
 
     val auditLogEntry = AuditLogEntry(
       siteId = siteId,
@@ -272,6 +272,7 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
+    saveDeleteLinks(newPost, authorId, tx)
     insertAuditLogEntry(auditLogEntry, tx)
     anyReviewTask.foreach(tx.upsertReviewTask)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
@@ -558,7 +559,7 @@ trait PostsDao {
       frequentPosterIds = newFrequentPosterIds,
       version = oldMeta.version + 1)
 
-    val uploadRefs = findUploadRefsInPost(newPost)
+    val uploadRefs = findUploadRefsInPost(newPost) // NO use TextAndHtml instead
 
     SECURITY // COULD: if is new chat user, create review task to look at his/her first
     // chat messages, but only the first few.
@@ -611,6 +612,7 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
+    saveDeleteLinks(newPost, authorId, tx)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     insertAuditLogEntry(auditLogEntry, tx)
 
@@ -702,6 +704,7 @@ trait PostsDao {
     tx.indexPostsSoon(editedPost)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     saveDeleteUploadRefs(lastPost, editedPost = editedPost, authorId, tx)
+    saveDeleteLinks(editedPost, authorId, tx)
 
     val oldMeta = tx.loadThePageMeta(lastPost.pageId)
     val newMeta = oldMeta.copy(version = oldMeta.version + 1)
@@ -812,6 +815,8 @@ trait PostsDao {
           newLastApprovedEditById,
           newApprovedSource,
           newApprovedHtmlSanitized,
+          // newInternalLinks = ...
+          // newExternalLinks = ...
           newApprovedAt) =
         if (anyNewApprovedById.isDefined)
           (true,
@@ -993,6 +998,7 @@ trait PostsDao {
       anySpamCheckTask.foreach(tx.insertSpamCheckTask)
       newRevision.foreach(tx.insertPostRevision)
       saveDeleteUploadRefs(postToEdit, editedPost = editedPost, editorId, tx)
+      saveDeleteLinks(editedPost, editorId, tx)
 
       insertAuditLogEntry(auditLogEntry, tx)
 
@@ -1036,13 +1042,18 @@ trait PostsDao {
   }
 
 
+  private def saveDeleteLinks(editedPost: Post, editorId: UserId,
+    tx: SiteTransaction): Unit = {
+  }
+
+
   private def saveDeleteUploadRefs(postToEdit: Post, editedPost: Post, editorId: UserId,
         tx: SiteTransaction): Unit = {
     // Use findUploadRefsInPost (not ...InText) so we'll find refs both in the hereafter
     // 1) approved version of the post, and 2) the current possibly unapproved version.
     // Because if any of the approved or the current version links to an uploaded file,
     // we should keep the file.
-    val currentUploadRefs = findUploadRefsInPost(editedPost)
+    val currentUploadRefs = findUploadRefsInPost(editedPost) // NO use TextAndHtml instead
     val oldUploadRefs = tx.loadUploadedFileReferences(postToEdit.id)
     val uploadRefsAdded = currentUploadRefs -- oldUploadRefs
     val uploadRefsRemoved = oldUploadRefs -- currentUploadRefs
@@ -1464,10 +1475,14 @@ trait PostsDao {
       throwForbidden("EsE5GYK02", "You're not staff so you cannot approve posts")
 
     // ------ The post
+
+    // A bit similar / dupl code [APRPOSTDPL]
+
     val renderSettings = makePostRenderSettings(pageMeta.pageType)
     COULD_OPTIMIZE // reuse html rendered here, to find @mentions, pass to NotificationGenerator below. [4WKAB02]
+    // Also, do outside tx. [nashorn_in_tx]
     val approvedHtmlSanitized = context.postRenderer.renderAndSanitize(postBefore, renderSettings,
-      IfCached.Die("TyE2BKYUF4"))
+          IfCached.Die("TyE2BKYUF4"), theSite())  // [double_tx] — should move outside tx anyway
 
     // Later: update lastApprovedEditAt, lastApprovedEditById and numDistinctEditors too,
     // or remove them.
@@ -1571,10 +1586,13 @@ trait PostsDao {
 
       // ----- A post
 
+      // A bit similar / dupl code [APRPOSTDPL]
+
       val renderSettings = makePostRenderSettings(pageMeta.pageType)
       COULD_OPTIMIZE // reuse html rendered here, to find @mentions, pass to NotificationGenerator below. + [4WKAB02]x
+      // [nashorn_in_tx]
       val approvedHtmlSanitized = context.postRenderer.renderAndSanitize(post, renderSettings,
-        IfCached.Die("TyE2PKL99"))
+            IfCached.Die("TyE2PKL99"), theSite())  // [double_tx]
 
       // Don't need to update lastApprovedEditAt, because this post has been invisible until now.
       // Don't set safeRevisionNr, because this approval hasn't been reviewed by a human.

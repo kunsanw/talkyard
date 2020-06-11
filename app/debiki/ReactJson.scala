@@ -37,9 +37,11 @@ import talkyard.server.JsX._
 case class PostExcerpt(text: String, firstImageUrls: immutable.Seq[String])
 
 
-private case class RendererWithSettings(renderer: PostRenderer, settings: PostRendererSettings) {
+private case class RendererWithSettings(
+  renderer: PostRenderer, settings: PostRendererSettings, site: SiteIdHostnames) {
+
   def renderAndSanitize(post: Post, ifCached: IfCached): String = {
-    renderer.renderAndSanitize(post, settings, ifCached)
+    renderer.renderAndSanitize(post, settings, ifCached, site)
   }
 }
 
@@ -587,7 +589,7 @@ class JsonMaker(dao: SiteDao) {
     val postRenderSettings = dao.makePostRenderSettings(page.pageType)
 
     val renderer = RendererWithSettings(
-      dao.context.postRenderer, postRenderSettings)
+          dao.context.postRenderer, postRenderSettings, dao.theSite())
 
     postToJsonNoDbAccess(post, showHidden = showHidden, includeUnapproved = includeUnapproved,
       tags = tags, howRender, renderer)
@@ -597,7 +599,9 @@ class JsonMaker(dao: SiteDao) {
   def postToJsonOutsidePage(post: Post, pageRole: PageType, showHidden: Boolean, includeUnapproved: Boolean,
         tags: Set[TagLabel]): JsObject = {
     val postRenderSettings = dao.makePostRenderSettings(pageRole)
-    val renderer = RendererWithSettings(dao.context.postRenderer, postRenderSettings)
+    val renderer = RendererWithSettings(
+          dao.context.postRenderer, postRenderSettings, dao.theSite())
+
     postToJsonNoDbAccess(post, showHidden = showHidden, includeUnapproved = includeUnapproved,
       tags = tags, new HowRenderPostInPage(false, JsNull, false, Nil), renderer)
   }
@@ -923,7 +927,8 @@ class JsonMaker(dao: SiteDao) {
       val tags = tagsByPostId(post.id)
       val postRenderSettings = dao.makePostRenderSettings(pageMeta.pageType)
       val renderer = RendererWithSettings(
-        dao.context.postRenderer, postRenderSettings)
+            dao.context.postRenderer, postRenderSettings, dao.theSite())
+
       post.nr.toString ->
         postToJsonNoDbAccess(post, showHidden = true, includeUnapproved = true,
           tags = tags, new HowRenderPostInPage(false, JsNull, false,

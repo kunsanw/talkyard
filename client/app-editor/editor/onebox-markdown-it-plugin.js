@@ -17,6 +17,9 @@
 
 (function() {
 
+// NEXT seems ok simple to create an IntLnRndr for internal link titles?
+// And [[wiki style]] links and later #[tags]?
+
 var pluginId = 'LnPvRndr';  // means LinkPreviewRenderer
 
 

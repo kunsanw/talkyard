@@ -616,6 +616,9 @@ class Globals(
   def settingsBySiteId(siteId: SiteId): AllSettings =
     siteDao(siteId).getWholeSiteSettings()
 
+  def siteById(siteId: SiteId): Option[Site] =
+    systemDao.getSite(siteId)
+
   def originOfSiteId(siteId: SiteId): Option[String] =
     systemDao.getSite(siteId).flatMap(_.canonicalHostname.map(originOf))
 
@@ -1129,11 +1132,9 @@ class Globals(
       RenderContentService.startNewActor(outer, edContext.nashorn)
 
     val spamChecker = new SpamChecker(
-      config,
-      isDevTest = isOrWasTest, originOfSiteId, settingsBySiteId,
-      executionContext, appLoaderContext.initialConfiguration, wsClient,
-      new TextAndHtmlMaker(
-            siteId = NoSiteId, pubSiteId =  "dummysiteid", edContext.nashorn))
+          config, isDevTest = isOrWasTest, siteById, originOfSiteId, settingsBySiteId,
+          executionContext, appLoaderContext.initialConfiguration, wsClient,
+          edContext.nashorn)
 
     spamChecker.start()
 

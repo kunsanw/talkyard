@@ -87,7 +87,7 @@ trait MessagesDao {
           Notifications.None
         }
         else {
-          notfGenerator(tx).generateForMessage(sender.user, bodyPost, toUserIds)
+          notfGenerator(tx).generateForMessage(sender.user, bodyPost, toUserIds)  // [nashorn_in_tx]
         }
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(sentByWho.id, nr))
