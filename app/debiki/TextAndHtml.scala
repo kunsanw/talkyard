@@ -109,8 +109,11 @@ object TextAndHtml {
 
   /** Links will have rel=nofollow. Images, pre, div allowed.
     */
-  def sanitizeAllowLinksAndBlocks(unsafeTags: String): String = {
-    Jsoup.clean(unsafeTags, org.jsoup.safety.Whitelist.basic())
+  def sanitizeAllowLinksAndBlocks(unsafeTags: String,
+        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    var whitelist = org.jsoup.safety.Whitelist.basic()
+    whitelist = amendWhitelistFn(whitelist)
+    Jsoup.clean(unsafeTags, whitelist)
   }
 
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
@@ -173,7 +176,7 @@ object TextAndHtmlMaker {
 
 /** Thread safe.
   */
-class TextAndHtmlMaker(val site: Site, nashorn: Nashorn) {
+class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
   private class TextAndHtmlImpl(
     val text: String,

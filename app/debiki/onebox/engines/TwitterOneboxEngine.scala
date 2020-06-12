@@ -259,7 +259,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
   // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
 
-  val cssClassName = "dw-ob-oembed"
+  val cssClassName = "s_LnPv-oEmb"
 
 
   /** The oEmbed stuff might include arbitrary html tags and even scripts,
@@ -289,12 +289,12 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
     // Wants:  theme: light / dark.  Primary color / link color.
     // And device:  mobile / tablet / laptop ?  for maxwidth.
-    val requestUrl = providerEndpoint +
+    val downloadUrl = providerEndpoint +
           "?maxwidth=600" +  // Twitter tweets are 598 px over at Twitter.com
           "&align=center" +
           s"&url=$unsafeUrl"
 
-    params.loadPreviewFromDb(requestUrl) foreach { cachedPreview =>
+    params.loadPreviewFromDb(downloadUrl) foreach { cachedPreview =>
       val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
         return FutBad("No link preview json [TyE0LNPVJSN]")
       }
@@ -310,13 +310,13 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
       return FutBad("No cached preview data, may not fetch [TyE0FETCHLNPV]")
     }
 
-    val request: WSRequest = globals.wsClient.url(requestUrl)
+    val request: WSRequest = globals.wsClient.url(downloadUrl)
 
     request.get().map({ r: request.Response =>
       // These can be problems with Twitter, rather than Talkyard? E.g. if the tweet
       // is gone, that's interesting to know for the site visitors.
       var problem = r.status match {
-        case 404 => s"Tweet gone: "
+        case 404 => s"Tweet not found: "
         case 429 => s"Rate limited by Twitter, cannot show: "
         case 200 => "" // continue below
         case x => s"Unexpected Twitter oEmbed status code: $x, url: "
@@ -354,8 +354,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
       val safeHtmlResult = {
         if (problem.nonEmpty) {
-          sanitizeAllowLinksAndBlocks(
-                problem + safeBoringLinkTag(unsafeUrl))
+          safeProblemHtml(problem = problem, unsafeUrl = unsafeUrl)
         }
         else {
           val unsafeHtml = anyUnsafeHtml.getOrDie("TyE6986SK")
@@ -365,14 +364,16 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
                 unsafeProviderName = unsafeProviderName)
 
           params.savePreviewInDb foreach { fn =>
-            fn(LinkPreview(  // mabye Ty SCRIPT tag instead?
+            val preview = LinkPreview(  // mabye Ty SCRIPT tag instead?
                   link_url_c = unsafeUrl,
-                  downloaded_from_url_c = requestUrl,
+                  downloaded_from_url_c = downloadUrl,
                   downloaded_at_c = globals.now(),
                   preview_type_c = LinkPreviewTypes.OEmbed,
-                  first_linked_by_c = params.requesterId,
-                  content_json_c = unsafeJsObj))
+                  first_linked_by_id_c = params.requesterId,
+                  content_json_c = unsafeJsObj)
+            fn(preview)
           }
+
           safeHtml
         }
       }
@@ -460,12 +461,12 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
               // looking page on the attacker's domain].
               "allow-top-navigation-by-user-activation")
 
-        <aside class="s_Ob s_Ob-Twitter s_Ob-oEmb"
+        <aside class={s"s_LnPv $cssClassName"}
           ><iframe seamless=""
                    sandbox={permissions}
                    srcdoc={unsafeHtml + OneboxIframe.adjustOEmbedIframeHeightScript}
           ></iframe
-          ><div class="s_Ob_Lnk"
+          ><div class="s_LnPv_ViewAt"
           ><a href={unsafeUrl} target="_blank">{
               "View at " + unsafeProviderName.getOrElse(unsafeUrl) /* I18N */
           } <span class="icon-link-ext"></span></a
@@ -498,6 +499,7 @@ object OneboxIframe {
   // with 20 px body margin, 20 px child div padding & margin,
   // should become 432 px tall? (margin & padding removed)
   val adjustOEmbedIframeHeightScript: String = """
+    |<script src="/-/assets/external-iframe.js"></script>
     |<script>(function(d) { // Talkyard [OEMBHGHT]
     |d.body.style.margin = '0';
     |var nSent = 0;

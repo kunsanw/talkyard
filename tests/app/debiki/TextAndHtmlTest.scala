@@ -142,8 +142,14 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
 
   "TextAndHtmlMaker can" - {
 
-    val maker = new TextAndHtmlMaker(
-          siteId = NoSiteId, pubSiteId = "123abc", nashorn = null)
+    val site: SiteIdHostnames = new SiteIdHostnames {
+      val id: SiteId = NoSiteId
+      val pubId = "123abc"
+      val canonicalHostnameStr = Some("forum.example.com")
+      val allHostnames: Seq[String] = canonicalHostnameStr.toSeq
+    }
+
+    val maker: TextAndHtmlMaker = new TextAndHtmlMaker(site, nashorn = null)
 
     "find links" - {
 

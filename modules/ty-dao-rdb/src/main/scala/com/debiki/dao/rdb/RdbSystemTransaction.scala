@@ -893,6 +893,8 @@ class RdbSystemTransaction(val daoFactory: RdbDaoFactory, val now: When)
     s"""
       delete from index_queue3
       delete from spam_check_queue3
+      delete from links_t
+      delete from link_previews_t
       delete from audit_log3
       delete from review_tasks3
       delete from perms_on_pages3

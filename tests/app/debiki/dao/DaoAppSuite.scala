@@ -59,8 +59,15 @@ class DaoAppSuite(
   lazy val context: EdContext = edAppComponents.context
   lazy val globals: Globals = context.globals
 
-  lazy val textAndHtmlMaker: TextAndHtmlMaker =
-    new TextAndHtmlMaker(NoSiteId, "testsiteid", context.nashorn)
+
+  val dummyNoSite: SiteIdHostnames = new SiteIdHostnames {
+    val id: SiteId = NoSiteId
+    val pubId = "testsiteid"
+    val canonicalHostnameStr = Some("forum.example.com")
+    val allHostnames: Seq[String] = canonicalHostnameStr.toSeq
+  }
+
+  lazy val textAndHtmlMaker = new TextAndHtmlMaker(dummyNoSite, context.nashorn)
 
 
   override def fakeApplication: Application = {

@@ -23,19 +23,27 @@ import play.api.libs.json.JsObject
 
 object LinkPreviewTypes {
   // Later:
-  val TitleDescrTags = 1 // <title> and <description>
-  val OpenGraph = 2
+  val MetaAndOpenGarphTags = 1 // <title> and <description>, and og: ... tags.
 
   // For now:
   val OEmbed = 3
 }
 
+/** Both link_url_c and downloaded_from_url_c are part of the database primary key
+  * — otherwise an attacker's website A could hijack a widget from a normal
+  * @param downloaded_at_c
+  * @param preview_type_c
+  * @param first_linked_by_id_c
+  * @param content_json_c — as of now: the oEmbed response.
+  *   Later: could also be OpenGraph stuff or { title: ... descr: ... }
+  *   from < title> and < descr> tags.
+  */
 case class LinkPreview(
   link_url_c: String,
   downloaded_from_url_c: String,
   downloaded_at_c: When,
   preview_type_c: Int, // always oEmbed, for now
-  first_linked_by_c: UserId,
+  first_linked_by_id_c: UserId,
   content_json_c: JsObject) {
 
   require(preview_type_c == LinkPreviewTypes.OEmbed, "TyE50RKSDJJ4")
@@ -43,20 +51,20 @@ case class LinkPreview(
 
 
 case class Link(
-  from_post_c: PostId,
+  from_post_id_c: PostId,
   link_url_c: String,
   added_at_c: When,
-  added_by_c: UserId,
+  added_by_id_c: UserId,
   is_external: Boolean,
-  to_post_c: Option[PostId],
-  to_pp_c: Option[UserId],
-  to_tag_c: Option[TagDefId],
-  to_categoy_c: Option[CategoryId]) {
+  to_post_id_c: Option[PostId],
+  to_pp_id_c: Option[UserId],
+  to_tag_id_c: Option[TagDefId],
+  to_categoy_id_c: Option[CategoryId]) {
 
   // Not impl
-  dieIf(to_tag_c ne null, "tag links not impl [TyE5928SK]")
+  dieIf(to_tag_id_c ne null, "tag links not impl [TyE5928SK]")
 
-  dieIf(is_external.toZeroOne + to_post_c.oneIfDefined + to_pp_c.oneIfDefined +
-        to_tag_c.oneIfDefined + to_categoy_c.oneIfDefined != 1, "TyE063KSUHD5")
+  dieIf(is_external.toZeroOne + to_post_id_c.oneIfDefined + to_pp_id_c.oneIfDefined +
+        to_tag_id_c.oneIfDefined + to_categoy_id_c.oneIfDefined != 1, "TyE063KSUHD5")
 
 }

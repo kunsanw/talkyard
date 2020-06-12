@@ -343,8 +343,9 @@ trait SiteTransaction {
   def updateUploadQuotaUse(uploadRef: UploadRef, wasAdded: Boolean): Unit
 
   def upsertLinkPreview(linkPreview: LinkPreview): Unit
-  def deleteLinkPreview(linkUrl: String): Boolean
-  def loadLinkPreview(linkUrl: String): Option[LinkPreview]
+  def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String): Option[LinkPreview]
+  /** Deletes for all download urls (e.g. downloaded for different screen sizes) */
+  def deleteLinkPreviews(linkUrl: String): Boolean
 
   def upsertLink(link: Link): Boolean
   def deleteLinkFromPost(postId: PostId, url: String): Boolean

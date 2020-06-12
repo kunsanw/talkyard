@@ -33,19 +33,17 @@ trait LinksSiteTxMixin extends SiteTransaction {
   override def upsertLinkPreview(linkPreview: LinkPreview): Unit = {
     val upsertStatement = s"""
           insert into link_previews_t (
-              site_c,
+              site_id_c,
               link_url_c,
               downloaded_from_url_c,
               downloaded_at_c,
               preview_type_c,
-              first_linked_by_c,
+              first_linked_by_id_c,
               content_json_c)
           values (?, ?, ?, ?, ?, ?, ?)
-          on conflict (site_id, link_url_c)
+          on conflict (site_id_c, link_url_c, downloaded_from_url_c)
           do update set
-              downloaded_from_url_c = excluded.downloaded_from_url_c,
-              donwloaded_at_c = excluded.donwloaded_at_c,
-              downloaded_at_c
+              downloaded_at_c = excluded.downloaded_at_c,
               preview_type_c = excluded.preview_type_c,
               content_json_c = excluded.content_json_c """
 
@@ -55,67 +53,65 @@ trait LinksSiteTxMixin extends SiteTransaction {
           linkPreview.downloaded_from_url_c,
           linkPreview.downloaded_at_c.asTimestamp,
           linkPreview.preview_type_c.asAnyRef,
-          linkPreview.first_linked_by_c.asAnyRef,
-          linkPreview.content_json_c.toString)
+          linkPreview.first_linked_by_id_c.asAnyRef,
+          linkPreview.content_json_c)
 
     runUpdateSingleRow(upsertStatement, values)
   }
 
 
-  override def deleteLinkPreview(linkUrl: String): Boolean = {
-    val deleteStatement = s"""
-          delete from link_previews_t
-          where site_c = ?
-            and link_url_c = ?
-          """
-    val values = List(siteId.asAnyRef, linkUrl)
-    runUpdateSingleRow(deleteStatement, values)
-  }
-
-
-  override def loadLinkPreview(linkUrl: String): Option[LinkPreview] = {
+  override def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String)
+  : Option[LinkPreview] = {
     val query = s"""
           select * from link_previews_t
-          where site_c = ?
+          where site_id_c = ?
             and link_url_c = ?
-          """
-
-    val values = List(siteId.asAnyRef, linkUrl)
-
+            and downloaded_from_url_c = ?  """
+    val values = List(siteId.asAnyRef, linkUrl, downloadUrl)
     runQueryFindOneOrNone(query, values, rs => {
       parseLinkPreview(rs)
     })
   }
 
 
+  override def deleteLinkPreviews(linkUrl: String): Boolean = {
+    val deleteStatement = s"""
+          delete from link_previews_t
+          where site_id_c = ?
+            and link_url_c = ?  """
+    val values = List(siteId.asAnyRef, linkUrl)
+    runUpdateSingleRow(deleteStatement, values)
+  }
+
+
   override def upsertLink(link: Link): Boolean = {
     val upsertStatement = s"""
           insert into link_t (
-              site_c,
-              from_post_c,
+              site_id_c,
+              from_post_id_c,
               link_url_c,
               added_at_c,
-              added_by_c,
+              added_by_id_c,
               is_external,
-              to_post_c,
-              to_pp_c,
-              to_tag_c,
-              to_categoy_c)
+              to_post_id_c,
+              to_pp_id_c,
+              to_tag_id_c,
+              to_categoy_id_c)
           values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          on conflict (site_c, from_post_c, link_url_c)
+          on conflict (site_id_c, from_post_id_c, link_url_c)
              do nothing """
 
     val values = List(
       siteId.asAnyRef,
-      link.from_post_c.asAnyRef,
+      link.from_post_id_c.asAnyRef,
       link.link_url_c,
       link.added_at_c.asTimestamp,
-      link.added_by_c.asAnyRef,
+      link.added_by_id_c.asAnyRef,
       link.is_external.asTrueOrNull,
-      link.to_post_c.asAnyRef,
-      link.to_pp_c.asAnyRef,
-      link.to_tag_c.asAnyRef,
-      link.to_categoy_c.asAnyRef)
+      link.to_post_id_c.asAnyRef,
+      link.to_pp_id_c.asAnyRef,
+      link.to_tag_id_c.asAnyRef,
+      link.to_categoy_id_c.asAnyRef)
 
     runUpdateSingleRow(upsertStatement, values)
   }
@@ -124,8 +120,8 @@ trait LinksSiteTxMixin extends SiteTransaction {
   override def deleteLinkFromPost(postId: PostId, url: String): Boolean = {
     val deleteStatement = s"""
           delete from links_t
-          where site_c = ?
-            and post_c = ?
+          where site_id_c = ?
+            and from_post_id_c = ?
             and link_url_c = ?
           """
     val values = List(siteId.asAnyRef, postId.asAnyRef, url)
@@ -136,8 +132,8 @@ trait LinksSiteTxMixin extends SiteTransaction {
   override def deleteAllLinksFromPost(postId: PostId): Boolean = {
     val deleteStatement = s"""
           delete from links_t
-          where site_c = ?
-            and post_c = ?
+          where site_id_c = ?
+            and from_post_id_c = ?
           """
     val values = List(siteId.asAnyRef, postId.asAnyRef)
     runUpdateSingleRow(deleteStatement, values)
@@ -147,9 +143,9 @@ trait LinksSiteTxMixin extends SiteTransaction {
   override def loadLinksToPage(pageId: PageId): Seq[Link] = {
     val query = s"""
           select * from posts3 ps inner join links_t ls
-            on ps.site_id = ls.site_c
-            and ps.unique_post_id = ls.to_post_c
-          where site_c = ?
+            on ps.site_id = ls.site_id_c
+            and ps.unique_post_id = ls.to_post_id_c
+          where site_id_c = ?
             and ps.page_id = ?
           """
 
@@ -167,22 +163,22 @@ trait LinksSiteTxMixin extends SiteTransaction {
           downloaded_from_url_c = getString(rs, "downloaded_from_url_c"),
           downloaded_at_c = getWhen(rs, "downloaded_at_c"),
           preview_type_c = getInt(rs, "preview_type_c"),
-          first_linked_by_c = getInt(rs, "first_linked_by_c"),
+          first_linked_by_id_c = getInt(rs, "first_linked_by_id_c"),
           content_json_c = getOptJsObject(rs, "content_json_c").get)
   }
 
 
   private def parseLink(rs: js.ResultSet): Link = {
     Link(
-          from_post_c = getInt(rs, "from_post_c"),
+          from_post_id_c = getInt(rs, "from_post_id_c"),
           link_url_c = getString(rs, "link_url_c"),
           added_at_c = getWhen(rs, "added_at_c"),
-          added_by_c = getInt(rs, "added_by_c"),
+          added_by_id_c = getInt(rs, "added_by_id_c"),
           is_external = getOptBool(rs, "is_external") is true,
-          to_post_c = getOptInt(rs, "to_post_c"),
-          to_pp_c = getOptInt(rs, "to_pp_c"),
-          to_tag_c = getOptInt(rs, "to_tag_c"),
-          to_categoy_c = getOptInt(rs, "to_categoy_c"))
+          to_post_id_c = getOptInt(rs, "to_post_id_c"),
+          to_pp_id_c = getOptInt(rs, "to_pp_id_c"),
+          to_tag_id_c = getOptInt(rs, "to_tag_id_c"),
+          to_categoy_id_c = getOptInt(rs, "to_categoy_id_c"))
   }
 
 }

@@ -94,19 +94,34 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
   }
 
 
-  protected def safeBoringLinkTag(unsafeUrl: String, extraClass: String = ""): String = {
-    dieIf(safeEncodeForHtml(extraClass) != extraClass, "TyE602RKDJ4")
+  protected def safeBoringLinkTag(unsafeUrl: String, isOk: Boolean): String = {
+    val errClass = if (!isOk) " s_LnPv_L-Err" else ""
     val safeUrl = safeEncodeForHtml(unsafeUrl)
-    s"""<a href="$safeUrl" rel="nofollow" class="$extraClass">$safeUrl</a>"""
+    s"""<a href="$safeUrl" rel="nofollow" class="s_LnPv_L$errClass">$safeUrl</a>"""
+  }
+
+  protected def safeProblemHtml(problem: String, unsafeUrl: String): String = {
+    val safeProblem = TextAndHtml.safeEncodeForHtmlContentOnly(problem)
+    val safeLinkTag = safeBoringLinkTag(unsafeUrl, isOk = false)
+    val safeHtml =
+          s"""<aside class="onebox s_LnPv s_LnPv-Err $cssClassName clearfix">${
+              safeProblem} $safeLinkTag</aside>"""
+
+    // safeHtml is safe already — let's double-sanitize just in case:
+    TextAndHtml.sanitizeAllowLinksAndBlocks(
+          safeHtml, _.addAttributes("aside", "class").addAttributes("a", "class"))
   }
 
   final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
 
     def sanitizeAndWrap(htmlOrError: String Or ErrorMessage): String = {
+      // <aside> class:    s_LnPv (-Err)    means Link Preview (Error)
+      // <aside><a> class: s_LnPv_L (-Err)  means the actual <a href=..> link
+
       val html = htmlOrError getOrIfBad { unsafeError =>
         return i"""
               |<!-- Link preview error: ${safeEncodeForHtml(unsafeError)} -->
-              |${safeBoringLinkTag(urlAndFns.unsafeUrl, extraClass = "s_LnPvErr")}"""
+              |${safeBoringLinkTag(urlAndFns.unsafeUrl, isOk = false)}"""
       }
       var safeHtml =
         if (alreadySanitized) html
@@ -124,7 +139,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
       safeHtml = pointUrlsToCdn(safeHtml)
       dieIf(safeEncodeForHtml(cssClassName) != cssClassName, "TyE06RKTDH2")
       if (!alreadyWrappedInAside) {
-        safeHtml = s"""<aside class="onebox $cssClassName clearfix">$safeHtml</aside>"""
+        safeHtml = s"""<aside class="onebox s_LnPv $cssClassName clearfix">$safeHtml</aside>"""
       }
       safeHtml
     }
@@ -200,6 +215,15 @@ class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
     new TwitterPrevwRendrEng(globals, siteId, mayHttpFetchData))
 
   def loadRenderSanitize(url: String): Future[String] = {
+    def loadPreiewInfoFromDatabase(downloadUrl: String): Option[LinkPreview] = {
+      // Don't create a write tx — could cause deadlocks, because unfortunately
+      // we might be inside a tx already: [nashorn_in_tx] (will fix later)
+      val siteDao = globals.siteDao(siteId)
+      siteDao.readOnlyTransaction { tx =>
+        tx.loadLinkPreviewByUrl(linkUrl = url, downloadUrl = downloadUrl)
+      }
+    }
+
     for (engine <- engines) {
       if (engine.handles(url)) {
         val args = new RenderPreviewParams(
@@ -215,15 +239,6 @@ class LinkPreviewRenderer(val globals: Globals, val siteId: SiteId,
     }
 
     Future.failed(NoEngineException)
-  }
-
-  private def loadPreiewInfoFromDatabase(url: String): Option[LinkPreview] = {
-    // Don't create a write tx — could cause deadlocks, because unfortunately
-    // we might be inside a tx already: [nashorn_in_tx] (will fix later)
-    val siteDao = globals.siteDao(siteId)
-    siteDao.readOnlyTransaction { tx =>
-      tx.loadLinkPreview(url)
-    }
   }
 
   private def savePreiewInfoToDatabase(linkPreview: LinkPreview): Unit = {

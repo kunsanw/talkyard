@@ -1,10 +1,17 @@
 
-.s_Ob-oEmb
+.s_LnPv-oEmb
   background: hsl(0, 0%, 91.6%);
   margin: 9px 25px;
   padding: 19px 0 9px;
+  &.s_LnPv-Err
+    padding: 12px 18px;
+    color: hsl(0, 0%, 15%);
+    .s_LnPv_L-Err
+      margin-left: 5px;
+    // So won't span the whole page — it's not so interesting, since broken.
+    display: inline-block;
 
-.s_Ob-oEmb iframe
+.s_LnPv-oEmb iframe
   margin: 0 auto;
   display: block;
   width: calc(100% - 30px);
@@ -12,7 +19,7 @@
   // A good start? Gets corrected quickly by this iframe srcdoc=.. script: [OEMBHGHT].
   height: 220px;
 
-.s_Ob_Lnk
+.s_LnPv_ViewAt
   display: block;
   margin: 7px auto 7px;  // already 10px extra margin-top: [oemb_extr_height]
   text-align: center;
