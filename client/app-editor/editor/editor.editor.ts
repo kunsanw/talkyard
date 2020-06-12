@@ -1418,7 +1418,12 @@ export const Editor = createFactory<any, EditorState>({
     this.setState({
       showMaximized: !state.showMaximized || !state.splitHorizontally,
       splitHorizontally: state.showMaximized && !state.splitHorizontally,
-    });
+    },
+      // If the preview is show inline directly in the post we're editing, and
+      // we click Maximize, then, there's not yet any preview here in the editor,
+      // and e.g. external link previews wouldn't appear. Then, need to:
+      // (and might as well do always)
+      this.updatePreviewSoon);
   },
 
   togglePreview: function() {

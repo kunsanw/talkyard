@@ -68,7 +68,6 @@ describe("editor onebox:", () => {
   // ----- Tweet preview in Editor
 
   it("... and a Twitter tweet link", () => {
-owensBrowser.debug();
     owensBrowser.editor.editText(
           'https://twitter.com/jacindaardern/status/1057100751955222530');
           // 'https://twitter.com/jacindaardern/status/1106397870628847617'
@@ -109,7 +108,6 @@ owensBrowser.debug();
   // ----- Tweets in real topic
 
   it("Owen saves the page", () => {
-owensBrowser.debug();
     owensBrowser.rememberCurrentUrl();
     owensBrowser.editor.save();
     owensBrowser.waitForNewUrl();
@@ -148,7 +146,6 @@ owensBrowser.debug();
   // ----- Tweet previews in Maximized editor
 
   it("Owen maximizes the editor", () => {
-owensBrowser.debug();
     owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
   });
 
@@ -177,12 +174,17 @@ owensBrowser.debug();
   // ----- Two tweets
 
   it("Owen adds text and a 2nd not-broken tweet", () => {
+    /// Ooops this once appended in the middle of the text :- (
     owensBrowser.editor.editText('\n\n' +
           'Wow_wow!\n\n' +
           'https://twitter.com/GreatOzGovTweet/status/707747970695962624',
           { append: true });
 
     owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor', howMany: 2 });
+  });
+
+  it("... saves", () => {
+owensBrowser.debug();
     owensBrowser.editor.save();
   });
 
