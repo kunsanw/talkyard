@@ -100,12 +100,14 @@ abstract class LinkPreviewRenderEngine(globals: Globals) {
     s"""<a href="$safeUrl" rel="nofollow" class="s_LnPv_L$errClass">$safeUrl</a>"""
   }
 
-  protected def safeProblemHtml(problem: String, unsafeUrl: String): String = {
+  protected def safeProblemHtml(problem: String, unsafeUrl: String, errorCode: String = "")
+        : String = {
     val safeProblem = TextAndHtml.safeEncodeForHtmlContentOnly(problem)
     val safeLinkTag = safeBoringLinkTag(unsafeUrl, isOk = false)
+    val errInBrackets = if (errorCode.isEmpty) "" else s" <code>[$errorCode]</code>"
     val safeHtml =
           s"""<aside class="onebox s_LnPv s_LnPv-Err $cssClassName clearfix">${
-              safeProblem} $safeLinkTag</aside>"""
+              safeProblem} $safeLinkTag$errInBrackets</aside>"""
 
     // safeHtml is safe already — let's double-sanitize just in case:
     TextAndHtml.sanitizeAllowLinksAndBlocks(

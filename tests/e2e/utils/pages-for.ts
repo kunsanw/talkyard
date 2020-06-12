@@ -1235,7 +1235,7 @@ export class TyE2eTestBrowser {
       });
     }
 
-    waitForExist(selector: string, ps: { timeoutMs?: number } = {}) {
+    waitForExist(selector: string, ps: { timeoutMs?: number, howMany?: number } = {}) {
       this.waitUntil(() => {
         const elem = this.$(selector);
         if (elem && elem.isExisting())
@@ -1244,6 +1244,10 @@ export class TyE2eTestBrowser {
         ...ps,
         message: `Waiting until exists:  ${selector}`,
       });
+
+      if (ps.howMany && ps.howMany >= 2) {
+        this.waitForAtLeast(ps.howMany, selector);
+      }
     }
 
     waitForGone(selector: string, ps: { timeoutMs?: number } = {}) {
@@ -4228,27 +4232,36 @@ export class TyE2eTestBrowser {
       __inPagePreviewSelector: '.s_P-Prvw ',
       __inEditorPreviewSelector: '#t_E_Preview ', // '#debiki-editor-controller .preview ';
 
+      exists: (selector: string, opts: { where: 'InEditor' | 'InPage' }): boolean => {
+        return this.preview.__checkPrevw(opts.where, (whichPrevwSelector: string) => {
+          return this.isExisting(whichPrevwSelector + selector);
+        });
+      },
+
       waitForExist: (
-            selector: string, opts: { where: 'InEditor' | 'InPage' }) => {
-        if (opts.where === 'InEditor') {
-          this.switchToEmbEditorIframeIfNeeded();
-          this.waitForExist(this.preview.__inEditorPreviewSelector + selector);
-        }
-        else {
-          this.switchToEmbCommentsIframeIfNeeded();
-          this.waitForExist(this.preview.__inPagePreviewSelector + selector);
-        }
+            selector: string, opts: { where: 'InEditor' | 'InPage', howMany?: number }) => {
+        this.preview.__checkPrevw(opts.where, (whichPrevwSelector: string) => {
+          this.waitForExist(whichPrevwSelector + selector, { howMany: opts.howMany });
+        });
       },
 
       waitUntilPreviewHtmlMatches: (
             text: string, opts: { where: 'InEditor' | 'InPage' }) => {
-        if (opts.where === 'InEditor') {
+        this.preview.__checkPrevw(opts.where, (whichPrevwSelector: string) => {
+          this.waitUntilHtmlMatches(whichPrevwSelector, text);
+        });
+      },
+
+      __checkPrevw: <R>(where: 'InEditor' | 'InPage', fn: (string) => R): R => {
+        if (where === 'InEditor') {
           this.switchToEmbEditorIframeIfNeeded();
-          this.waitUntilHtmlMatches(this.preview.__inEditorPreviewSelector, text);
+          //this.waitUntilHtmlMatches(this.preview.__inEditorPreviewSelector, text);
+          return fn(this.preview.__inEditorPreviewSelector);
         }
         else {
           this.switchToEmbCommentsIframeIfNeeded();
-          this.waitUntilHtmlMatches(this.preview.__inPagePreviewSelector, text);
+          //this.waitUntilHtmlMatches(this.preview.__inPagePreviewSelector, text);
+          return fn(this.preview.__inPagePreviewSelector);
         }
       },
     };
@@ -4470,6 +4483,11 @@ export class TyE2eTestBrowser {
           logMessage(`id attr: ${idAttr}, expected nr: ${expectedNr}`);
           tyAssert.eq(idAttr, `post-${expectedNr}`);
         }
+      },
+
+      waitForExistsInPost: (postNr: PostNr, selector: string,
+            ps: { timeoutMs?: number, howMany?: number } = {}) => {
+        this.waitForExist(this.topic.postBodySelector(postNr) + ' ' + selector, ps);
       },
 
       postNrContains: (postNr: PostNr, selector: string) => {

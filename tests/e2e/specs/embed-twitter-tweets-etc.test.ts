@@ -1,7 +1,7 @@
 /// <reference path="../test-types.ts"/>
 
 import * as _ from 'lodash';
-import assert = require('assert');
+import assert = require('../utils/ty-assert');
 import server = require('../utils/server');
 import utils = require('../utils/utils');
 import { TyE2eTestBrowser } from '../utils/pages-for';
@@ -20,30 +20,16 @@ let mariasBrowser: TyE2eTestBrowser;
 
 let idAddress: IdAddress;
 let forumTitle = "Editor Onebox Forum";
-let oneboxTopicTitle = "Onebox Topic Title";
+let tweetTopicTitle = "Tweet Topic Title";
 
 let dotOneboxClass = '.onebox';
 
-// Currently Onebox links must be HTTPS if the server uses HTTPS —  [E2EHTTPS]
-// because then http gets changed to https. [1BXHTTPS]
-// Let's use some http links too though, unless the server uses https.
-let imageJpgUrl = 'https://www.example.com/image.jpg';
-let imagePngUrl = `${settings.scheme}://www.example.com/image.png`;  // http, sometimes
-let imageGifUrl = `${settings.scheme}://www.example.com/image.gif`;  //
-let videoMp4Url = 'https://www.example.com/video.mp4';
-let videoYouTubeIdInvalid = 'https://www.youtube.com/watch?v=DAR27FWzyZY';
-let videoYouTubeId = 'DAR27FWzyZY';
-let videoYouTubeUrl = `https://www.youtube.com/watch?v=${videoYouTubeId}`;
-let videoYouTubeUrlInvalidId = `https://www.youtube.com/watch?v=${videoYouTubeIdInvalid}`;
-let imageJpgOnebox = `aside.onebox.dw-ob-image a[href="${imageJpgUrl}"] img[src="${imageJpgUrl}"]`;
-let imagePngOnebox = `aside.onebox.dw-ob-image a[href="${imagePngUrl}"] img[src="${imagePngUrl}"]`;
-let imageGifOnebox = `aside.onebox.dw-ob-image a[href="${imageGifUrl}"] img[src="${imageGifUrl}"]`;
-let videoMp4Onebox = `aside.onebox.dw-ob-video video[src="${videoMp4Url}"]`;
-let videoYouTubeOnebox =
-    `aside.onebox.dw-ob-youtube iframe[src^="https://www.youtube.com/embed/${videoYouTubeId}"]`;
 
-const inPagePreviewSelector = '.s_P-Prvw ';
-const inEditorPreviewSelector = '#debiki-editor-controller .preview ';
+
+const brokenPreview = '.s_LnPv-Err';
+const tweetPrevwOk  = `.s_LnPv-Twitter:not(${brokenPreview})`;
+const tweetPrevwError = `.s_LnPv-Twitter${brokenPreview}`;
+
 
 describe("editor onebox:", () => {
 
@@ -75,121 +61,142 @@ describe("editor onebox:", () => {
   });
 
   it("Owen types a title", () => {
-    owensBrowser.editor.editTitle(oneboxTopicTitle);
+    owensBrowser.editor.editTitle(tweetTopicTitle);
   });
 
-  it("... and a Twitter tweet url", () => {
+
+  // ----- Tweet preview in Editor
+
+  it("... and a Twitter tweet link", () => {
 owensBrowser.debug();
     owensBrowser.editor.editText(
           'https://twitter.com/jacindaardern/status/1057100751955222530');
           // 'https://twitter.com/jacindaardern/status/1106397870628847617'
   });
 
-  /*
-  it("The image url gets converted to a .onebox tag", () => {
+  it("The tweet link becomes a Twitter Tweet Preview iframe", () => {
     // Something in here timed out once. So do in two steps, simpler to troubleshoot. First: ...
-    owensBrowser.preview.waitForExist(dotOneboxClass, { where: 'InEditor' });
-    owensBrowser.waitForExist(inEditorPreviewSelector + dotOneboxClass);  // CLEAN_UP remove
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor' });
   });
 
-  it("... with an a[href=...] and img[src=...]", () => {
-    // ...Then:
-    owensBrowser.preview.waitForExist(imageJpgOnebox, { where: 'InEditor' });
-    owensBrowser.waitForExist(inEditorPreviewSelector + imageJpgOnebox);  // CLEAN_UP remove
+
+  // ----- Broken tweet
+
+  it("... there's no broken tweet", () => {
+    // Test the test:
+    assert.ok(owensBrowser.preview.exists(tweetPrevwOk, { where: 'InEditor' }));
+    // The real test:
+    assert.not(owensBrowser.preview.exists(tweetPrevwError, { where: 'InEditor' }));
   });
+
+  it("Owen types a broken tweet link", () => {
+    owensBrowser.editor.editText('\n\n' +
+          // Seems the username can be whatever — only the tweet nuumber matters.
+          // But there aren't 9999... tweets yet.
+          'https://twitter.com/someusername/status/9999999999999991234',
+          { append: true });
+  });
+
+  it("That tweet becomes a 'Tweet not found' message", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwError, { where: 'InEditor' });
+  });
+
+  it("The ok tweet is still there", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor' });
+  });
+
+
+  // ----- Tweets in real topic
 
   it("Owen saves the page", () => {
+owensBrowser.debug();
     owensBrowser.rememberCurrentUrl();
     owensBrowser.editor.save();
     owensBrowser.waitForNewUrl();
-    owensBrowser.assertPageTitleMatches(oneboxTopicTitle);
+    owensBrowser.assertPageTitleMatches(tweetTopicTitle);
   });
 
-  it("... and sees the onebox <img> tag", () => {
-    owensBrowser.waitForExist('.esOrigPost ' + dotOneboxClass);
-    owensBrowser.waitForExist('.esOrigPost ' + imageJpgOnebox);
+  it("The tweet appears in the new topic", () => {
+    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwOk);
   });
 
-  it("Owen edits the page, adds a video url", () => {
+  it("... and the broken tweet too", () => {
+    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwError);
+  });
+
+  it("The editor and the in-editor previews, are gone", () => {
+    assert.not(owensBrowser.preview.exists(tweetPrevwOk, { where: 'InEditor' }));
+    assert.not(owensBrowser.preview.exists(tweetPrevwError, { where: 'InEditor' }));
+  });
+
+
+  // ----- In Page tweet previews
+
+  it("Owen edits the page", () => {
     owensBrowser.topic.clickEditOrigPost();
-    owensBrowser.editor.editText(videoMp4Url, { checkAndRetry: true });
   });
 
-  it("It appears as a onebox <video> tag in the preview", () => {
-    owensBrowser.preview.waitForExist(dotOneboxClass, { where: 'InPage' });
-    owensBrowser.waitForExist(inPagePreviewSelector + dotOneboxClass);  // CLEAN_UP remove
-
-    owensBrowser.preview.waitForExist(videoMp4Onebox, { where: 'InPage' });
-    owensBrowser.waitForExist(inPagePreviewSelector + videoMp4Onebox);  // CLEAN_UP remove
+  it("... now the broken tween preview appears in the page", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwError, { where: 'InPage' });
   });
 
-  it("Owen saves the edits, sees both the onebox <img> and the <video> tags", () => {
+  it("... and the ok tweet preview too", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InPage' });
+  });
+
+
+  // ----- Tweet previews in Maximized editor
+
+  it("Owen maximizes the editor", () => {
+owensBrowser.debug();
+    owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
+  });
+
+  it("... an in-editor preview appears, for the Ok tweet", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor' });
+  });
+
+  it("... and for the broken tweet", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwError, { where: 'InEditor' });
+  });
+
+  it("Owen tiles the editor horizontally", () => {
+owensBrowser.debug();
+    owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
+  });
+
+  it("... the in-editor Ok tweet preview is still there", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor' });
+  });
+
+  it("... and the broken tweet preview too", () => {
+    owensBrowser.preview.waitForExist(tweetPrevwError, { where: 'InEditor' });
+  });
+
+
+  // ----- Two tweets
+
+  it("Owen adds text and a 2nd not-broken tweet", () => {
+    owensBrowser.editor.editText('\n\n' +
+          'Wow_wow!\n\n' +
+          'https://twitter.com/GreatOzGovTweet/status/707747970695962624',
+          { append: true });
+
+    owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor', howMany: 2 });
     owensBrowser.editor.save();
-    owensBrowser.waitForExist('.esOrigPost ' + videoMp4Onebox);
   });
 
-  // Let's do the remaining tests as a non-staff member.
-  it("Owen leaves; Maria logs in", () => {
-    owensBrowser.topbar.clickLogout();
-    mariasBrowser.complex.loginWithPasswordViaTopbar(maria);
-    mariasBrowser.disableRateLimits();
+  it("The new text appears in the page", () => {
+    owensBrowser.topic.waitForPostAssertTextMatches(c.BodyNr, "Wow_wow");
   });
 
-  it("She can also post image urls, which get converted to onebox <img> tags", () => {
-    mariasBrowser.complex.replyToOrigPost(imageJpgUrl);
-    mariasBrowser.topic.waitForPostNrVisible(2);
-    assert(mariasBrowser.topic.postNrContains(2, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(2, imageJpgOnebox));
+  it("... The two ok tweets appear", () => {
+    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwOk, { howMany: 2 });
   });
 
-  it("But unknown links won't get converted to oneboxes", () => {
-    const weirdUrl = 'https://www.example.com/what.is.this.weirdweird';
-    mariasBrowser.complex.replyToOrigPost('https://www.example.com/what.is.this.weirdweird');
-    mariasBrowser.topic.waitForPostNrVisible(3);
-    assert(!mariasBrowser.topic.postNrContains(3, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(3, `a[href="${weirdUrl}"]`));
+  it("... and the broken tweet too", () => {
+    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwError);
   });
-
-  it("A media url inside a text paragraph is converted to a link, not a onebox", () => {
-    mariasBrowser.complex.replyToOrigPost('zzz ' + imageJpgUrl + ' qqq');
-    mariasBrowser.topic.waitForPostAssertTextMatches(4, 'zzz .* qqq');
-    assert(!mariasBrowser.topic.postNrContains(4, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(4, `a[href="${imageJpgUrl}"]`));
-  });
-
-  it("A onebox can be inserted between two text paragraphs", () => {
-    mariasBrowser.complex.replyToOrigPost("Paragraph one.\n\n" + imageJpgUrl + "\n\nPara two.");
-    mariasBrowser.topic.waitForPostAssertTextMatches(5, "Paragraph one");
-    mariasBrowser.topic.assertPostTextMatches(5, "Para two");
-    // Failed once.
-    assert(mariasBrowser.topic.postNrContains(5, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(5, imageJpgOnebox));
-  });
-
-  it("Jpg, png, gif, mp4, YouTube oneboxes work fine", () => {
-    mariasBrowser.complex.replyToOrigPost(
-        imageJpgUrl + '\n\n' +
-        imagePngUrl + '\n\n' +
-        imageGifUrl + '\n\n' +
-        videoMp4Url + '\n\n' +
-        videoYouTubeUrl);
-    mariasBrowser.topic.waitForPostNrVisible(6);
-    assert(mariasBrowser.topic.postNrContains(6, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(6, imageJpgOnebox));
-    assert(mariasBrowser.topic.postNrContains(6, imagePngOnebox));
-    assert(mariasBrowser.topic.postNrContains(6, imageGifOnebox));
-    assert(mariasBrowser.topic.postNrContains(6, videoMp4Onebox));
-    assert(mariasBrowser.topic.postNrContains(6, videoYouTubeOnebox));
-  });
-
-  it("The server survives an invalid YouTube video id", () => {
-    // Reply to the previous post because we've now scrolled down so the orig post isn't visible.
-    mariasBrowser.complex.replyToPostNr(6, videoYouTubeUrlInvalidId + '\n\n\nPlain text.');
-    mariasBrowser.topic.waitForPostAssertTextMatches(7, "Plain text");
-    assert(!mariasBrowser.topic.postNrContains(7, dotOneboxClass));
-    assert(mariasBrowser.topic.postNrContains(7, `a[href="${videoYouTubeUrlInvalidId}"]`));
-  });
-  */
 
 });
 

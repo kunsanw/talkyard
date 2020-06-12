@@ -259,7 +259,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
   // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
 
-  val cssClassName = "s_LnPv-oEmb"
+  val cssClassName = "s_LnPv-oEmb s_LnPv-Twitter"
 
 
   /** The oEmbed stuff might include arbitrary html tags and even scripts,
@@ -271,13 +271,13 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
 
   def loadAndRender(params: RenderPreviewParams): Future[String Or ErrorMessage] = {
-    def FutBad(message: String) = Future.successful(Bad(message))
-
     val unsafeUrl: String = params.unsafeUrl
     val providerEndpoint: String =
           TwitterOneboxEngine.getOEmbedProviderEndpoint(unsafeUrl) getOrElse {
             return Future.successful(Bad("Ooops unimpl [43987626576]"))
           }
+
+    def NoHtmlInOEmbed = "No html in Twitter oEmbed, url: "
 
     // omit_script=1  ?
     // theme  = {light, dark}
@@ -296,18 +296,20 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
     params.loadPreviewFromDb(downloadUrl) foreach { cachedPreview =>
       val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
-        return FutBad("No link preview json [TyE0LNPVJSN]")
+        return FutGood(safeProblemHtml(NoHtmlInOEmbed, unsafeUrl = unsafeUrl))
       }
       val unsafeProviderName = (cachedPreview.content_json_c \ "provider_name").asOpt[String]
-      makeSafePreviewHtml(
+      val safeHtml = makeSafePreviewHtml(
             unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
             unsafeProviderName = unsafeProviderName)
+      return FutGood(safeHtml)
     }
 
     if (!params.mayHttpFetchData) {
       // This can happen if one types and saves a new post really fast, before
       // preview data has been downloaded? (so not yet found in cache above)
-      return FutBad("No cached preview data, may not fetch [TyE0FETCHLNPV]")
+      return FutGood(safeProblemHtml(
+            "No preview for tweet: ", unsafeUrl = unsafeUrl, errorCode = "TyE0FETCHPRVW"))
     }
 
     val request: WSRequest = globals.wsClient.url(downloadUrl)
@@ -349,7 +351,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
             else None
 
       if (problem.isEmpty && anyUnsafeHtml.isEmpty) {
-        problem = s"No html in Twitter oEmbed, url: "
+        problem = NoHtmlInOEmbed
       }
 
       val safeHtmlResult = {
@@ -363,6 +365,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
                 unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
                 unsafeProviderName = unsafeProviderName)
 
+          SECURITY // incl in quota? num preview links * X
           params.savePreviewInDb foreach { fn =>
             val preview = LinkPreview(  // mabye Ty SCRIPT tag instead?
                   link_url_c = unsafeUrl,

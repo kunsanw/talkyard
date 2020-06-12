@@ -1171,6 +1171,9 @@ package object core {
     futureResults.map(_.reverse)(execCtx)  // because of  ::  above
   }
 
+  def FutGood[T](t: T): Future[Good[T]] = Future.successful(Good(t))
+  def FutBad[T](t: T): Future[Bad[T]] = Future.successful(Bad(t))
+
 
   /** If you're short of time, add e.g. an UNTESTED statement. The compiler
     * ensures you don't do a typo. Then, before a release:
