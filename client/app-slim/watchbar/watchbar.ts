@@ -151,6 +151,8 @@ const SubCommunities = createComponent({
 const RecentTopicsAndNotfs = createComponent({
   displayName: 'RecentTopicsAndNotfs',
 
+  // ADD REMOVE BUTTON
+
   render: function() {
     const store: Store = this.props.store;
     const watchbar: Watchbar = store.me.watchbar;
