@@ -1,5 +1,5 @@
 
-.s_LnPv-oEmb
+.s_LnPv
   background: hsl(0, 0%, 91.6%);
   margin: 9px 25px;
   padding: 19px 0 9px;
@@ -14,13 +14,15 @@
     // So won't span the whole page — it's not so interesting, since broken.
     display: inline-block;
 
-.s_LnPv-oEmb iframe
+.s_LnPv iframe
   margin: 0 auto;
   display: block;
-  width: calc(100% - 30px);
+  width: calc(100% - 40px);
   border: none;
-  // A good start? Gets corrected quickly by this iframe srcdoc=.. script: [OEMBHGHT].
-  height: 220px;
+  // Gets corrected quickly by this iframe srcdoc=.. script: [OEMBHGHT],
+  // however, for other iframes, e.g. Telegram, can a bit too tall. [TELEGRIFR]
+  height: auto;
+  overflow: hidden;
 
 .s_LnPv_ViewAt
   display: block;
@@ -34,11 +36,11 @@
   max-width: 480px;
   height: 270px;
 
-.dw-ob-image > a
+.s_LnPv-Img > a
   float: left;  // makes Utterscroll work on any whitespace to the right of the image
   max-width: 100%;
 
-aside.onebox
+xx_aside.onebox
   margin: 1.5em 0 9px;
   + p,
   + ol,

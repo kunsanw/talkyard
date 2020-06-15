@@ -33,9 +33,10 @@ import scala.util.matching.Regex
 class ImagePrevwRendrEng(globals: Globals)
   extends InstantLinkPreviewEngine(globals) {
 
-  val regex: Regex = """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
+  override val regex: Regex =
+    """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
 
-  val cssClassName = "dw-ob-image"
+  def providerLnPvCssClassName = "s_LnPv-Img"
 
   override val alreadySanitized = true
 
@@ -49,7 +50,7 @@ class ImagePrevwRendrEng(globals: Globals)
 
     val safeUrl = safeEncodeForHtml(url)
 
-    Good(s"<a href='$safeUrl' rel='nofollow' target='_blank'><img src='$safeUrl'></a>")
+    Good(s"<a href='$safeUrl' rel='nofollow noopener' target='_blank'><img src='$safeUrl'></a>")
   }
 
 }

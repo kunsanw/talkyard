@@ -35,15 +35,22 @@ let videoYouTubeIdInvalid = 'https://www.youtube.com/watch?v=DAR27FWzyZY';
 let videoYouTubeId = 'DAR27FWzyZY';
 let videoYouTubeUrl = `https://www.youtube.com/watch?v=${videoYouTubeId}`;
 let videoYouTubeUrlInvalidId = `https://www.youtube.com/watch?v=${videoYouTubeIdInvalid}`;
-let imageJpgOnebox = `aside.onebox.dw-ob-image a[href="${imageJpgUrl}"] img[src="${imageJpgUrl}"]`;
-let imagePngOnebox = `aside.onebox.dw-ob-image a[href="${imagePngUrl}"] img[src="${imagePngUrl}"]`;
-let imageGifOnebox = `aside.onebox.dw-ob-image a[href="${imageGifUrl}"] img[src="${imageGifUrl}"]`;
-let videoMp4Onebox = `aside.onebox.dw-ob-video video[src="${videoMp4Url}"]`;
+let imageJpgOnebox = `aside.onebox.s_LnPv-Img a[href="${imageJpgUrl}"] img[src="${imageJpgUrl}"]`;
+let imagePngOnebox = `aside.onebox.s_LnPv-Img a[href="${imagePngUrl}"] img[src="${imagePngUrl}"]`;
+let imageGifOnebox = `aside.onebox.s_LnPv-Img a[href="${imageGifUrl}"] img[src="${imageGifUrl}"]`;
+let videoMp4Onebox = `aside.onebox.s_LnPv-Video video[src="${videoMp4Url}"]`;
 let videoYouTubeOnebox =
     `aside.onebox.dw-ob-youtube iframe[src^="https://www.youtube.com/embed/${videoYouTubeId}"]`;
 
 const inPagePreviewSelector = '.s_P-Prvw ';
 const inEditorPreviewSelector = '#debiki-editor-controller .preview ';
+
+
+// Also try w real pics & vids:
+//  https://preview.redd.it/7fig79vdq4451.png?width=640&height=640&crop=smart&auto=webp&s=548214ef563f762152ab1c0733b37fbf16bad3c8
+//  http://techslides.com/demos/sample-videos/small.mp4
+// verify does resize & show?
+
 
 describe("editor onebox:", () => {
 

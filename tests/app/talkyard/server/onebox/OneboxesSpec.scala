@@ -22,7 +22,7 @@ package talkyard.server.onebox
 import org.scalatest._
 import org.scalatest.matchers.must
 import com.debiki.core.Prelude._
-import debiki.onebox.engines.TwitterOneboxEngine
+import debiki.onebox.engines.TwitterPrevwRendrEng
 
 
 class OneboxesSpec extends FreeSpec with must.Matchers {
@@ -33,7 +33,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
   "Oneboxes" - {
 
     "TwitterOneboxEngine can" - {
-      import TwitterOneboxEngine.{regex => rgx}
+      import TwitterPrevwRendrEng.{regex => rgx}
 
       // Sample tweet link from:
       // https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-oembed
@@ -75,7 +75,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
     val facebookVideoUrl = "https://www.facebook.com/abc123/videos/def456"
 
     "FacebookPostsOneboxEngine can" - {
-      import debiki.onebox.engines.{FacebookPostsOneboxEngine => fb}
+      import debiki.onebox.engines.{FacebookPostPrevwRendrEng => fb}
 
       val postUrl = facebookPostUrl
       val photoUrl = "https://www.facebook.com/photos/def456"
@@ -107,7 +107,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
 
 
     "FacebookVideosOneboxEngine can" - {
-      import debiki.onebox.engines.{FacebookVideosOneboxEngine => fb}
+      import debiki.onebox.engines.{FacebookVideoPrevwRendrEng => fb}
 
       val videoUrl = facebookVideoUrl
       val videoUrl2 = "https://www.facebook.com/video.php?query=param"
@@ -134,16 +134,22 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
 
 
     "InstagramOneboxEngine can" - {
-      import debiki.onebox.engines.{InstagramOneboxEngine => insta}
+      import debiki.onebox.engines.{InstagramPrevwRendrEng => insta}
 
+      val realUrl1 = "https://www.instagram.com/p/BJlNX-rju7o/?utm_source=ig_web_button_share_sheet"
+      val realUrl2 = "https://www.instagram.com/p/CBCJGUZDVT_/"
       val url1 = "https://instagram.com/abc123/p/def456"
       val url2 = "https://instagram.com/abc123/tv/def456"
       val url3 = "https://instagram.com/p/def456"
       val url4 = "https://instagram.com/tv/def456"
-
       val url5 = "https://instagr.am/abc123/p/def456"
 
-      "match Instagram urls" in {
+      "match real Instagram url:s" in {
+        insta.regex.matches(realUrl1) mustBe true
+        insta.regex.matches(realUrl2) mustBe true
+      }
+
+      "match even more Instagram urls" in {
         insta.regex.matches(url1) mustBe true
         insta.regex.matches(url2) mustBe true
         insta.regex.matches(url3) mustBe true
@@ -167,7 +173,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
 
 
     "RedditOneboxEngine can" - {
-      import debiki.onebox.engines.{RedditOneboxEngine => reddit}
+      import debiki.onebox.engines.{RedditPrevwRendrEng => reddit}
 
       val url1 = "https://reddit.com/r/abc123/comments/de45/fg67"
       val url2 = "https://www.reddit.com/r/abc123/comments/de45/fg67"
@@ -196,6 +202,35 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
         // too many /
         reddit.regex.matches(url3.replaceAllLiterally("/AskReddit/", "/AskR/eddit/")) mustBe false
       }
+    }
+  }
+
+
+  "TikTokPrevwRendrEng can" - {
+    import debiki.onebox.engines.{TikTokPrevwRendrEng => tiktok}
+
+    val url1 = "https://www.tiktok.com/@scout2015/video/6718335390845095173"
+    val url2 = "https://www.tiktok.com/@someone.somename/video/1234567890000000002"
+
+    "match TikTok urls" in {
+      tiktok.regex.matches(url1) mustBe true
+      tiktok.regex.matches(url2) mustBe true
+    }
+
+    "but not the wrong urls" in {
+      // http not https
+      tiktok.regex.matches(url1.replaceAllLiterally("https:", "http:")) mustBe false
+      tiktok.regex.matches(url2.replaceAllLiterally("https:", "http:")) mustBe false
+      // wrong domain
+      tiktok.regex.matches(url1.replaceAllLiterally("tiktok.com", "tik_ok.com")) mustBe false
+      tiktok.regex.matches(url2.replaceAllLiterally("tiktok.com", "tiktok.org")) mustBe false
+      tiktok.regex.matches(url2.replaceAllLiterally("www.tiktok", "bad.tiktok")) mustBe false
+      // wrong path
+      tiktok.regex.matches(url1.replaceAllLiterally("/video/", "/villains/")) mustBe false
+      tiktok.regex.matches(url2.replaceAllLiterally("/video/", "/vi/deo/")) mustBe false
+      tiktok.regex.matches(url2.replaceAllLiterally("/video/", "/")) mustBe false
+      // no  @ in username
+      tiktok.regex.matches(url1.replaceAllLiterally("/@", "/")) mustBe false
     }
   }
 

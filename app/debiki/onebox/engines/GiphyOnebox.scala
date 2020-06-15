@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 class GiphyPrevwRendrEng(globals: Globals)
   extends InstantLinkPreviewEngine(globals) {
 
-  val regex: Regex =
+  override val regex: Regex =
     """^(https?:)?\/\/giphy\.com\/(gifs|embed)/[a-zA-Z0-9-]*-?[a-zA-Z0-9]+(/html5)?$""".r
 
   // (?:...) is a non capturing group.
@@ -38,19 +38,22 @@ class GiphyPrevwRendrEng(globals: Globals)
   val findIdRegex: Regex =
     """(?:https?:)\/\/[^/]+\/[a-z]+\/[a-zA-Z0-9-]*?-?([a-zA-Z0-9]+)""".r
 
-  val cssClassName = "esOb-Giphy"
+  def providerLnPvCssClassName = "esOb-Giphy"
 
   override val alreadySanitized = true
 
-  def renderInstantly(unsafeUrl: String): String Or ErrorMessage = {
+  def renderInstantly(unsafeUrl: String): String Or LinkPreviewProblem = {
     val unsafeId = findIdRegex.findGroupIn(unsafeUrl) getOrElse {
-      return Bad("Cannot find Giphy video id in URL")
+      return Bad(LinkPreviewProblem(
+            "Cannot find Giphy video id in URL", unsafeUrl = unsafeUrl, "TyEGIPHYURL"))
      }
 
     // The id is [a-zA-Z0-9] so need not be sanitized, but do anyway.
     val safeId = safeEncodeForHtml(unsafeId)
 
     COULD // find out if this still works? Or use oEmbed?
+
+    // SANDBOX!
 
     // The hardcoded width & height below are probably incorrect. They can be retrieved
     // via Giphys API: https://github.com/Giphy/GiphyAPI#get-gif-by-id-endpoint

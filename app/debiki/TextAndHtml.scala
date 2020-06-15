@@ -116,6 +116,13 @@ object TextAndHtml {
     Jsoup.clean(unsafeTags, whitelist)
   }
 
+  def sanitizeRelaxed(unsafeTags: String,
+        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    var whitelist = org.jsoup.safety.Whitelist.relaxed()
+    whitelist = amendWhitelistFn(whitelist)
+    Jsoup.clean(unsafeTags, whitelist)
+  }
+
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
   // But it's slow, if importing a whole site. How deal with this?
   // Maybe just let admins-that-import-a-site set a flag that everything has been
@@ -126,6 +133,7 @@ object TextAndHtml {
 
     // rel=nofollow not included by default, in the relaxed() whitelist,
     // see: https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed()
+    BUG // this removes  noopener
     org.jsoup.safety.Whitelist.relaxed().addEnforcedAttribute("a", "rel", "nofollow")
   }
 }

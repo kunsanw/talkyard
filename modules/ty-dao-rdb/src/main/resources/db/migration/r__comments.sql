@@ -1,5 +1,5 @@
 
-comment on table link_previews_t is $c$
+comment on table  link_previews_t  is $_$
 
 Both link_url_c and downloaded_from_url_c are part of the primary key
 — otherwise an attacker's website A could hijack a widget from a normal
@@ -16,5 +16,32 @@ But by including both link_url_c and downloaded_from_url_c in the primary key,
 that cannot happen — when looking up https://webs-w/widget + E,
 the attacker's entry wouldn't be found (because it's  https://webs-a/...).
 
-$c$;
+There's an index  linkpreviews_i_site_downl_err_at  you can use to maybe retry
+failed downlads after a while.
+$_$;
+
+
+comment on column  link_previews_t.content_json_c  is $_$
+
+Why up to 27 000 long? [oEmb_json_len] Well, this can be lots of data — an Instagram
+oEmbed was 9 215 bytes, and contains an inline <svg> image, and
+'background-color: #F4F4F4' repeated at 8 places, and the Instagram post text
+repeated twice. Better allow at least 2x more than that.
+$_$;
+
+
+comment on column  link_previews_t.status_code_c  is $_$
+
+Is 0 if the request failed completely [ln_pv_netw_err], didn't get any response. E.g.
+TCP RST or timeout. 0 means the same in a browser typically, e.g. request.abort().
+$_$;
+
+
+comment on column  link_previews_t.content_json_c  is $_$
+
+Null if the request failed, got no response json. E.g. an error status code,
+or a request timeout or TCP RST?
+$_$;
+
+
 

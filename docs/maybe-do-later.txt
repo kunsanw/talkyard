@@ -280,3 +280,12 @@ Read-only tx in tx is ok but unnecessary, a tiny bit slower & more mem.
 
 [Scala_213]
 Try —> Using
+
+[typesafe_lua]
+Maybe: https://github.com/teal-language/tl  Teal, a typed dialect of Lua  ?
+  by https://github.com/hishamhm  works at Kong. FOSDEM2020, VSCode & Vim support.
+https://github.com/emilk/sol — no longer in active development
+
+[censor_stuff]
+Content filter, e.g. don't allow toxic speech, or pics of zebras if that's against
+the community's rules. 

@@ -5,9 +5,10 @@ create table link_previews_t(
   link_url_c varchar not null,
   downloaded_from_url_c varchar not null,
   downloaded_at_c timestamp not null,
+  status_code_c int not null,
   preview_type_c int not null,
   first_linked_by_id_c int not null,
-  content_json_c jsonb not null,
+  content_json_c jsonb,
 
   constraint  linkpreviews_p_linkurl_downlurl primary key (
       site_id_c, link_url_c, downloaded_from_url_c),
@@ -22,18 +23,23 @@ create table link_previews_t(
   constraint linkpreviews_c_downloadedfromurl_len check (
       length(downloaded_from_url_c) between 5 and 500),
 
+  constraint linkpreviews_c_statuscode check (
+      status_code_c >= 0),
+
   constraint linkpreviews_c_previewtype check (
       preview_type_c between 1 and 9),
 
   constraint linkpreviews_c_contentjson_len check (
-      pg_column_size(content_json_c) between 5 and 5000)
+      pg_column_size(content_json_c) between 5 and 27000)
 );
 
 
-create index linkpreviews_i_downloadedat on link_previews_t (downloaded_at_c);
-create index linkpreviews_i_site_downlat on link_previews_t (site_id_c, downloaded_at_c);
+create index linkpreviews_i_g_downloadedat on link_previews_t (downloaded_at_c);
+create index linkpreviews_i_downlat on link_previews_t (site_id_c, downloaded_at_c);
 create index linkpreviews_i_firstlinkedby on link_previews_t (site_id_c, first_linked_by_id_c);
 
+create index linkpreviews_i_downl_err_at on link_previews_t (site_id_c, downloaded_at_c)
+    where status_code_c <> 200;
 
 create table links_t(
   site_id_c int not null,

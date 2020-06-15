@@ -13,17 +13,13 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * The parts copyrighted by jzeta are available under the MIT license:
- * - https://github.com/discourse/onebox/blob/master/lib/onebox/engine/video_onebox.rb
- * - https://github.com/discourse/onebox/blob/master/LICENSE.txt
  */
 
 package debiki.onebox.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn}
+import debiki.{Globals, Nashorn, TextAndHtml}
 import debiki.onebox._
 import debiki.TextAndHtml.sanitizeAllowLinksAndBlocks
 import org.scalactic.{Bad, ErrorMessage, Good, Or}
@@ -33,185 +29,6 @@ import scala.concurrent.Future
 import scala.util.matching.Regex
 import talkyard.server.TyLogging
 
-
-
-object FacebookPostsOneboxEngine {
-
-  // Facebook posts and photos URL scheme, from https://oembed.com:
-  //
-  // API endpoint: https://www.facebook.com/plugins/post/oembed.json
-  // for urls like:
-  // >  https://www.facebook.com/*/posts/*
-  // >  https://www.facebook.com/photos/*
-  // >  https://www.facebook.com/*/photos/*
-  // >  https://www.facebook.com/photo.php*
-  // >  https://www.facebook.com/photo.php
-  // >  https://www.facebook.com/*/activity/*
-  // >  https://www.facebook.com/permalink.php
-  // >  https://www.facebook.com/media/set?set=*
-  // >  https://www.facebook.com/questions/*
-  // >  https://www.facebook.com/notes/*/*/*
-  //
-  // From  https://developers.facebook.com/docs/plugins/oembed-endpoints/:
-  //   https://www.facebook.com/{page-name}/posts/{post-id}
-  //   https://www.facebook.com/{username}/posts/{post-id}
-  //   https://www.facebook.com/{username}/activity/{activity-id}
-  //   https://www.facebook.com/photo.php?fbid={photo-id}
-  //   https://www.facebook.com/photos/{photo-id}
-  //   https://www.facebook.com/permalink.php?story_fbid={post-id}
-  //   https://www.facebook.com/media/set?set={set-id}
-  //   https://www.facebook.com/questions/{question-id}
-  //   https://www.facebook.com/notes/{username}/{note-url}/{note-id}
-
-  def handles(url: String): Boolean = {
-    if (!url.startsWith("https://www.facebook.com/"))
-      return false
-
-    val path = url.replaceAllLiterally("https://www.facebook.com", "")
-
-    if (path.startsWith("/photos") ||
-        path.startsWith("/photo.php?") ||      // folowed by ?query=params
-        path.startsWith("/permalink.php?") ||  // ?story_fbid=...
-        path.startsWith("/media/set?set=") ||
-        path.startsWith("/questions/") ||
-        path.startsWith("/notes/"))
-      return true
-
-    // This is good enough?
-    if (path.contains("/posts/") ||
-        path.contains("/photos/") ||
-        path.contains("/activity/"))
-      return true
-
-    false
-  }
-
-}
-
-
-object FacebookVideosOneboxEngine {
-
-  // maxwidth=...
-  // omitscript=...
-
-  // Facebook videos URL scheme, from https://oembed.com:
-  //
-  // API endpoint: https://www.facebook.com/plugins/video/oembed.json
-  // for urls like:
-  // >  https://www.facebook.com/*/videos/*
-  // >  https://www.facebook.com/video.php
-  //
-  // Videos, from https://developers.facebook.com/docs/plugins/oembed-endpoints/:
-  //   https://www.facebook.com/{page-name}/videos/{video-id}/
-  //   https://www.facebook.com/{username}/videos/{video-id}/
-  //   https://www.facebook.com/video.php?id={video-id}
-  //   https://www.facebook.com/video.php?v={video-id}
-  //
-  // Response looks like:
-  //   {
-  //     "author_name": "Facebook",
-  //     "author_url": "https://www.facebook.com/facebook/",
-  //     "provider_url": "https://www.facebook.com",
-  //     "provider_name": "Facebook",
-  //     "success": true,
-  //     "height": null,
-  //     "html": "<div id=\"fb-root\"></div>\n<script>(function(d, s, id) {\n  var js, fjs = d.getElementsByTagName(s)[0];\n  if (d.getElementById(id)) return;\n  js = d.createElement(s); js.id = id;\n  js.src = \"https://connect.facebook.net/en_US/sdk.js#xfbml=1&amp;version=v2.9\";\n  fjs.parentNode.insertBefore(js, fjs);\n}(document, 'script', 'facebook-jssdk'));</script><div class=\"fb-video\" data-href=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><div class=\"fb-xfbml-parse-ignore\"><blockquote cite=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><a href=\"https://www.facebook.com/facebook/videos/10153231379946729/\">How to Share With Just Friends</a><p>How to share with just friends.</p>Posted by <a href=\"https://www.facebook.com/facebook/\">Facebook</a> on Friday, December 5, 2014</blockquote></div></div>",
-  //     "type": "video",
-  //     "version": "1.0",
-  //     "url": "https://www.facebook.com/facebook/videos/10153231379946729/",
-  //     "width": "100%"
-  //   }
-
-  def handles(url: String): Boolean = {
-    if (!url.startsWith("https://www.facebook.com/"))
-      return false
-
-    val path = url.replaceAllLiterally("https://www.facebook.com", "")
-
-    if (path.startsWith("/video.php?")) // folowed by ?query=params
-      return true
-
-    // Good enough?
-    if (path.contains("/videos/"))
-      return true
-
-    false
-  }
-
-}
-
-
-object InstagramOneboxEngine {
-
-  // Instagram URL scheme, from https://oembed.com:
-  //
-  //  API:  https://api.instagram.com/oembed  (only json)
-  //
-  // > http://instagram.com/*/p/*,
-  // > http://www.instagram.com/*/p/*,
-  // > https://instagram.com/*/p/*,
-  // > https://www.instagram.com/*/p/*,
-  // > http://instagram.com/p/*
-  // > http://instagr.am/p/*
-  // > http://www.instagram.com/p/*
-  // > http://www.instagr.am/p/*
-  // > https://instagram.com/p/*
-  // > https://instagr.am/p/*
-  // > https://www.instagram.com/p/*
-  // > https://www.instagr.am/p/*
-  // > http://instagram.com/tv/*
-  // > http://instagr.am/tv/*
-  // > http://www.instagram.com/tv/*
-  // > http://www.instagr.am/tv/*
-  // > https://instagram.com/tv/*
-  // > https://instagr.am/tv/*
-  // > https://www.instagram.com/tv/*
-  // > https://www.instagr.am/tv/*
-
-  val regex: Regex =
-    """^https?://(www\.)?(instagram\.com|instagr\.am)/(.*/)?(p|tv)/.*$""".r
-
-}
-
-
-object RedditOneboxEngine {
-
-  // From https://oembed.com:
-  //
-  // API endpoint: https://www.reddit.com/oembed
-  // > https://reddit.com/r/*/comments/*/*
-  // > https://www.reddit.com/r/*/comments/*/*
-
-  val regex: Regex =
-    """^https://(www\.)?(reddit\.com|instagr\.am)/r/[^/]+/comments/[^/]+/.*$""".r
-
-}
-
-
-
-object TwitterOneboxEngine {
-
-  // URL scheme, from https://oembed.com:
-  // >  https://twitter.com/*/status/*
-  // >  https://*.twitter.com/*/status/*
-  val regex: Regex = """^https://(.*\.)?twitter\.com/.*/status/.*$""".r
-
-  // What about Twitter Moments?
-  // https://developer.twitter.com/en/docs/twitter-for-websites/moments/guides/oembed-api
-  // Links look like:
-  //   https://twitter.com/i/moments/650667182356082688
-
-  // And Timelines?
-  // https://developer.twitter.com/en/docs/twitter-for-websites/timelines/guides/oembed-api
-  // Links look like:
-  //   https://twitter.com/TwitterDev
-
-  def getOEmbedProviderEndpoint(stuffUrl: String): Option[String] = {
-    // for now
-    Some("https://publish.twitter.com/oembed")
-  }
-
-}
 
 
 // Visit linked page, look for oEmbed and OpenGraph tags
@@ -245,13 +62,9 @@ object TwitterOneboxEngine {
   * Later: oEmbed works for FB, Insta, Mediumm, Reddit, "everything" — just change
   * the regex, + map urls to the correct oEmbed provider endpoints.
   */
-class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
-        mayHttpFetchData: Boolean)
+abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
   extends ExternalRequestLinkPreviewEngine(
-        globals, siteId = siteId, mayHttpFetchData = mayHttpFetchData)
-  with TyLogging {
-
-  def regex: Regex = TwitterOneboxEngine.regex
+        globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   // ! wow !
   //  https://github.com/michael-simons/java-oembed
@@ -259,25 +72,46 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
   // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
 
-  val cssClassName = "s_LnPv-oEmb s_LnPv-Twitter"
+  val extraLnPvCssClasses: String = "s_LnPv-oEmb " + providerLnPvCssClassName
+
+  def providerName: Option[String]
+
+  def widgetName: String
+
+  def providerLnPvCssClassName: String
+
+  def providerEndpoint: String
+
+  //def sanitizeInsteadOfSandbox = false
+
+  def queryParamsEndAmp = "max_width=600&"
+
+  def moreQueryParamsEndAmp = ""
 
 
   /** The oEmbed stuff might include arbitrary html tags and even scripts,
     * so we render it in a sandboxed iframe.
     */
-  override val alreadySanitized = true
+  //override val alreadySanitized = true
 
-  override val alreadyWrappedInAside = true
+  override def sandboxInIframe = true
 
 
-  def loadAndRender(params: RenderPreviewParams): Future[String Or ErrorMessage] = {
+  //override val alreadyWrappedInAside = true
+
+
+  def loadAndRender(params: RenderPreviewParams): Future[String Or LinkPreviewProblem] = {
     val unsafeUrl: String = params.unsafeUrl
-    val providerEndpoint: String =
-          TwitterOneboxEngine.getOEmbedProviderEndpoint(unsafeUrl) getOrElse {
-            return Future.successful(Bad("Ooops unimpl [43987626576]"))
-          }
 
-    def NoHtmlInOEmbed = "No html in Twitter oEmbed, url: "
+    def provdrOrUnk = providerName getOrElse "oEmbed provider"  // I18N
+    def providerWidget = s"$provdrOrUnk $widgetName"
+
+    // This'll look like e.g. "Twitter tweet not found: ...the-url...".  I18N
+    def notFoundError = s"$providerWidget not found: "
+    def networkError = s"Error getting a $providerWidget preview: Got no response, url: "
+    def rateLimitedError = s"Rate limited by $provdrOrUnk, cannot show: "
+    def weirdStatusError(x: Int) = s"Unexpected $provdrOrUnk http status code: $x, url: "
+    def noHtmlInOEmbed = s"No html in $providerWidget API response, url: "
 
     // omit_script=1  ?
     // theme  = {light, dark}
@@ -289,110 +123,172 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
     // Wants:  theme: light / dark.  Primary color / link color.
     // And device:  mobile / tablet / laptop ?  for maxwidth.
-    val downloadUrl = providerEndpoint +
-          "?maxwidth=600" +  // Twitter tweets are 598 px over at Twitter.com
-          "&align=center" +
-          s"&url=$unsafeUrl"
+    val downloadUrl =
+          s"$providerEndpoint?$queryParamsEndAmp${moreQueryParamsEndAmp}url=$unsafeUrl"
 
     params.loadPreviewFromDb(downloadUrl) foreach { cachedPreview =>
-      val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
-        return FutGood(safeProblemHtml(NoHtmlInOEmbed, unsafeUrl = unsafeUrl))
+      UX; SHOULD // not cache 404 and other errors for too long
+      SECURITY; SHOULD // rate limit each user, and each site, + max db table rows per site?
+      cachedPreview.status_code_c match {
+        case 200 => // ok
+        case 404 =>
+          return FutBad(LinkPreviewProblem(
+                notFoundError, unsafeUrl = unsafeUrl, errorCode = "TyELNPV404"))
+        case 429 =>
+          return FutBad(LinkPreviewProblem(
+                rateLimitedError, unsafeUrl = unsafeUrl, errorCode = "TyELNPV429"))
+        case 0 =>
+          // Currently won't happen, [ln_pv_netw_err].
+          return FutBad(LinkPreviewProblem(
+                networkError, unsafeUrl = unsafeUrl, errorCode = "TyELNP0"))
+        case x =>
+          return FutBad(LinkPreviewProblem(
+                weirdStatusError(x), unsafeUrl = unsafeUrl, errorCode = "TyELNPVWUNK"))
       }
+
+      val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
+        return FutBad(LinkPreviewProblem(
+                  noHtmlInOEmbed, unsafeUrl = unsafeUrl, errorCode = "TyELNPV0HTML"))
+      }
+
+      // Try get from Redis or mem cache
+
+
+      /*
       val unsafeProviderName = (cachedPreview.content_json_c \ "provider_name").asOpt[String]
-      val safeHtml = makeSafePreviewHtml(
-            unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
-            unsafeProviderName = unsafeProviderName)
-      return FutGood(safeHtml)
+
+      val safeHtml = {
+        if (sanitizeInsteadOfSandbox) {
+          TextAndHtml.sanitizeRelaxed(unsafeHtml)
+        }
+        else {
+          SandboxedAutoSizeIframe.makeSafePreviewHtml(
+                unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
+                unsafeProviderName = unsafeProviderName,
+                extraLnPvCssClasses = extraLnPvCssClasses)
+        }
+      }
+
+      val safeHtmlInAside = LinkPreviewHtml.wrapSafeHtmlInAside(
+            safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
+            unsafeUrl = unsafeUrl, unsafeProviderName = unsafeProviderName)
+      */
+
+      return FutGood(unsafeHtml) //safeHtmlInAside)
     }
 
-    if (!params.mayHttpFetchData) {
+    if (!params.mayHttpFetch) {
       // This can happen if one types and saves a new post really fast, before
       // preview data has been downloaded? (so not yet found in cache above)
-      return FutGood(safeProblemHtml(
-            "No preview for tweet: ", unsafeUrl = unsafeUrl, errorCode = "TyE0FETCHPRVW"))
+      return FutBad(LinkPreviewProblem(
+            s"No preview for $providerWidget: ", // [0LNPV]
+            unsafeUrl = unsafeUrl, errorCode = "TyE0LNPV"))
     }
 
     val request: WSRequest = globals.wsClient.url(downloadUrl)
 
     request.get().map({ r: request.Response =>
-      // These can be problems with Twitter, rather than Talkyard? E.g. if the tweet
-      // is gone, that's interesting to know for the site visitors.
+      // These can be problems with the provider, rather than Talkyard? E.g. if
+      // a Twitter tweet is gone, that's interesting to know for the site visitors.
       var problem = r.status match {
-        case 404 => s"Tweet not found: "
-        case 429 => s"Rate limited by Twitter, cannot show: "
+        case 404 => notFoundError
+        case 429 => rateLimitedError
         case 200 => "" // continue below
-        case x => s"Unexpected Twitter oEmbed status code: $x, url: "
+        case x => weirdStatusError(x)
       }
 
-      CLEAN_UP // later
+      // There has to be a max-json-length restriction. There's ths db constraint:
+      val dbJsonMaxLength = 27*1000 // [oEmb_json_len]
+      if (r.bodyAsBytes.length > (dbJsonMaxLength - 2000)) {
+        problem = s"Too large $provdrOrUnk oEmbed response: ${r.bodyAsBytes.length} bytes json"
+      }
 
-      val unsafeJsObj: JsObject = {
-        if (problem.nonEmpty) JsObject(Nil)
-        else {
+      val unsafeJsObj: JsObject = if (problem.nonEmpty) JsObject(Nil) else {
+        try {
           // What does r.json do if the response wasn't json?
-          try {
-            r.json match {
-              case jo: JsObject => jo
-              case _ =>
-                problem = "Got json but it's not a js obj, request url: "
-                JsObject(Nil)
-            }
-          }
-          catch {
-            case ex: Exception =>
-              problem = "Response not json, request url: "
+          r.json match {
+            case jo: JsObject => jo
+            case _ =>
+              problem = s"Got $provdrOrUnk json but it's not a json obj, request url: "
               JsObject(Nil)
           }
+        }
+        catch {
+          case ex: Exception =>
+            problem = s"$provdrOrUnk response not json, request url: "
+            JsObject(Nil)
         }
       }
 
       val anyUnsafeHtml =
-            if (problem.isEmpty) (r.json \ "html").asOpt[String]
+            if (problem.isEmpty) (unsafeJsObj \ "html").asOpt[String]
             else None
 
       if (problem.isEmpty && anyUnsafeHtml.isEmpty) {
-        problem = NoHtmlInOEmbed
+        problem = noHtmlInOEmbed
       }
 
-      val safeHtmlResult = {
+      val result: String Or LinkPreviewProblem = {
         if (problem.nonEmpty) {
-          safeProblemHtml(problem = problem, unsafeUrl = unsafeUrl)
+          // CACHE in Redis
+          Bad(LinkPreviewProblem(
+                problem, unsafeUrl = unsafeUrl, errorCode = "TyELNPVRSP"))
         }
         else {
-          val unsafeHtml = anyUnsafeHtml.getOrDie("TyE6986SK")
-          val unsafeProviderName = (unsafeJsObj \ "provider_name").asOpt[String]
-          val safeHtml = makeSafePreviewHtml(
-                unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
-                unsafeProviderName = unsafeProviderName)
-
           SECURITY // incl in quota? num preview links * X
           params.savePreviewInDb foreach { fn =>
             val preview = LinkPreview(  // mabye Ty SCRIPT tag instead?
                   link_url_c = unsafeUrl,
                   downloaded_from_url_c = downloadUrl,
                   downloaded_at_c = globals.now(),
+                  status_code_c = r.status,
                   preview_type_c = LinkPreviewTypes.OEmbed,
                   first_linked_by_id_c = params.requesterId,
                   content_json_c = unsafeJsObj)
             fn(preview)
           }
 
-          safeHtml
+          val unsafeHtml = anyUnsafeHtml.getOrDie("TyE6986SK")
+          /*
+          val unsafeProviderName = (unsafeJsObj \ "provider_name").asOpt[String]
+
+          val safeHtml = {
+            if (sanitizeInsteadOfSandbox) {
+              TextAndHtml.sanitizeRelaxed(unsafeHtml)
+            }
+            else {
+              SandboxedAutoSizeIframe.makeSafePreviewHtml(
+                    unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
+                    unsafeProviderName = unsafeProviderName,
+                    extraLnPvCssClasses = extraLnPvCssClasses)
+            }
+          }
+
+          val safeHtmlInAside = LinkPreviewHtml.wrapSafeHtmlInAside(
+                safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
+                unsafeUrl = unsafeUrl, unsafeProviderName = unsafeProviderName)
+          safeHtmlInAside */
+          Good(unsafeHtml)
         }
       }
 
-      Good(safeHtmlResult)
+      result
 
     })(globals.executionContext).recover({
       case ex: Exception =>
+        // Maybe save with status code 0? [ln_pv_netw_err]
         logger.warn("Error creating oEmbed link preview [TyEOEMB897235]", ex)
-        Bad(ex.getMessage)
+        Bad(LinkPreviewProblem(
+              ex.getMessage, unsafeUrl = unsafeUrl, errorCode = "TyE0EMBNETW"))
     })(globals.executionContext)
   }
+}
 
+
+object SandboxedAutoSizeIframe {  // move to where? Own file?
 
   def makeSafePreviewHtml(unsafeUrl: String, unsafeHtml: String,
-        unsafeProviderName: Option[String]): String = {
+        unsafeProviderName: Option[String], extraLnPvCssClasses: String): String = {
           /* Example response json, this from Twitter:
             {
               "url": "https://twitter.com/Interior/status/507185938620219395",
@@ -444,37 +340,59 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId,
 
         // https://github.com/beefproject/beef
 
-        // Iframe sandbox permissions.
+        // Iframe sandbox permissions. [IFRMSNDBX]
         val permissions = (
               // Most? oEmbeds execute Javascript to render themselves — ok, in a sandbox.
               "allow-scripts " +
 
-              // This makes:  <a href=... target=_blank>  work — opens a new
-              // browser tab. But since we don't  allow-same-origin,  cookies won't work
-              // in that new tab — it "inherits" the sandbox, ...
+              // This makes:  <a href=.. target=_blank>  work — opens in new browser tab.
               "allow-popups " +
 
-              // So need this too — makes cookies work in the above-mentioned new tab.
+              // Makes a popup / new-tab opened from the iframe work properly;
+              // it won't inherit the iframe sandbox restrictions.
               "allow-popups-to-escape-sandbox " +
+
+              // Lets the iframe access cookies and stuff *from its own domain*,
+              // e.g. to know if one is logged in, so they can show one's avatar
+              // or other things relevant to oneself in the iframe.
+              //
+              // This, plus  allow-scripts, would have been unsafe it was served by
+              // Talkyard on the Talkyard site's domain itself — it could then have
+              // removed the sandbox attribute.
+              // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#attr-sandbox
+              // Also:
+              // https://stackoverflow.com/questions/31184505/sandboxing-iframe-and-allow-same-origin
+              //
+              // However! Together with srcdoc=..., seems the iframe *does* get the same
+              // origin as the parent window, i.e. Talkyard itself, letting the
+              // iframe escape the sandbox? So skip this for now (let previews
+              // that require same-origin be broken).
+              //
+              // "allow-same-origin " +   // no, see above
 
               // This makes links work, but only if the user actually clicks the links.
               // Javascript in the iframe cannot change the top win location when
-              // the user is inactive — that would have made pishing attacks possible,
-              // if the iframe could silently replace the whole page with [a similar
+              // the user is inactive — that would have made pishing attacks possible:
+              // the iframe could silently have replaced the whole page with [a similar
               // looking page on the attacker's domain].
               "allow-top-navigation-by-user-activation")
 
-        <aside class={s"s_LnPv $cssClassName"}
+    <iframe seamless="" sandbox={permissions} srcdoc={
+          unsafeHtml + OneboxIframe.adjustOEmbedIframeHeightScript
+          }></iframe>.toString
+
+    /*
+        <aside class={s"s_LnPv $extraLnPvCssClasses"}
           ><iframe seamless=""
                    sandbox={permissions}
                    srcdoc={unsafeHtml + OneboxIframe.adjustOEmbedIframeHeightScript}
           ></iframe
           ><div class="s_LnPv_ViewAt"
-          ><a href={unsafeUrl} target="_blank">{
+          ><a href={unsafeUrl} target="_blank" rel="nofollow noopener">{
               "View at " + unsafeProviderName.getOrElse(unsafeUrl) /* I18N */
           } <span class="icon-link-ext"></span></a
           ></div
-        ></aside>.toString
+        ></aside>.toString */
   }
 }
 
@@ -501,8 +419,11 @@ object OneboxIframe {
   // TESTS_MISSING  // create a LinkPrevwRendrEng that creates a 432 px tall div,
   // with 20 px body margin, 20 px child div padding & margin,
   // should become 432 px tall? (margin & padding removed)
-  val adjustOEmbedIframeHeightScript: String = """
-    |<script src="/-/assets/external-iframe.js"></script>
+  val adjustOEmbedIframeHeightScript: String = s"""
+    |<script src="/-/assets/ext-iframe$min.js"></script>
+    """.stripMargin
+
+    /*
     |<script>(function(d) { // Talkyard [OEMBHGHT]
     |d.body.style.margin = '0';
     |var nSent = 0;
@@ -529,6 +450,7 @@ object OneboxIframe {
     |setTimeout(sendH, 500);
     |})(document);
     |</script>
-    |""".stripMargin
+    |""".stripMargin */
 
+  private def min = Globals.isDevOrTest ? "" | ".min"
 }

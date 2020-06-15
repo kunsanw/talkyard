@@ -22,6 +22,7 @@
 
 package debiki.onebox.engines
 
+/*
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.onebox._
@@ -32,15 +33,15 @@ import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 
 
-
 class YouTubePrevwRendrEng(globals: Globals)
   extends InstantLinkPreviewEngine(globals) {
 
   import YouTubePrevwRendrEng._
 
-  val regex: Regex = """^https?:\/\/(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/.+$""".r
+  override val regex: Regex =
+    """^https?:\/\/(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/.+$""".r
 
-  val cssClassName = "dw-ob-youtube"
+  def providerLnPvCssClassName = "dw-ob-youtube"
 
   /** Do not use java.net.URL because it might try to do a reverse lookup of the hostname
     * (its operator equals).
@@ -49,7 +50,7 @@ class YouTubePrevwRendrEng(globals: Globals)
 
   override val alreadySanitized = true
 
-  def renderInstantly(safeUrl: String): String Or ErrorMessage = {
+  def renderInstantly(safeUrl: String): String Or LinkPreviewProblem = {
     javaUri = new jn.URI(safeUrl)
     findVideoId(javaUri) match {
       case Some(videoId) =>
@@ -57,12 +58,12 @@ class YouTubePrevwRendrEng(globals: Globals)
         // the iframe below won't be removed.
         // (Better sanitize, also if seems to be no werird chars in the id.)
         if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
-          return Bad("Bad YouTube video ID, cannot create preview [TyE2URKT04]")
+          return Bad(LinkPreviewProblem("Bad YouTube video ID, cannot create preview [TyE2URKT04]"))
         }
 
         val safeId = safeEncodeForHtml(videoId)
         val unsafeParams = findParams(javaUri) getOrElse {
-          return Bad("Bad YouTube video URL, cannot create preview [TyE7DI60J2]")
+          return Bad(LinkPreviewProblem("Bad YouTube video URL, cannot create preview [TyE7DI60J2]"))
         }
 
         val safeParams = safeEncodeForHtml(unsafeParams)
@@ -78,7 +79,8 @@ class YouTubePrevwRendrEng(globals: Globals)
       case None =>
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
-        Bad("Cannot currently onebox this YouTube URL [TyE45kFE2]")
+        Bad(LinkPreviewProblem(
+              "Cannot currently onebox this YouTube URL [TyE45kFE2]"))
     }
   }
 
@@ -134,4 +136,4 @@ object YouTubePrevwRendrEng {
   }
 }
 
-
+ */

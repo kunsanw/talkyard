@@ -35,9 +35,10 @@ import scala.util.matching.Regex
 class VideoPrevwRendrEng(globals: Globals)
   extends InstantLinkPreviewEngine(globals) {
 
-  val regex: Regex = """^(https?:)?\/\/.*\.(mov|mp4|m4v|webm|ogv)(\?.*)?$""".r
+  override val regex: Regex =
+    """^(https?:)?\/\/.*\.(mov|mp4|m4v|webm|ogv)(\?.*)?$""".r
 
-  val cssClassName = "dw-ob-video"
+  def providerLnPvCssClassName = "s_LnPv-Video"
 
   override def alreadySanitized = true
 
@@ -45,7 +46,7 @@ class VideoPrevwRendrEng(globals: Globals)
     val safeUrl = safeEncodeForHtml(unsafeUrl)
     Good(o"""
      <video width='100%' height='100%' controls src='$safeUrl'>
-       <a href='$safeUrl' target='_blank' rel='nofollow'>$safeUrl</a>
+       <a href='$safeUrl' target='_blank' rel='nofollow noopener'>$safeUrl</a>
      </video>
     """)
   }

@@ -22,6 +22,7 @@ import com.debiki.core.Prelude._
 import java.{sql => js}
 import Rdb._
 import RdbUtil.makeInListFor
+import play.api.libs.json.JsNull
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -37,13 +38,15 @@ trait LinksSiteTxMixin extends SiteTransaction {
               link_url_c,
               downloaded_from_url_c,
               downloaded_at_c,
+              status_code_c,
               preview_type_c,
               first_linked_by_id_c,
               content_json_c)
-          values (?, ?, ?, ?, ?, ?, ?)
+          values (?, ?, ?, ?, ?, ?, ?, ?)
           on conflict (site_id_c, link_url_c, downloaded_from_url_c)
           do update set
               downloaded_at_c = excluded.downloaded_at_c,
+              status_code_c = excluded.status_code_c,
               preview_type_c = excluded.preview_type_c,
               content_json_c = excluded.content_json_c """
 
@@ -52,6 +55,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           linkPreview.link_url_c,
           linkPreview.downloaded_from_url_c,
           linkPreview.downloaded_at_c.asTimestamp,
+          linkPreview.status_code_c.asAnyRef,
           linkPreview.preview_type_c.asAnyRef,
           linkPreview.first_linked_by_id_c.asAnyRef,
           linkPreview.content_json_c)
@@ -162,9 +166,10 @@ trait LinksSiteTxMixin extends SiteTransaction {
           link_url_c = getString(rs, "link_url_c"),
           downloaded_from_url_c = getString(rs, "downloaded_from_url_c"),
           downloaded_at_c = getWhen(rs, "downloaded_at_c"),
+          status_code_c = getInt(rs, "status_code_c"),
           preview_type_c = getInt(rs, "preview_type_c"),
           first_linked_by_id_c = getInt(rs, "first_linked_by_id_c"),
-          content_json_c = getOptJsObject(rs, "content_json_c").get)
+          content_json_c = getOptJsObject(rs, "content_json_c").getOrElse(JsNull))
   }
 
 

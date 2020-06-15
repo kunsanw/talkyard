@@ -236,7 +236,7 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
     import request.{siteId, requesterOrUnknown}
 
     val renderer = new LinkPreviewRenderer(
-          globals, siteId = siteId, mayHttpFetchData = true,
+          globals, siteId = siteId, mayHttpFetch = true,
           requesterId = requesterOrUnknown.id)
 
     val response = renderer.loadRenderSanitize(url).transform(

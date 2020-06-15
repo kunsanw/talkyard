@@ -31,7 +31,7 @@ const tweetPrevwOk  = `.s_LnPv-Twitter:not(${brokenPreview})`;
 const tweetPrevwError = `.s_LnPv-Twitter${brokenPreview}`;
 
 
-describe("editor onebox:", () => {
+describe("Twitter link previews  TyT0JSM8PF68", () => {
 
   it("initialize people", () => {
     browser = new TyE2eTestBrowser(wdioBrowser);
@@ -143,7 +143,7 @@ describe("editor onebox:", () => {
   });
 
 
-  // ----- Tweet previews in Maximized editor
+  // ----- Tweet previews in Maximized editor   TyT033SKHWW73M
 
   it("Owen maximizes the editor", () => {
     owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
@@ -158,7 +158,6 @@ describe("editor onebox:", () => {
   });
 
   it("Owen tiles the editor horizontally", () => {
-owensBrowser.debug();
     owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
   });
 
@@ -175,6 +174,7 @@ owensBrowser.debug();
 
   it("Owen adds text and a 2nd not-broken tweet", () => {
     /// Ooops this once appended in the middle of the text :- (
+    // on my lt-19 but not lt-17  weird
     owensBrowser.editor.editText('\n\n' +
           'Wow_wow!\n\n' +
           'https://twitter.com/GreatOzGovTweet/status/707747970695962624',
@@ -184,7 +184,6 @@ owensBrowser.debug();
   });
 
   it("... saves", () => {
-owensBrowser.debug();
     owensBrowser.editor.save();
   });
 

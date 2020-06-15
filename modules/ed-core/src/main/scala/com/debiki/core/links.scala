@@ -18,7 +18,7 @@
 package com.debiki.core
 
 import com.debiki.core.Prelude._
-import play.api.libs.json.JsObject
+import play.api.libs.json.JsValue
 
 
 object LinkPreviewTypes {
@@ -31,20 +31,43 @@ object LinkPreviewTypes {
 
 /** Both link_url_c and downloaded_from_url_c are part of the database primary key
   * — otherwise an attacker's website A could hijack a widget from a normal
+  * website W, like so:s
+  *   https://webs-a/widget pretends in a html tag that its oEmbed endpoint is
+  *   E = https://webs-w/oembed?url=https://webs-w/widget  (note: webs-w, not -a)
+  * and then later when someone tries to link to https://webs-w/widget,
+  * whose oEmbed endpoint is E for real,
+  * then, if lookng up by E only,
+  * there'd already be a link_url_c = https//webs-a/widget associated with E,
+  * i.e. pointing to the attacker's site.
+  *
+  * But by including both link_url_c and downloaded_from_url_c in the primary key,
+  * that cannot happen — when looking up https://webs-w/widget + E,
+  * the attacker's entry wouldn't be found (because it's  https://webs-a/...).
+  *
+  * @param link_url_c: The thing to embed.
+  * @param downloaded_from_url_c:
+  *  The same link url can get downloaded many times, with different
+  *  maxwidth=... params, for different device sizes / resolutions.
+  *  For OpenGraph, downloaded_from_url_c is the same as link_url_c,
+  *  but for oEmbed, it's different.
+  *
   * @param downloaded_at_c
+  * @param status_code_c: 0 if the request failed, no response. E.g. the network.
   * @param preview_type_c
   * @param first_linked_by_id_c
   * @param content_json_c — as of now: the oEmbed response.
   *   Later: could also be OpenGraph stuff or { title: ... descr: ... }
   *   from < title> and < descr> tags.
+  *   JsNull if the request failed.
   */
 case class LinkPreview(
   link_url_c: String,
   downloaded_from_url_c: String,
   downloaded_at_c: When,
+  status_code_c: Int,
   preview_type_c: Int, // always oEmbed, for now
   first_linked_by_id_c: UserId,
-  content_json_c: JsObject) {
+  content_json_c: JsValue) {
 
   require(preview_type_c == LinkPreviewTypes.OEmbed, "TyE50RKSDJJ4")
 }
