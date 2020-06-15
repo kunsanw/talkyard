@@ -22,7 +22,9 @@ import com.debiki.core.Prelude._
 import debiki.{Globals, TextAndHtml}
 import debiki.onebox.engines._
 import debiki.TextAndHtml.safeEncodeForHtml
+import debiki.dao.RedisCache
 import org.scalactic.{Bad, ErrorMessage, Good, Or}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ExecutionContext, Future}
@@ -54,6 +56,7 @@ object RenderPreviewResult {
 
 
 class RenderPreviewParams(
+  val siteId: SiteId,
   val unsafeUrl: String,
   val requesterId: UserId,
   val mayHttpFetch: Boolean,
@@ -103,6 +106,15 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
 
   final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
+
+    val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
+
+    WOULD_OPTIMIZE // do max once per second or minute (unimportant).
+    redisCache.removeOldLinkPreviews()
+
+    redisCache.getLinkPreviewSafeHtml(urlAndFns.unsafeUrl) foreach { safeHtml =>
+      return Future.successful(safeHtml)
+    }
 
     def sanitizeAndWrap(htmlOrError: String Or LinkPreviewProblem): String = {
       // <aside> class:    s_LnPv (-Err)    means Link Preview (Error)
@@ -170,6 +182,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
               unsafeUrl = urlAndFns.unsafeUrl, unsafeProviderName = providerName)
       }
 
+      redisCache.putLinkPreviewSafeHtml(urlAndFns.unsafeUrl, safeHtml)
       safeHtml
     }
 
@@ -326,6 +339,7 @@ class LinkPreviewRenderer(
     for (engine <- engines) {
       if (engine.handles(url)) {
         val args = new RenderPreviewParams(
+              siteId = siteId,
               unsafeUrl = url,
               requesterId = requesterId,
               mayHttpFetch = mayHttpFetch,

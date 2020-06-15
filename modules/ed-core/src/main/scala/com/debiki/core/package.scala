@@ -1207,6 +1207,7 @@ package object core {
   def SLOW_QUERY = ()
   def SHOULD_OPTIMIZE = ()
   def COULD_OPTIMIZE = () // Also see [On2] but typically O(n^2) is intentional (because simpler).
+  def WOULD_OPTIMIZE = () // Unimportant thing that could be optimized.
   def BLOCKING_REQ = ()
   def EDIT_INDEX = ()     // Database index could be simplified. Or investigate if it's getting used?
   def AVOID_RERENDER = ()

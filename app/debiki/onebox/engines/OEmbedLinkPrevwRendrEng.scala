@@ -19,15 +19,12 @@ package debiki.onebox.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, Nashorn, TextAndHtml}
+import debiki.Globals
 import debiki.onebox._
-import debiki.TextAndHtml.sanitizeAllowLinksAndBlocks
-import org.scalactic.{Bad, ErrorMessage, Good, Or}
+import org.scalactic.{Bad, Good, Or}
 import play.api.libs.json.JsObject
 import play.api.libs.ws.WSRequest
 import scala.concurrent.Future
-import scala.util.matching.Regex
-import talkyard.server.TyLogging
 
 
 

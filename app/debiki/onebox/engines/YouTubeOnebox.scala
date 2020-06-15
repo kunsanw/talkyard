@@ -70,11 +70,13 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
                 unsafeUrl = safeUrl, errorCode = "TyEYOUTBPS"))
         }
 
-        SECURITY; SHOULD // also include the origin parameter to the URL, specifying
-        // the URL scheme (http:// or https://) and full domain of your host page as
-        // the parameter value. While origin is optional, including it protects
-        // against malicious third-party JavaScript being injected into your page
-        // and hijacking control of your YouTube player.
+        SECURITY; SHOULD // also include the origin parameter to the URL [yt_ln_pv_orig],
+        //  > specifying the URL scheme (http:// or https://) and full domain of your
+        //  > host page asthe parameter value. While origin is optional, including it
+        //  > protects against malicious third-party JavaScript being injected into
+        //  > your page and hijacking control of your YouTube player.
+        // https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player
+        //
         // So, needs site origin too.
         // Re-render if origin changes :-(  ?  (new Talkyard hostname)
 

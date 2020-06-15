@@ -222,6 +222,34 @@ class RedisCache(val siteId: SiteId, private val redis: RedisClient, private val
   }
 
 
+  // Link Previews
+  //-------------
+
+  // Failed link previews aren't saved to the database (then could DoS-make it
+  // run out of space?). Just cached for a while here in Redis.
+
+
+  def getLinkPreviewSafeHtml(url: String): Option[String] = {
+    val futureString: Future[Option[ByteString]] = redis.get(linkPreviewKey(siteId, url))
+    val anyString: Option[ByteString] =
+      try Await.result(futureString, DefaultTimeout)
+      catch {
+        case _: TimeoutException => die("Ty603SRKW7", "Redis timeout")
+      }
+    anyString.map(s => s.utf8String)
+  }
+
+
+  def removeOldLinkPreviews(): Unit = {
+    // todo
+  }
+
+
+  def putLinkPreviewSafeHtml(url: String, safeHtml: String): Unit = {
+    redis.set(linkPreviewKey(siteId, url), safeHtml)
+  }
+
+
   // Key names
   //-------------
 
@@ -230,9 +258,12 @@ class RedisCache(val siteId: SiteId, private val redis: RedisClient, private val
 
   // All keys should be like:  <siteId>-
   // and then, if for a user: u<userId>-
-  // e.g.  3-u456-w = site 3, user 456, then 'w' (watchbar).
+  // e.g.  3-u456-w = site 3, user 456, then 'w' (watchbar) or 'LnPv' (link preview).
 
   private def watchbarKey(siteId: SiteId, userId: UserId) = s"$siteId-u$userId-w"
+
+  // Later: maybe device width? And origin? YouTube wants [yt_ln_pv_orig].
+  private def linkPreviewKey(siteId: SiteId, url: String) = s"$siteId-u$url-LnPv"
 
   private def usersOnlineKey(siteId: SiteId) = s"$siteId-uo"
   private def strangersOnlineByIpKey(siteId: SiteId) = s"$siteId-soip"
