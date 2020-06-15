@@ -357,7 +357,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
 // URL scheme: https://youtu.be/*
 // API endpoint: https://www.youtube.com/oembed
 //
-object YouTubePrevwRendrEng {
+object YouTubePrevwRendrEngOEmbed {
   val youtuDotBeStart = "https://youtu.be/"
   val youtubeComRegex: Regex = """^https://[^.]+\.youtube\.com/(watch|v/).+$""".r
 
@@ -366,6 +366,9 @@ object YouTubePrevwRendrEng {
     youtubeComRegex matches url
   }
 }
+
+/* Doesn't work, just gets 404 Not Found oEmbed responses. Use instead:
+    YouTubePrevwRendrEng extends InstantLinkPreviewEngine
 
 class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
   extends OEmbedPrevwRendrEng(
@@ -379,4 +382,4 @@ class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
     YouTubePrevwRendrEng.handles(url)
   }
 
-}
+}  */

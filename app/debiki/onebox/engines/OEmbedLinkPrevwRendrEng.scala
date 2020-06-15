@@ -199,7 +199,7 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
 
       // There has to be a max-json-length restriction. There's ths db constraint:
       val dbJsonMaxLength = 27*1000 // [oEmb_json_len]
-      if (r.bodyAsBytes.length > (dbJsonMaxLength - 2000)) {
+      if (problem.isEmpty && r.bodyAsBytes.length > (dbJsonMaxLength - 2000)) {
         problem = s"Too large $provdrOrUnk oEmbed response: ${r.bodyAsBytes.length} bytes json"
       }
 

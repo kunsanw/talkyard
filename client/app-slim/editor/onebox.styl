@@ -24,14 +24,22 @@
   height: auto;
   overflow: hidden;
 
+// Height: The default is 390px, see:
+// https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player
+.s_LnPv-YouTube iframe
+  height: 390px;
+
+
 .s_LnPv_ViewAt
   display: block;
-  margin: 7px auto 7px;  // already 10px extra margin-top: [oemb_extr_height]
+  margin: 9px auto 5px;
   text-align: center;
 
+.s_LnPv-oEmb.s_LnPv_ViewAt
+  margin: 7px auto 7px;  // already 10px extra margin-top: [oemb_extr_height]
 
 
-.dw-ob-youtube iframe
+.LnPv-YouTube iframe
   width: 100%;
   max-width: 480px;
   height: 270px;

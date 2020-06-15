@@ -303,7 +303,7 @@ class LinkPreviewRenderer(
     new ImagePrevwRendrEng(globals),
     new VideoPrevwRendrEng(globals),
     new GiphyPrevwRendrEng(globals),
-    new YouTubePrevwRendrEng(globals, siteId, mayHttpFetch),
+    new YouTubePrevwRendrEng(globals),
     new TelegramPrevwRendrEng(globals),
     new TikTokPrevwRendrEng(globals, siteId, mayHttpFetch),
     new TwitterPrevwRendrEng(globals, siteId, mayHttpFetch),

@@ -40,7 +40,7 @@ let imagePngOnebox = `aside.onebox.s_LnPv-Img a[href="${imagePngUrl}"] img[src="
 let imageGifOnebox = `aside.onebox.s_LnPv-Img a[href="${imageGifUrl}"] img[src="${imageGifUrl}"]`;
 let videoMp4Onebox = `aside.onebox.s_LnPv-Video video[src="${videoMp4Url}"]`;
 let videoYouTubeOnebox =
-    `aside.onebox.dw-ob-youtube iframe[src^="https://www.youtube.com/embed/${videoYouTubeId}"]`;
+    `aside.onebox.LnPv-YouTube iframe[src^="https://www.youtube.com/embed/${videoYouTubeId}"]`;
 
 const inPagePreviewSelector = '.s_P-Prvw ';
 const inEditorPreviewSelector = '#debiki-editor-controller .preview ';

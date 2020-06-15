@@ -38,7 +38,9 @@ class GiphyPrevwRendrEng(globals: Globals)
   val findIdRegex: Regex =
     """(?:https?:)\/\/[^/]+\/[a-z]+\/[a-zA-Z0-9-]*?-?([a-zA-Z0-9]+)""".r
 
-  def providerLnPvCssClassName = "esOb-Giphy"
+  override def providerName: Option[String] = Some("Giphy")
+
+  def providerLnPvCssClassName = "s_LnPv-Giphy"
 
   override val alreadySanitized = true
 

@@ -22,7 +22,6 @@
 
 package debiki.onebox.engines
 
-/*
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.onebox._
@@ -33,15 +32,16 @@ import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 
 
-class YouTubePrevwRendrEng(globals: Globals)
-  extends InstantLinkPreviewEngine(globals) {
+class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(globals) {
 
   import YouTubePrevwRendrEng._
 
-  override val regex: Regex =
-    """^https?:\/\/(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/.+$""".r
+  override def handles(url: String): Boolean =
+    YouTubePrevwRendrEngOEmbed.handles(url)
 
-  def providerLnPvCssClassName = "dw-ob-youtube"
+  override def providerName: Option[String] = Some("YouTube")
+
+  def providerLnPvCssClassName = "s_LnPv-YouTube"
 
   /** Do not use java.net.URL because it might try to do a reverse lookup of the hostname
     * (its operator equals).
@@ -58,13 +58,25 @@ class YouTubePrevwRendrEng(globals: Globals)
         // the iframe below won't be removed.
         // (Better sanitize, also if seems to be no werird chars in the id.)
         if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
-          return Bad(LinkPreviewProblem("Bad YouTube video ID, cannot create preview [TyE2URKT04]"))
+          return Bad(LinkPreviewProblem(
+                "Bad YouTube video ID, cannot create preview [TyE2URKT04]",
+                unsafeUrl = safeUrl, errorCode = "TyEYOUTBID"))
         }
 
         val safeId = safeEncodeForHtml(videoId)
         val unsafeParams = findParams(javaUri) getOrElse {
-          return Bad(LinkPreviewProblem("Bad YouTube video URL, cannot create preview [TyE7DI60J2]"))
+          return Bad(LinkPreviewProblem(
+                "Bad YouTube video URL, cannot create preview [TyE7DI60J2]",
+                unsafeUrl = safeUrl, errorCode = "TyEYOUTBPS"))
         }
+
+        SECURITY; SHOULD // also include the origin parameter to the URL, specifying
+        // the URL scheme (http:// or https://) and full domain of your host page as
+        // the parameter value. While origin is optional, including it protects
+        // against malicious third-party JavaScript being injected into your page
+        // and hijacking control of your YouTube player.
+        // So, needs site origin too.
+        // Re-render if origin changes :-(  ?  (new Talkyard hostname)
 
         val safeParams = safeEncodeForHtml(unsafeParams)
         // wmode=opaque makes it possible to cover the iframe with a transparent div,
@@ -80,7 +92,8 @@ class YouTubePrevwRendrEng(globals: Globals)
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
         Bad(LinkPreviewProblem(
-              "Cannot currently onebox this YouTube URL [TyE45kFE2]"))
+              "Cannot currently onebox this YouTube URL [TyE45kFE2]",
+              unsafeUrl = safeUrl, errorCode = "TyEYOUTB0ID"))
     }
   }
 
@@ -89,9 +102,9 @@ class YouTubePrevwRendrEng(globals: Globals)
 
 object YouTubePrevwRendrEng {
 
-  private val SlashVideoIdRegex = """\/([^\/]+)""".r
-  private val SlashEmbedSlashVideoIdRegex = """\/embed\/([^\/]+)""".r
-  private val QueryStringVideoIdRegex = """v=([^&\?]+)""".r.unanchored
+  private val SlashVideoIdRegex = """/([^/]+)""".r
+  private val SlashEmbedSlashVideoIdRegex = """/embed/([^/]+)""".r
+  private val QueryStringVideoIdRegex = """v=([^&?]+)""".r.unanchored
 
 
   /** We can get the video id directly for URLs like:
@@ -136,4 +149,3 @@ object YouTubePrevwRendrEng {
   }
 }
 
- */

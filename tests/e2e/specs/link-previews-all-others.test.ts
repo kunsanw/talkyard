@@ -7,7 +7,7 @@ import utils = require('../utils/utils');
 import { TyE2eTestBrowser } from '../utils/pages-for';
 import settings = require('../utils/settings');
 import make = require('../utils/make');
-import logAndDie = require('../utils/log-and-die');
+import { dieIf } from '../utils/log-and-die';
 import c = require('../test-constants');
 
 let browser: TyE2eTestBrowser;
@@ -38,7 +38,8 @@ interface LinkPreviewProvider {
 
 type ProvidersMap = { [name: string]: LinkPreviewProvider };
 
-// NOTE:  To troubleshoot just one, search for "just_one" below.
+// NOTE:  To troubleshoot just one, add:  --only3rdParty reddit  to the
+// wdio command line, for exampe. Or just:  --o3 reddit
 
 let providersToTest: ProvidersMap = {
   facebook: {
@@ -103,11 +104,29 @@ let providersToTest: ProvidersMap = {
     linkTwoInTopicButBroken: 'https://www.tiktok.com/@noone/video/99999999999999999999999',
     linkTwoExpectedPrevwText: "No html in TikTok",
     linkInReply: 'https://www.tiktok.com/@sofia.tingeling/video/6830082580818169093',
+  },
+
+  youtube: {
+    name: "YouTube",
+    sandboxedIframe: true,
+    // Honey badger doesn't care.
+    linkInTopic: 'https://youtu.be/box0-koAuIY',
+    linkInTopicExpectedPreviewText: "",
+    linkTwoInTopicButBroken: 'https://youtu.be/9898-9898989898',
+    linkTwoNoticesIsBroken: false,
+    // Not oEmbed, so we cannot easily know the video is broken, skip:
+    // linkTwoExpectedPrevwText: "YouTube video not found",
+    // "You shall not pass."
+    linkInReply: 'https://www.youtube.com/watch?v=S7znI_Kpzbs',
   }
 }
 
-// To troubleshoot just_one:
-// providersToTest = { x: providersToTest.tiktok };  // for example
+
+if (settings.only3rdParty) {
+  const provider = providersToTest[settings.only3rdParty];
+  dieIf(!provider, `No such 3rd party provider: ${provider.name} [TyE402SKD7]`);
+  providersToTest = { x: provider };
+}
 
 
 const brokenPreview = '.s_LnPv-Err';
