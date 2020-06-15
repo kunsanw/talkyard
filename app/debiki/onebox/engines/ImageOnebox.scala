@@ -39,6 +39,7 @@ class ImagePrevwRendrEng(globals: Globals)
   def providerLnPvCssClassName = "s_LnPv-Img"
 
   override val alreadySanitized = true
+  override val addViewAtLink = false
 
   def renderInstantly(url: String): Good[String] = {
     var betterUrl = url

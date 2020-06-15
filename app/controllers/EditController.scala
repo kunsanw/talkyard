@@ -239,6 +239,9 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
           globals, siteId = siteId, mayHttpFetch = true,
           requesterId = requesterOrUnknown.id)
 
+    // link_previews_t.link_url_c is max 500.
+    throwForbiddenIf(url.length >= 450, "TyELNPVURLLEN", "URL too long")
+
     val response = renderer.loadRenderSanitize(url).transform(
           html => Ok(html),
           throwable => throwable match {

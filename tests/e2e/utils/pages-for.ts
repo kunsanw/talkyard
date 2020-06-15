@@ -4561,6 +4561,18 @@ export class TyE2eTestBrowser {
         return this.isExisting(this.topic.postBodySelector(postNr) + ' ' + selector);
       },
 
+      assertPostNrContains: (postNr: PostNr, selector: string) => {
+        if (!this.topic.postNrContains(postNr, selector)) {
+          assert.fail(`Post ${postNr} doesn't contain selector:  ${selector}`);
+        }
+      },
+
+      assertPostNrNotContains: (postNr: PostNr, selector: string) => {
+        if (this.topic.postNrContains(postNr, selector)) {
+          assert.fail(`Post ${postNr} contains, but should not, selector:  ${selector}`);
+        }
+      },
+
       postNrContainsVisible: (postNr: PostNr, selector: string) => {
         return this.isVisible(this.topic.postBodySelector(postNr) + ' ' + selector);
       },

@@ -188,7 +188,7 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
   });
 
   it("The new text appears in the page", () => {
-    owensBrowser.topic.waitForPostAssertTextMatches(c.BodyNr, "Wow_wow");
+    owensBrowser.topic.waitUntilPostTextMatches(c.BodyNr, "Wow_wow");
   });
 
   it("... The two ok tweets appear", () => {

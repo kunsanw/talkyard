@@ -64,7 +64,7 @@ object QuickSpamCheckDao {
       throwIfTooManyLinks(15)
     }
     else if (user.isAuthenticated) {
-      throwIfTooManyLinks(10)
+      throwIfTooManyLinks(11)  // [TyT603RTDJ43]
     }
     else {
       throwIfTooManyLinks(5)

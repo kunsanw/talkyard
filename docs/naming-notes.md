@@ -17,12 +17,15 @@ they never see the phrase "Root category".
 
 ### Database tables, columns etc
 
-Table names ends with `_t`, e.g. `links_t`. Otherwise it'd take long to find
-all occurrences of e.g. the links table — example: if you search for "links"
-you find 99% off-topic matches, but "links_t" gives you close to 100%
-on-topic search results.
+Table names ends with `_t`, e.g. `links_t`.
+Column names end with `_c`, e.g. `site_c`.
 
-Column names end with `_c` for the same reason, e.g. `site_c`.
+Otherwise it'd take long to find all occurrences of e.g.
+the links table — example: if you search for "links"
+you find 99% off-topic matches, but "links_t" gives you close to 100%
+on-topic search results. Also, now you can just type: `link_url_c` without
+explaining that it's a database column — the other Ty devs willl know,
+just by looking at `_c`. And can find it instantly in the database docs.
 
 "Participant" is abbreviated with "pp", or "..._by". E.g. `links_t.to_pp_id_c` means
 a link to the tparticipant with the id in the `to_pp_id_c` column.

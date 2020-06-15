@@ -59,14 +59,14 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
         // (Better sanitize, also if seems to be no werird chars in the id.)
         if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
           return Bad(LinkPreviewProblem(
-                "Bad YouTube video ID, cannot create preview [TyE2URKT04]",
-                unsafeUrl = safeUrl, errorCode = "TyEYOUTBID"))
+                "Bad YouTube video ID, cannot create preview",
+                unsafeUrl = safeUrl, errorCode = "TyEYOUTBID_"))
         }
 
         val safeId = safeEncodeForHtml(videoId)
         val unsafeParams = findParams(javaUri) getOrElse {
           return Bad(LinkPreviewProblem(
-                "Bad YouTube video URL, cannot create preview [TyE7DI60J2]",
+                "Bad YouTube video URL, cannot create preview",
                 unsafeUrl = safeUrl, errorCode = "TyEYOUTBPS"))
         }
 

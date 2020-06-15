@@ -63,12 +63,6 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
   extends ExternalRequestLinkPreviewEngine(
         globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
-  // ! wow !
-  //  https://github.com/michael-simons/java-oembed
-  // could be a blog post: Safely oEmbed via srcdoc?
-
-  // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
-
   val extraLnPvCssClasses: String = "s_LnPv-oEmb " + providerLnPvCssClassName
 
   def providerName: Option[String]
@@ -79,22 +73,11 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
 
   def providerEndpoint: String
 
-  //def sanitizeInsteadOfSandbox = false
-
   def queryParamsEndAmp = "max_width=600&"
 
   def moreQueryParamsEndAmp = ""
 
-
-  /** The oEmbed stuff might include arbitrary html tags and even scripts,
-    * so we render it in a sandboxed iframe.
-    */
-  //override val alreadySanitized = true
-
   override def sandboxInIframe = true
-
-
-  //override val alreadyWrappedInAside = true
 
 
   def loadAndRender(params: RenderPreviewParams): Future[String Or LinkPreviewProblem] = {
@@ -110,16 +93,6 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
     def weirdStatusError(x: Int) = s"Unexpected $provdrOrUnk http status code: $x, url: "
     def noHtmlInOEmbed = s"No html in $providerWidget API response, url: "
 
-    // omit_script=1  ?
-    // theme  = {light, dark}
-    // link_color  = #zzz   [ty_themes]
-    // lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
-    // see:
-    // https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview
-    // dnt  ?
-
-    // Wants:  theme: light / dark.  Primary color / link color.
-    // And device:  mobile / tablet / laptop ?  for maxwidth.
     val downloadUrl =
           s"$providerEndpoint?$queryParamsEndAmp${moreQueryParamsEndAmp}url=$unsafeUrl"
 
@@ -148,30 +121,7 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
                   noHtmlInOEmbed, unsafeUrl = unsafeUrl, errorCode = "TyELNPV0HTML"))
       }
 
-      // Try get from Redis or mem cache
-
-
-      /*
-      val unsafeProviderName = (cachedPreview.content_json_c \ "provider_name").asOpt[String]
-
-      val safeHtml = {
-        if (sanitizeInsteadOfSandbox) {
-          TextAndHtml.sanitizeRelaxed(unsafeHtml)
-        }
-        else {
-          SandboxedAutoSizeIframe.makeSafePreviewHtml(
-                unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
-                unsafeProviderName = unsafeProviderName,
-                extraLnPvCssClasses = extraLnPvCssClasses)
-        }
-      }
-
-      val safeHtmlInAside = LinkPreviewHtml.wrapSafeHtmlInAside(
-            safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
-            unsafeUrl = unsafeUrl, unsafeProviderName = unsafeProviderName)
-      */
-
-      return FutGood(unsafeHtml) //safeHtmlInAside)
+      return FutGood(unsafeHtml)
     }
 
     if (!params.mayHttpFetch) {
@@ -227,45 +177,22 @@ abstract class OEmbedPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetc
 
       val result: String Or LinkPreviewProblem = {
         if (problem.nonEmpty) {
-          // CACHE in Redis
           Bad(LinkPreviewProblem(
                 problem, unsafeUrl = unsafeUrl, errorCode = "TyELNPVRSP"))
         }
         else {
           SECURITY // incl in quota? num preview links * X
-          params.savePreviewInDb foreach { fn =>
-            val preview = LinkPreview(  // mabye Ty SCRIPT tag instead?
-                  link_url_c = unsafeUrl,
-                  downloaded_from_url_c = downloadUrl,
-                  downloaded_at_c = globals.now(),
-                  status_code_c = r.status,
-                  preview_type_c = LinkPreviewTypes.OEmbed,
-                  first_linked_by_id_c = params.requesterId,
-                  content_json_c = unsafeJsObj)
-            fn(preview)
-          }
+          val preview = LinkPreview(  // mabye Ty SCRIPT tag instead?
+                link_url_c = unsafeUrl,
+                downloaded_from_url_c = downloadUrl,
+                downloaded_at_c = globals.now(),
+                status_code_c = r.status,
+                preview_type_c = LinkPreviewTypes.OEmbed,
+                first_linked_by_id_c = params.requesterId,
+                content_json_c = unsafeJsObj)
+          params.savePreviewInDb(preview)
 
-          val unsafeHtml = anyUnsafeHtml.getOrDie("TyE6986SK")
-          /*
-          val unsafeProviderName = (unsafeJsObj \ "provider_name").asOpt[String]
-
-          val safeHtml = {
-            if (sanitizeInsteadOfSandbox) {
-              TextAndHtml.sanitizeRelaxed(unsafeHtml)
-            }
-            else {
-              SandboxedAutoSizeIframe.makeSafePreviewHtml(
-                    unsafeUrl = unsafeUrl, unsafeHtml = unsafeHtml,
-                    unsafeProviderName = unsafeProviderName,
-                    extraLnPvCssClasses = extraLnPvCssClasses)
-            }
-          }
-
-          val safeHtmlInAside = LinkPreviewHtml.wrapSafeHtmlInAside(
-                safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
-                unsafeUrl = unsafeUrl, unsafeProviderName = unsafeProviderName)
-          safeHtmlInAside */
-          Good(unsafeHtml)
+          Good(anyUnsafeHtml getOrDie "TyE6986SK")
         }
       }
 
@@ -299,7 +226,13 @@ object SandboxedAutoSizeIframe {  // move to where? Own file?
               "provider_name": "Twitter",
               "provider_url": "https://twitter.com",
               "version": "1.0"
-            } */
+                } */
+
+        // ! wow !
+        //  https://github.com/michael-simons/java-oembed
+        // could be a blog post: Safely oEmbed via srcdoc?
+
+        // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
 
         // Nice:
         // https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
@@ -419,35 +352,6 @@ object OneboxIframe {
   val adjustOEmbedIframeHeightScript: String = s"""
     |<script src="/-/assets/ext-iframe$min.js"></script>
     """.stripMargin
-
-    /*
-    |<script>(function(d) { // Talkyard [OEMBHGHT]
-    |d.body.style.margin = '0';
-    |var nSent = 0;
-    |function sendH() {
-    |  var h = d.body.clientHeight;
-    |  console.debug("Sending oEmbed height: " + h + " [TyMOEMBHGHT]");
-    |  try {
-    |    var cs = d.querySelectorAll('body > *');
-    |    for (var i = 0; i < cs.length; ++i) {
-    |      var c = cs[i];
-    |      c.style.margin = '0 auto';
-    |      c.style.padding = '0';
-    |    }
-    |  }
-    |  catch (ex) {
-    |    console.warn("Error removing margin [TyEOEMBMARG]");
-    |  }
-    |  window.parent.postMessage(['oEmbHeight', h], '*');
-    |  nSent += 1;
-    |  if (nSent < 4) {
-    |    setTimeout(sendH, nSent * 500);
-    |  }
-    |}
-    |setTimeout(sendH, 500);
-    |})(document);
-    |</script>
-    |""".stripMargin */
 
   private def min = Globals.isDevOrTest ? "" | ".min"
 }

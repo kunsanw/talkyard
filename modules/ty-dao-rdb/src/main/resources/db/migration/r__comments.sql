@@ -1,3 +1,12 @@
+-- Please sort tables alphabetically.
+-- And columns in what seems like a "good to know first" order,
+-- maybe primary key first?
+
+
+------------------------------------------------------------------------
+--  link_previews_t
+------------------------------------------------------------------------
+
 
 comment on table  link_previews_t  is $_$
 
@@ -18,6 +27,14 @@ the attacker's entry wouldn't be found (because it's  https://webs-a/...).
 
 There's an index  linkpreviews_i_site_downl_err_at  you can use to maybe retry
 failed downlads after a while.
+$_$;
+
+
+comment on column  link_previews_t.link_url_c  is $_$
+
+A link to a Wikipedia page or Twitter tweet or YouTube video,
+or an external image or blog post, whatever. That linked thing
+is what we want to show a preview of, in Talkyard.
 $_$;
 
 
@@ -42,6 +59,11 @@ comment on column  link_previews_t.content_json_c  is $_$
 Null if the request failed, got no response json. E.g. an error status code,
 or a request timeout or TCP RST?
 $_$;
+
+
+------------------------------------------------------------------------
+--
+------------------------------------------------------------------------
 
 
 

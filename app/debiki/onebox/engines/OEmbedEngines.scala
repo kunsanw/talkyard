@@ -317,6 +317,17 @@ class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 // Links look like:
 //   https://twitter.com/TwitterDev
 
+// omit_script=1  ?
+// theme  = {light, dark}
+// link_color  = #zzz   [ty_themes]
+// lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
+// see:
+// https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview
+// dnt  ?
+
+// Wants:  theme: light / dark.  Primary color / link color.
+// And device:  mobile / tablet / laptop ?  for maxwidth.
+
 object TwitterPrevwRendrEng {
   // URL scheme, from https://oembed.com:
   // >  https://twitter.com/*/status/*

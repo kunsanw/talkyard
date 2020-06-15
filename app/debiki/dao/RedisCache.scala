@@ -228,6 +228,7 @@ class RedisCache(val siteId: SiteId, private val redis: RedisClient, private val
   // Failed link previews aren't saved to the database (then could DoS-make it
   // run out of space?). Just cached for a while here in Redis.
 
+  val LinkPreviewExpirationSecs: Int = 30 * 60
 
   def getLinkPreviewSafeHtml(url: String): Option[String] = {
     val futureString: Future[Option[ByteString]] = redis.get(linkPreviewKey(siteId, url))
@@ -246,7 +247,8 @@ class RedisCache(val siteId: SiteId, private val redis: RedisClient, private val
 
 
   def putLinkPreviewSafeHtml(url: String, safeHtml: String): Unit = {
-    redis.set(linkPreviewKey(siteId, url), safeHtml)
+    redis.set(linkPreviewKey(siteId, url), safeHtml,
+          exSeconds = Some(LinkPreviewExpirationSecs))
   }
 
 

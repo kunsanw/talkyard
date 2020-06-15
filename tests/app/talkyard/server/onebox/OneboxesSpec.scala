@@ -25,14 +25,14 @@ import com.debiki.core.Prelude._
 import debiki.onebox.engines.TwitterPrevwRendrEng
 
 
-class OneboxesSpec extends FreeSpec with must.Matchers {
+class OneboxesSpec extends FreeSpec with must.Matchers {  // RENAME to LinkPreviewMatchSpec ?
 
   val http = "http"
   val https = "https"
 
-  "Oneboxes" - {
+  "LinkPreviewRenderEngine" - {
 
-    "TwitterOneboxEngine can" - {
+    "TwitterPrevwRendrEng can" - {
       import TwitterPrevwRendrEng.{regex => rgx}
 
       // Sample tweet link from:
@@ -74,7 +74,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
     val facebookPostUrl = "https://www.facebook.com/abc123/posts/def456"
     val facebookVideoUrl = "https://www.facebook.com/abc123/videos/def456"
 
-    "FacebookPostsOneboxEngine can" - {
+    "FacebookPostPrevwRendrEng can" - {
       import debiki.onebox.engines.{FacebookPostPrevwRendrEng => fb}
 
       val postUrl = facebookPostUrl
@@ -106,7 +106,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
     }
 
 
-    "FacebookVideosOneboxEngine can" - {
+    "FacebookVideoPrevwRendrEng can" - {
       import debiki.onebox.engines.{FacebookVideoPrevwRendrEng => fb}
 
       val videoUrl = facebookVideoUrl
@@ -133,7 +133,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
     }
 
 
-    "InstagramOneboxEngine can" - {
+    "InstagramPrevwRendrEng can" - {
       import debiki.onebox.engines.{InstagramPrevwRendrEng => insta}
 
       val realUrl1 = "https://www.instagram.com/p/BJlNX-rju7o/?utm_source=ig_web_button_share_sheet"
@@ -172,7 +172,7 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
     }
 
 
-    "RedditOneboxEngine can" - {
+    "RedditPrevwRendrEng can" - {
       import debiki.onebox.engines.{RedditPrevwRendrEng => reddit}
 
       val url1 = "https://reddit.com/r/abc123/comments/de45/fg67"
@@ -233,6 +233,34 @@ class OneboxesSpec extends FreeSpec with must.Matchers {
       tiktok.regex.matches(url1.replaceAllLiterally("/@", "/")) mustBe false
     }
   }
+
+
+  "YouTubePrevwRendrEngOEmbed can" - {
+    import debiki.onebox.engines.{YouTubePrevwRendrEngOEmbed => youtube}
+
+    val url1 = "https://youtu.be/box0-koAuIY"
+    val url2 = "https://www.youtube.com/watch?v=S7znI_Kpzbs"
+    val url3 = "https://www.youtube.com/watch?v=8h9Mvz1i9hk"
+
+    "match YouTube urls" in {
+      youtube.handles(url1) mustBe true
+      youtube.handles(url2) mustBe true
+      youtube.handles(url3) mustBe true
+    }
+
+    "but not the wrong urls" in {
+      // http not https
+      youtube.handles(url1.replaceAllLiterally("https:", "http:")) mustBe false
+      // wrong domain
+      youtube.handles(url1.replaceAllLiterally(".be", ".com")) mustBe false
+      youtube.handles(url2.replaceAllLiterally(".com", ".be")) mustBe false
+      youtube.handles(url3.replaceAllLiterally("youtube", "yo_tube")) mustBe false
+      // wrong path
+      youtube.handles(url2.replaceAllLiterally("/watch", "/look")) mustBe false
+      youtube.handles(url2.replaceAllLiterally("/watch", "/wow/watch")) mustBe false
+    }
+  }
+
 
 }
 
