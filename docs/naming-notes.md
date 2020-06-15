@@ -38,6 +38,12 @@ Constraints and indexes:
  - Unique indexes: `tablename_u_col1_col2_etc`.
  - Other indexes: `tablename_i_col1_col2_etc`.
 
+Don't include the `site_id_c` column in these names — it's always there, not
+interesting. Instead, in the few cases where the site is _not_ included,
+add `_g` instead, for "global" index: `tablename_i_g_col1` means `col1` across
+all sites.
+
+
 When adding a foreign key, always include a comment on the line above
 about which index indexes that foreign key. Example:
 
