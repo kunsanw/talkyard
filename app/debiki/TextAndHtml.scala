@@ -28,6 +28,27 @@ import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 
 
+case class TitleSourceAndHtml(text: String, safeHtmlSanitized: String) {
+  def source: String = text
+}
+
+
+object TitleSourceAndHtml {
+  def apply(source: String): TitleSourceAndHtml = {
+    //  =  dao.textAndHtmlMaker.forTitle(title)
+
+    // this.textAndHtmlMaker.forTitle(s"Description of the $name category")
+    //                            where this = CategoriesDao
+
+
+    // def createForum(options, ...)
+    // val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
+
+    TitleSourceAndHtml(source, ???)
+  }
+}
+
+
 
 /** Immutable. Use linkDomains to check all links against a spam/evil-things domain block list
   * like Spamhaus DBL, https://www.spamhaus.org/faq/section/Spamhaus%20DBL#271.

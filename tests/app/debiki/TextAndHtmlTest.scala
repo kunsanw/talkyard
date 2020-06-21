@@ -30,14 +30,15 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
     import TextAndHtml.{sanitizeTitleText => san}
 
     def checkRemovesScriptTags(fn: String => String): Unit = {
-      san("""<script>alert("123")</script>Title""") mustBe "Title"
-      san("""Two <script>alert("123") three</script>four""") mustBe "Two four"
-      san("""Unterminated <script>alert("123") scr ip t""") mustBe "Unterminated"
-      san("""very </script> terminated""") mustBe "very  terminated"
+      fn("""<script>alert("123")</script>Title""") mustBe "Title"
+      fn("""Two <script>alert("123") three</script>four""") mustBe "Two four"
+      fn("""Unterminated <script>alert("123") scr ip t""") mustBe "Unterminated"
+      fn("""very </script> terminated""") mustBe "very  terminated"
 
+      // Old comment:
       // But does not sanitize for inclusion in html *attributes*, e.g. this is ok:
       // (from https://hackerone.com/reports/197914)
-      // san("""descr' onerror='alert(/XSS by skavans/)""")
+      // fn("""descr' onerror='alert(/XSS by skavans/)""")
     }
 
     def checkRemovesScriptAttributes(fn: String => String, keepTag: Boolean): Unit = {

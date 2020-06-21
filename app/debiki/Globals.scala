@@ -617,7 +617,7 @@ class Globals(
     siteDao(siteId).getWholeSiteSettings()
 
   def siteById(siteId: SiteId): Option[Site] =
-    systemDao.getSite(siteId)
+    systemDao.getSiteById(siteId)
 
   def originOfSiteId(siteId: SiteId): Option[String] =
     systemDao.getSiteById(siteId).flatMap(_.canonicalHostname.map(originOf))

@@ -20,7 +20,7 @@ package debiki.dao
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp._
-import debiki.{TextAndHtml, TextAndHtmlMaker}
+import debiki.{TextAndHtml, TextAndHtmlMaker, TitleSourceAndHtml}
 import ed.server.auth.{Authz, ForumAuthzContext, MayMaybe}
 import java.{util => ju}
 import org.scalactic.{ErrorMessage, Good, Or}
@@ -112,8 +112,8 @@ case class CategoryToSave(
 
   def isNewCategory: Boolean = anyId.exists(_ < 0)
 
-  def makeAboutTopicTitle(textAndHtmlMaker: TextAndHtmlMaker): TextAndHtml =
-    textAndHtmlMaker.forTitle(s"Description of the $name category")  // sync with the upserter [G204MF3]
+  def makeAboutTopicTitle(): TitleSourceAndHtml =
+    TitleSourceAndHtml(s"Description of the $name category")  // sync with the upserter [G204MF3]  I18N
 
   def makeAboutTopicBody(textAndHtmlMaker: TextAndHtmlMaker): TextAndHtml =
     textAndHtmlMaker.forBodyOrComment(description) // COULD follow links? Only staff can create categories [WHENFOLLOW]
@@ -673,14 +673,13 @@ trait CategoriesDao {
     val category = newCategoryData.makeCategory(categoryId, tx.now.toJavaDate)
     tx.insertCategoryMarkSectionPageStale(category)
 
-    val titleTextAndHtml = newCategoryData.makeAboutTopicTitle(textAndHtmlMaker)
+    val titleSourceAndHtml = newCategoryData.makeAboutTopicTitle()
     val bodyTextAndHtml = newCategoryData.makeAboutTopicBody(textAndHtmlMaker)
 
     val aboutPagePath = createPageImpl(
         PageType.AboutCategory, PageStatus.Published, anyCategoryId = Some(categoryId),
         anyFolder = None, anySlug = Some("about-" + newCategoryData.slug), showId = true,
-        titleSource = titleTextAndHtml.text,
-        titleHtmlSanitized = titleTextAndHtml.safeHtml,
+        title = titleSourceAndHtml,
         bodySource = bodyTextAndHtml.text,
         bodyHtmlSanitized = bodyTextAndHtml.safeHtml,
         pinOrder = None,

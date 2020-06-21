@@ -51,7 +51,7 @@ trait PagesDao {
 
 
   def createPage(pageRole: PageType, pageStatus: PageStatus, anyCategoryId: Option[CategoryId],
-        anyFolder: Option[String], anySlug: Option[String], titleTextAndHtml: TextAndHtml,
+        anyFolder: Option[String], anySlug: Option[String], title: TitleSourceAndHtml,
         bodyTextAndHtml: TextAndHtml, showId: Boolean, deleteDraftNr: Option[DraftNr], byWho: Who,
         spamRelReqStuff: SpamRelReqStuff,
         discussionIds: Set[AltPageId] = Set.empty, embeddingUrl: Option[String] = None,
@@ -74,10 +74,10 @@ trait PagesDao {
     if (bodyTextAndHtml.safeHtml.trim.isEmpty)
       throwForbidden("DwE3KFE29", "Page body should not be empty")
 
-    if (titleTextAndHtml.text.length > MaxTitleLength)
+    if (title.source.length > MaxTitleLength)
       throwBadReq("DwE4HEFW8", s"Title too long, max length is $MaxTitleLength")
 
-    if (titleTextAndHtml.safeHtml.trim.isEmpty)
+    if (title.safeHtmlSanitized.trim.isEmpty)
       throwForbidden("DwE5KPEF21", "Page title should not be empty")
 
     dieIf(discussionIds.exists(_.startsWith("diid:")), "TyE0KRTDT53J")
@@ -85,12 +85,14 @@ trait PagesDao {
     quickCheckIfSpamThenThrow(byWho, bodyTextAndHtml, spamRelReqStuff)
 
     val pagePath = readWriteTransaction { tx =>
-      val (pagePath, bodyPost, anyReviewTask) = createPageImpl(pageRole, pageStatus, anyCategoryId,
-        anyFolder = anyFolder, anySlug = anySlug, showId = showId,
-        titleSource = titleTextAndHtml.text, titleHtmlSanitized = titleTextAndHtml.safeHtml,
-        bodySource = bodyTextAndHtml.text, bodyHtmlSanitized = bodyTextAndHtml.safeHtml,
-        pinOrder = None, pinWhere = None, byWho, Some(spamRelReqStuff),
-        tx, discussionIds = discussionIds, embeddingUrl = embeddingUrl, extId = extId)
+      val (pagePath, bodyPost, anyReviewTask) =
+            createPageImpl(
+                pageRole, pageStatus, anyCategoryId,
+                anyFolder = anyFolder, anySlug = anySlug, showId = showId,
+                title = title,
+                bodySource = bodyTextAndHtml.text, bodyHtmlSanitized = bodyTextAndHtml.safeHtml,
+                pinOrder = None, pinWhere = None, byWho, Some(spamRelReqStuff),
+                tx, discussionIds = discussionIds, embeddingUrl = embeddingUrl, extId = extId)
 
       val notifications = notfGenerator(tx).generateForNewPost(
         newPageDao(pagePath.pageId, tx),
@@ -114,7 +116,7 @@ trait PagesDao {
   /** Returns (PagePath, body-post)
     */
   def createPageImpl2(pageRole: PageType,
-        title: TextAndHtml, body: TextAndHtml,
+        title: TitleSourceAndHtml, body: TextAndHtml,
         pageStatus: PageStatus = PageStatus.Published,
         anyCategoryId: Option[CategoryId] = None,
         anyFolder: Option[String] = None, anySlug: Option[String] = None, showId: Boolean = true,
@@ -123,7 +125,7 @@ trait PagesDao {
         tx: SiteTransaction): (PagePathWithId, Post) = {
     val result = createPageImpl(pageRole, pageStatus, anyCategoryId = anyCategoryId,
       anyFolder = anyFolder, anySlug = anySlug, showId = showId,
-      titleSource = title.text, titleHtmlSanitized = title.safeHtml,
+      title,
       bodySource = body.text, bodyHtmlSanitized = body.safeHtml,
       pinOrder = pinOrder, pinWhere = pinWhere,
       byWho, spamRelReqStuff, tx = tx,
@@ -134,8 +136,9 @@ trait PagesDao {
   def createPageImpl(pageRole: PageType, pageStatus: PageStatus,
       anyCategoryId: Option[CategoryId],
       anyFolder: Option[String], anySlug: Option[String], showId: Boolean,
-      titleSource: String, titleHtmlSanitized: String,
-      bodySource: String, bodyHtmlSanitized: String,
+      // titleSource: String, titleHtmlSanitized: String,
+      title: TitleSourceAndHtml,
+      bodySource: String, bodyHtmlSanitized: String,  /// wants txt and html?!
       pinOrder: Option[Int], pinWhere: Option[PinPageWhere],
       byWho: Who, spamRelReqStuff: Option[SpamRelReqStuff],
       tx: SiteTransaction,
@@ -154,7 +157,7 @@ trait PagesDao {
     val categoryPath = tx.loadCategoryPathRootLast(anyCategoryId)
     val groupIds = tx.loadGroupIdsMemberIdFirst(author)
     val permissions = tx.loadPermsOnPages()
-    val authzCtx = ForumAuthzContext(Some(author), groupIds, permissions)
+    //val authzCtx = ForumAuthzContext(Some(author), groupIds, permissions)
     val settings = loadWholeSiteSettings(tx)
 
     dieOrThrowNoUnless(Authz.mayCreatePage(  // REFACTOR COULD pass a pageAuthzCtx instead [5FLK02]
@@ -165,13 +168,13 @@ trait PagesDao {
 
     require(!anyFolder.exists(_.isEmpty), "EsE6JGKE3")
     // (Empty slug ok though, e.g. homepage.)
-    require(!titleSource.isEmpty && !titleHtmlSanitized.isEmpty, "EsE7MGK24")
+    require(!title.source.isEmpty && !title.safeHtmlSanitized.isEmpty, "EsE7MGK24")
     require(!bodySource.isEmpty && !bodyHtmlSanitized.isEmpty, "EsE1WKUQ5")
     require(pinOrder.isDefined == pinWhere.isDefined, "Ese5MJK2")
     require(embeddingUrl.trimNoneIfBlank == embeddingUrl, "Cannot have blank emb urls [TyE75SPJBJ]")
 
     val pageSlug = anySlug.getOrElse({
-        context.nashorn.slugifyTitle(titleSource)
+        context.nashorn.slugifyTitle(title.source)
     }).take(PagePath.MaxSlugLength).dropRightWhile(_ == '-').dropWhile(_ == '-')
 
     COULD // try to move this authz + review-reason check to ed.server.auth.Authz?
@@ -231,8 +234,8 @@ trait PagesDao {
       pageId = pageId,
       createdAt = now.toJavaDate,
       createdById = authorId,
-      source = titleSource,
-      htmlSanitized = titleHtmlSanitized,
+      source = title.source,
+      htmlSanitized = title.safeHtmlSanitized,
       approvedById = approvedById)
 
     val bodyPost = Post.createBody(

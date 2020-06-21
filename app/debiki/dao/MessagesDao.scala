@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp.throwForbidden
 import ed.server.pubsub
-import debiki.TextAndHtml
+import debiki.{TextAndHtml, TitleSourceAndHtml}
 
 
 trait MessagesDao {
@@ -31,7 +31,7 @@ trait MessagesDao {
   /** COULD perhaps this method be used to create OpenChat pages too? So that the creator
     * gets auto added to the page? [5KTE02Z]
     */
-  def startGroupTalk(title: TextAndHtml, body: TextAndHtml, pageRole: PageType,
+  def startGroupTalk(title: TitleSourceAndHtml, body: TextAndHtml, pageRole: PageType,
         toUserIds: Set[UserId], sentByWho: Who, spamRelReqStuff: SpamRelReqStuff,
         deleteDraftNr: Option[DraftNr]): PagePathWithId = {
 

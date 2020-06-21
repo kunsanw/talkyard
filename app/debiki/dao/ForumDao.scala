@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
-import debiki.TextAndHtml
+import debiki.{TextAndHtml, TitleSourceAndHtml}
 import talkyard.server.CommonMarkSourceAndHtml
 
 
@@ -63,7 +63,7 @@ trait ForumDao {
 
 
   def createForum(options: CreateForumOptions, byWho: Who): Option[CreateForumResult] = {
-    val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
+    val titleSourceAndHtml = TitleSourceAndHtml(options.title)
     val isForEmbCmts = options.isForEmbeddedComments
 
     val result = readWriteTransaction { tx =>
@@ -103,7 +103,7 @@ trait ForumDao {
       val forumPagePath = createPageImpl(
         PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
         anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
-        titleSource = options.title, titleHtmlSanitized = titleHtmlSanitized,
+        title = titleSourceAndHtml,
         bodySource = introText.source, bodyHtmlSanitized = introText.html,
         pinOrder = None, pinWhere = None,
         byWho, spamRelReqStuff = None, tx, layout = Some(options.topicListStyle))._1
@@ -368,13 +368,15 @@ trait ForumDao {
         bySystem)(tx)
     } */
 
+    def makeTitle(safeText: String) =
+      TitleSourceAndHtml(safeText, safeHtmlSanitized = safeText)
+
     // Create forum welcome topic.
     createPageImpl(
       PageType.Discussion, PageStatus.Published,
       anyCategoryId = Some(generalCategoryId),
       anyFolder = None, anySlug = Some("welcome"), showId = true,
-      titleSource = WelcomeTopicTitle,
-      titleHtmlSanitized = WelcomeTopicTitle,
+      title = makeTitle(WelcomeTopicTitle),
       bodySource = welcomeTopic.source,
       bodyHtmlSanitized = welcomeTopic.html,
       pinOrder = Some(WelcomeToForumTopicPinOrder),
@@ -391,8 +393,7 @@ trait ForumDao {
         PageType.Discussion, PageStatus.Published,
         anyCategoryId = Some(generalCategoryId), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-discussion"), showId = true,
-        titleSource = SampleThreadedDiscussionTitle,
-        titleHtmlSanitized = SampleThreadedDiscussionTitle,
+        title = makeTitle(SampleThreadedDiscussionTitle),
         bodySource = SampleThreadedDiscussionText,
         bodyHtmlSanitized = s"<p>$SampleThreadedDiscussionText</p>",
         pinOrder = None,
@@ -417,8 +418,7 @@ trait ForumDao {
         PageType.Problem, PageStatus.Published,
         anyCategoryId = anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-problem"), showId = true,
-        titleSource = SampleProblemTitle,
-        titleHtmlSanitized = SampleProblemTitle,
+        title = makeTitle(SampleProblemTitle),
         bodySource = SampleProblemText.source,
         bodyHtmlSanitized = SampleProblemText.html,
         pinOrder = None,
@@ -432,8 +432,7 @@ trait ForumDao {
         PageType.Idea, PageStatus.Published,
         anyCategoryId = anyIdeasCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-idea"), showId = true,
-        titleSource = SampleIdeaTitle,
-        titleHtmlSanitized = SampleIdeaTitle,
+        title = makeTitle(SampleIdeaTitle),
         bodySource = SampleIdeaText.source,
         bodyHtmlSanitized = SampleIdeaText.html,
         pinOrder = None,
@@ -463,8 +462,7 @@ trait ForumDao {
         PageType.Question, PageStatus.Published,
         anyCategoryId = anyQuestionsCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-question"), showId = true,
-        titleSource = SampleQuestionTitle,
-        titleHtmlSanitized = SampleQuestionTitle,
+        title = makeTitle(SampleQuestionTitle),
         bodySource = SampleQuestionText.source,
         bodyHtmlSanitized = SampleQuestionText.html,
         pinOrder = None,
@@ -491,8 +489,7 @@ trait ForumDao {
       PageType.OpenChat, PageStatus.Published,
       anyCategoryId = Some(staffCategoryId),
       anyFolder = None, anySlug = Some("staff-chat"), showId = true,
-      titleSource = StaffChatTopicTitle,
-      titleHtmlSanitized = StaffChatTopicTitle,
+      title = makeTitle(StaffChatTopicTitle),
       bodySource = StaffChatTopicText,
       bodyHtmlSanitized = s"<p>$StaffChatTopicText</p>",
       pinOrder = None,

@@ -108,9 +108,6 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
   final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
     val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
 
-    WOULD_OPTIMIZE // do max once per second or minute (unimportant).
-    redisCache.removeOldLinkPreviews()
-
     COULD_OPTIMIZE // hash the url, so shorter?
     redisCache.getLinkPreviewSafeHtml(urlAndFns.unsafeUrl) foreach { safeHtml =>
       SHOULD // if preview broken *and* if (urlAndFns.mayHttpFetch):
