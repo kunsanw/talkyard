@@ -51,6 +51,7 @@ create table links_t(
   added_by_id_c int not null,
   -- Exactly one of these:
   is_external_c boolean,
+  to_page_id_c int,
   to_post_id_c int,
   to_pp_id_c int,
   to_tag_id_c int,
@@ -68,15 +69,19 @@ create table links_t(
   --    references link_previews_t (site_id_c, link_url_c),
 
   -- fk index: links_i_addedby
-  constraint links_r_pps foreign key (site_id_c, added_by_id_c)
+  constraint links_addedby_r_pps foreign key (site_id_c, added_by_id_c)
       references users3 (site_id, user_id),
 
-  -- fk index: links_i_topost
-  constraint links_topost_r_posts foreign key (site_id_c, to_post_id_c)
+  -- fk index: links_i_topageid
+  constraint links_topageid_r_pages foreign key (site_id_c, to_page_id_c)
+      references pages3 (site_id, page_id),
+
+  -- fk index: links_i_topostid
+  constraint links_topostid_r_posts foreign key (site_id_c, to_post_id_c)
       references posts3 (site_id, unique_post_id),
 
   -- fk index: links_i_topp
-  constraint links_topost_r_pps foreign key (site_id_c, to_pp_id_c)
+  constraint links_topp_r_pps foreign key (site_id_c, to_pp_id_c)
       references users3 (site_id, user_id),
 
   -- fk idnex: links_i_totag
@@ -92,13 +97,15 @@ create table links_t(
       is_external_c or (is_external_c is null)),
 
   constraint links_c_to_just_one check (
-      num_nonnulls(is_external_c, to_post_id_c, to_pp_id_c, to_tag_id_c, to_categoy_id_c) = 1)
+      num_nonnulls(is_external_c, to_page_id_c, to_post_id_c,
+                      to_pp_id_c, to_tag_id_c, to_categoy_id_c) = 1)
 );
 
 
 create index links_i_linkurl    on links_t (site_id_c, link_url_c);
 create index links_i_addedby    on links_t (site_id_c, added_by_id_c);
-create index links_i_topost     on links_t (site_id_c, to_post_id_c);
+create index links_i_topageid    on links_t (site_id_c, to_page_id_c);
+create index links_i_topostid   on links_t (site_id_c, to_post_id_c);
 create index links_i_topp       on links_t (site_id_c, to_pp_id_c);
 create index links_i_totag      on links_t (site_id_c, to_tag_id_c);
 create index links_i_tocategory on links_t (site_id_c, to_categoy_id_c);

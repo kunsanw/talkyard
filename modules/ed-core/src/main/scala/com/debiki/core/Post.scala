@@ -468,6 +468,12 @@ case class Post(   // [exp] ok use
   def pagePostNr = PagePostNr(pageId, nr)
   def hasAnId: Boolean = nr >= PageParts.LowestPostNr
 
+  def lastApprovedAt: Option[When] =
+    lastApprovedEditAt.map(When.fromDate) orElse {
+      if (isSomeVersionApproved) Some(createdWhen)
+      else None
+    }
+
   def createdAtUnixSeconds: UnixMillis = createdAt.getTime / 1000
   def createdAtMillis: UnixMillis = createdAt.getTime
   def createdWhen: When = When.fromMillis(createdAt.getTime)

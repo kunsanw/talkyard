@@ -24,10 +24,10 @@ import com.debiki.core.PageParts.FirstReplyNr
 import com.debiki.core.Participant.SystemUserId
 import debiki._
 import debiki.EdHttp._
-import ed.server.auth.{Authz, ForumAuthzContext}
+import ed.server.auth.Authz
 import ed.server.spam.SpamChecker
 import java.{util => ju}
-import scala.collection.{immutable, mutable}
+import scala.collection.immutable
 import math.max
 import org.owasp.encoder.Encode
 
@@ -362,7 +362,7 @@ trait PagesDao {
     uploadPaths foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
-    saveDeleteLinks(bodyPost, authorId, tx)
+    saveDeleteLinks(bodyPost, body, authorId, tx)
 
     discussionIds.foreach(id => tx.insertAltPageId("diid:" + id, realPageId = pageId))
 

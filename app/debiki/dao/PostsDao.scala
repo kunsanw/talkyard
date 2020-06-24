@@ -625,7 +625,7 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
-    saveDeleteLinks(newPost, authorId, tx)
+    saveDeleteLinks(newPost, textAndHtml, authorId, tx)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     insertAuditLogEntry(auditLogEntry, tx)
 
@@ -718,7 +718,7 @@ trait PostsDao {
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     saveDeleteUploadRefs(lastPost, editedPost = editedPost, textAndHtml,
           isAppending = true, authorId, tx)
-    saveDeleteLinks(editedPost, authorId, tx)
+    saveDeleteLinks(editedPost, combinedTextAndHtml, authorId, tx)
 
     val oldMeta = tx.loadThePageMeta(lastPost.pageId)
     val newMeta = oldMeta.copy(version = oldMeta.version + 1)
@@ -1066,23 +1066,45 @@ trait PostsDao {
     if (!post.isCurrentVersionApproved)
       return
 
+    val approvedAt: When = post.lastApprovedAt getOrElse {
+      logger.warn(s"s$siteId: Post approved but no date: $post [TyE603RKDJM44]")
+      return
+    }
+
+    /*
     val linksBefore: Seq[Link] = tx.loadLinksFromPost(post.id)
     val linkStrsAfter = sourceAndHtml.internalLinks
     val linksAfter = linkStrsAfter flatMap { linkStr: String =>
       val uri = new java.net.URI(linkStr)
       val urlPath = uri.getPath
-      val pagePath = PagePath.fromUrlPath(siteId, urlPath) match {
-        case PagePath.Parsed.Good(path) =>
-          val correctPagePath: Option[PagePath] = checkPagePath(path)
-          val anyPageMeta = correctPagePath.flatMap(_.pageId.flatMap(getPageMeta))
-          ???
-        case PagePath.Parsed.Bad(error) => throwBadRequest("DwE0kI3E4", error)
-        case PagePath.Parsed.Corrected(newPath) => throwTemporaryRedirect(newPath)
+      val pagePath: Option[PagePathWithId] = PagePath.fromUrlPath(siteId, urlPath) match {
+        case PagePath.Parsed.Good(maybeOkPath) =>
+          // There's a db constraint, pgpths_page_r_pages, so if the page path
+          // exists, the page does too.
+          checkPagePath2(maybeOkPath) filter { path =>
+            // We remember just one link even if there're many same-post ——> same-page
+            // links (many <a href=...> to the same page, from the same post).
+            linksBefore.exists(_.to_post_id_c == path.pageId)
+          }
+        case PagePath.Parsed.Bad(error) =>
+          None
+        case PagePath.Parsed.Corrected(newPath) =>
+          None // or checkPagePath2(newPath) ?
       }
-      ???
+      pagePath map {
+        Link(
+          from_post_id_c = post.id,
+          link_url_c = linkStr,
+          added_at_c = approvedAt,
+          added_by_id_c: UserId,
+          is_external: Boolean,
+          to_post_id_c: Option[PostId],
+          to_pp_id_c: Option[UserId],
+          to_tag_id_c: Option[TagDefId],
+          to_categoy_id_c: Option[CategoryId])
+      }
     }
-
-    ???
+     */
   }
 
 

@@ -56,15 +56,15 @@ create table links_t(
   to_post_id_c int,
   ...
 
-  -- fk index: links_i_topost
-  constraint links_topost_r_posts foreign key (site_c, to_post_id_c)
+  -- fk index: links_i_topostid
+  constraint links_topostid_r_posts foreign key (site_c, to_post_id_c)
       references posts3 (site_id, unique_post_id),
   ...
 );
 
 ...
 
-create index links_i_topost on links_t (site_c, to_post_id_c);
+create index links_i_topostid on links_t (site_c, to_post_id_c);
 ```
 
 (Need not include "site" in the index name — there's always a site id in all indexes (almost).)
