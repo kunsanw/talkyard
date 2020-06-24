@@ -19,7 +19,7 @@ package talkyard.server
 
 import com.debiki.core._
 import com.debiki.core.Prelude.die
-import debiki.Nashorn
+import debiki.{Nashorn, TextAndHtml}
 
 
 case class PostRendererSettings(
@@ -88,6 +88,4 @@ class PostRenderer(private val nashorn: Nashorn) {
 
 }
 
-
-case class CommonMarkSourceAndHtml(source: String, html: String)
 

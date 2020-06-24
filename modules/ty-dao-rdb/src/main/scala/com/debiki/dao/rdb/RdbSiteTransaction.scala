@@ -1068,7 +1068,7 @@ class RdbSiteTransaction(var siteId: SiteId, val daoFactory: RdbDaoFactory, val 
     var binds = List[AnyRef](pagePathIn.siteId.asAnyRef)
     pagePathIn.pageId match {
       case Some(id) =>
-        query += s" and PAGE_ID = ? order by $CanonicalFirst"
+        query += s" and PAGE_ID = ? order by $CanonicalFirst"  Te ret val is canical rgt? CONTINUE_HERE
         binds ::= id.asAnyRef
       case None =>
         // SHOW_ID = 'F' means that the page page id must not be part

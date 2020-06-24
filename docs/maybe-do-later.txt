@@ -306,6 +306,13 @@ ex data to incl: https://docs.mattermost.com/administration/statistics.html
    + stats:
       https://docs.mattermost.com/deployment/metrics.html#statistics
   ~= GitHub Contributors stats would be nice, per user / group?
+   + stats per tag(s) / categories / users / groups.
+       to see how a department or team (group) or type of topics
+       (tags or category) is doing.
+   Median and 90, 99 percentil response time? and Done [x] or Answered (v) time?
+   Maybe as a function of when during the day, and on which day, topic posted?
+   Both first reply response time (first reply to the Orig Post)
+     and Followup replies response time, for replying to replies (until topic closed / done).
 If wants very detailed: https://www.timescale.com?  PipelineDB?  Prometheus?
 but then as a separate pg instance?
 So a full dump of the actual site won't take forever because terrabytes time series data.
@@ -329,3 +336,22 @@ Blake3 is ~ 10x faster than SHA2:
 Wait until there's a well tested Java lib available?
 Then use Blake3 instead e.g. to hash long Redis keys (and just delete the old
 cached things, it's a cache).
+
+[rebuild_reindex_posts]
+A background job that regenerates html (CommonMark –> html) and
+renindexes all posts (or all posts in a category / tag / by certain participants).
+It finds all links/backlinks, upload refs, ext link preview links,
+changes any  embeddedOriginOrEmpty links,  and any url subfolder installation path,
+& full text search reindexes,
+Without! any long running db transactions. 1) loads the data it needs, in a read-only tx.
+Then, compiles Commonmark to html, finds all links etc.
+Then, a read-write-tx: If the post wasn't changed since the r/o tx, then
+save the rebuilt post.
+
+[security]
+prevent usernames from being displayed in Unicode, if mixed charsets used,
+e.g. Latin + Cryllic = facebooĸ.com.
+
+[authn]
+What about adding U2F login?
+https://github.com/Yubico/java-webauthn-server/ — a Java U2F / WebAuthn lib.

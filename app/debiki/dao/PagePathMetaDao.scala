@@ -54,7 +54,22 @@ trait PagePathMetaDao {
   }
 
 
+  def checkPagePath2(pathToCheck: PagePath): Option[PagePathWithId] = {
+    val path: Option[PagePath] = checkPagePath(pathToCheck: PagePath)
+    path flatMap { pathShouldHaveId =>
+      if (pathShouldHaveId.pageId.isEmpty) {
+        // Could log warning
+        None
+      }
+      else {
+        Some(pathShouldHaveId.toNew(canonical = true))
+      }
+    }
+  }
+
+
   def checkPagePath(pathToCheck: PagePath): Option[PagePath] = {
+    CLEAN_UP // return PagePathWithId, see checkPagePath2 above
     val key = _pathWithIdByPathKey(pathToCheck)
     memCache.lookup[PagePath](key) foreach { path =>
       return Some(path)

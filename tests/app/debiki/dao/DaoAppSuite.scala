@@ -19,13 +19,12 @@ package debiki.dao
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.{Globals, TextAndHtml, TextAndHtmlMaker}
+import debiki.{Globals, TextAndHtml, TextAndHtmlMaker, TitleSourceAndHtml}
 import ed.server.{EdAppComponents, EdContext}
 import org.scalatest._
 import org.scalatestplus.play.{BaseOneAppPerSuite, FakeApplicationFactory}
 import DaoAppSuite._
 import java.io.File
-
 import play.api.inject.DefaultApplicationLifecycle
 import play.api._
 
@@ -310,13 +309,13 @@ class DaoAppSuite(
   } */
 
 
-  def createPage(pageRole: PageType, titleTextAndHtml: TextAndHtml,
+  def createPage(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,
         bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
         dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
         extId: Option[ExtId] = None, discussionIds: Set[AltPageId] = Set.empty): PageId = {
     dao.createPage(pageRole, PageStatus.Published, anyCategoryId = anyCategoryId,
       anyFolder = Some("/"), anySlug = Some(""),
-      titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
+      title = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
       showId = true, deleteDraftNr = None, Who(authorId, browserIdData), dummySpamRelReqStuff,
       discussionIds = discussionIds, extId = extId
     ).pageId

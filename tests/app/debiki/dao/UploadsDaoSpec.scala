@@ -18,10 +18,10 @@
 package debiki.dao
 
 import java.io.RandomAccessFile
-
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import debiki.EdHttp.ResultException
+import debiki.TitleSourceAndHtml
 import org.scalatest._
 import java.{io => jio}
 
@@ -301,11 +301,11 @@ class UploadsDaoAppSpec extends DaoAppSuite(disableScripts = false) {
       resourceUsage.numUploadBytes mustBe 0
 
       info("create page, link first file, now some quota used")
-      val titleTextAndHtml = textAndHtmlMaker.forTitle("Planets")
+      val titleSourceAndHtml = TitleSourceAndHtml("Planets")
       val bodyTextAndHtml = textAndHtmlMaker.forBodyOrComment(s"[The sun](${sunImage.ref.url})")
       val pagePath = dao.createPage(PageType.Discussion, PageStatus.Published,
         anyCategoryId = None, anyFolder = None, anySlug = None,
-        titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
+        title = titleSourceAndHtml, bodyTextAndHtml = bodyTextAndHtml,
         showId = true, deleteDraftNr = None, Who(user.id, browserIdData), dummySpamRelReqStuff)
 
       resourceUsage = dao.loadResourceUsage()
@@ -355,11 +355,11 @@ class UploadsDaoAppSpec extends DaoAppSuite(disableScripts = false) {
         browserIdData)
 
       info("create page, link missing file, no quota used")
-      val titleTextAndHtml = textAndHtmlMaker.forTitle("The Sun")
+      val titleSourceAndHtml = TitleSourceAndHtml("The Sun")
       val bodyTextAndHtml = textAndHtmlMaker.forBodyOrComment(s"[The sun](${sunImage.ref.url})")
       val pagePath = dao.createPage(PageType.Discussion, PageStatus.Published,
         anyCategoryId = None, anyFolder = None, anySlug = None,
-        titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
+        title = titleSourceAndHtml, bodyTextAndHtml = bodyTextAndHtml,
         showId = true, deleteDraftNr = None, Who(user.id, browserIdData), dummySpamRelReqStuff)
 
       resourceUsage = dao.loadResourceUsage()
@@ -434,7 +434,7 @@ class UploadsDaoAppSpec extends DaoAppSuite(disableScripts = false) {
 
       // COULD speed up by writing html, not commonmark, and passing a noop CommonmarRenderer
       // to TextAndHtml (see its function signature).
-      val titleTextAndHtml = textAndHtmlMaker.forTitle("Planets")
+      val titleSourceAndHtml = TitleSourceAndHtml("Planets")
       val bodyTextAndHtmlSite1 = textAndHtmlMaker.forBodyOrComment(
         s"[Shared](${sharedFile.ref.url}), [site-one](${site1File.ref.url})")
       val bodyTextAndHtmlSite2 = textAndHtmlMaker.forBodyOrComment(
@@ -442,12 +442,12 @@ class UploadsDaoAppSpec extends DaoAppSuite(disableScripts = false) {
 
       val pagePath1 = dao.createPage(PageType.Discussion, PageStatus.Published,
         anyCategoryId = None, anyFolder = None, anySlug = None,
-        titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtmlSite1,
+        title = titleSourceAndHtml, bodyTextAndHtml = bodyTextAndHtmlSite1,
         showId = true, deleteDraftNr = None, Who(user.id, browserIdData), dummySpamRelReqStuff)
 
       dao2.createPage(PageType.Discussion, PageStatus.Published,
         anyCategoryId = None, anyFolder = None, anySlug = None,
-        titleTextAndHtml = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtmlSite2,
+        title = titleSourceAndHtml, bodyTextAndHtml = bodyTextAndHtmlSite2,
         showId = true, deleteDraftNr = None, Who(user2.id, browserIdData), dummySpamRelReqStuff)
 
       resourceUsage = dao.loadResourceUsage()

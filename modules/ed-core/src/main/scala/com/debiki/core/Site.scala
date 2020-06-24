@@ -306,6 +306,10 @@ object Hostname {
 }
 
 
+/**
+  * @param hostname — doesn't include scheme or port, but maybe should? [remember_port]
+  *   Doesn't matter in real life, whatever is fine.
+  */
 case class Hostname(
   hostname: String,
   role: Hostname.Role) {

@@ -23,7 +23,7 @@ import scala.collection.immutable
 import Prelude._
 
 
-trait SiteTransaction {
+trait SiteTransaction {   RENAME // to SiteTx — already started with a type SiteTx = this
   def commit(): Unit
   def rollback(): Unit
   def hasBeenRolledBack: Boolean
@@ -358,6 +358,7 @@ trait SiteTransaction {
   def upsertLink(link: Link): Boolean
   def deleteLinkFromPost(postId: PostId, url: String): Boolean
   def deleteAllLinksFromPost(postId: PostId): Boolean
+  def loadLinksFromPost(postId: PostId): Seq[Link]
   def loadLinksToPage(pageId: PageId): Seq[Link]
 
   def insertInvite(invite: Invite): Unit

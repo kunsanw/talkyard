@@ -71,8 +71,11 @@ trait MessagesDao {
 
       // This generates no review task — staff aren't asked to review and approve
       // direct messages; such messages can be semi private.
-      val (pagePath, bodyPost) = createPageImpl2(pageRole, title, body,
-        byWho = sentByWho, spamRelReqStuff = Some(spamRelReqStuff), tx = tx)
+      val (pagePath, bodyPost, _) = createPageImpl(
+            pageRole, PageStatus.Published, anyCategoryId = None,
+            anyFolder = None, anySlug = None, showId = true,
+            title = title, body = body,
+            byWho = sentByWho, spamRelReqStuff = Some(spamRelReqStuff), tx = tx)
 
       // If this is a private topic, they'll get notified about all posts,
       // by default, although no notf pref configured here. [PRIVCHATNOTFS]

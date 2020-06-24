@@ -200,7 +200,13 @@ trait PostsDao {
       numOrigPostRepliesVisible = page.parts.numOrigPostRepliesVisible + numNewOpRepliesVisible,
       version = oldMeta.version + 1)
 
-    val uploadRefs = findUploadRefsInPost(newPost) // NO use TextAndHtml instead
+    // Since the post didn't exist before, it's enough to remember the refs
+    // from the new textAndHtml only. [new_upl_refs]
+    val uploadRefs = textAndHtml.uploadRefs
+    if (!Globals.isProd) {
+      val uplRefs2 = findUploadRefsInPost_gaah(newPost)
+      dieIf(uploadRefs != uplRefs2, "TyE503SKH5", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+    }
 
     val auditLogEntry = AuditLogEntry(
       siteId = siteId,
@@ -272,7 +278,9 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
-    saveDeleteLinks(newPost, authorId, tx)
+    if (newPost.isCurrentVersionApproved) {
+      saveDeleteLinks(newPost, textAndHtml, authorId, tx)
+    }
     insertAuditLogEntry(auditLogEntry, tx)
     anyReviewTask.foreach(tx.upsertReviewTask)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
@@ -559,7 +567,12 @@ trait PostsDao {
       frequentPosterIds = newFrequentPosterIds,
       version = oldMeta.version + 1)
 
-    val uploadRefs = findUploadRefsInPost(newPost) // NO use TextAndHtml instead
+    // New post, all refs in textAndHtml regardless of if approved or not. [new_upl_refs]
+    val uploadRefs: Set[UploadRef] = textAndHtml.uploadRefs
+    if (!Globals.isProd) {
+      val uplRefs2: Set[UploadRef] = findUploadRefsInPost_gaah(newPost)
+      dieIf(uploadRefs != uplRefs2, "TyE38RDHD4", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+    }
 
     SECURITY // COULD: if is new chat user, create review task to look at his/her first
     // chat messages, but only the first few.
@@ -661,7 +674,7 @@ trait PostsDao {
     val pageMeta = tx.loadThePageMeta(lastPost.pageId)
 
     val postRenderSettings = makePostRenderSettings(pageMeta.pageType)
-    val combinedTextAndHtml = textAndHtmlMaker.forBodyOrComment(
+    val combinedTextAndHtml = textAndHtmlMaker.forBodyOrComment(  // [nashorn_in_tx]
       newCombinedText,
       embeddedOriginOrEmpty = postRenderSettings.embeddedOriginOrEmpty,
       followLinks = false)
@@ -703,7 +716,8 @@ trait PostsDao {
     tx.updatePost(editedPost)
     tx.indexPostsSoon(editedPost)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
-    saveDeleteUploadRefs(lastPost, editedPost = editedPost, authorId, tx)
+    saveDeleteUploadRefs(lastPost, editedPost = editedPost, textAndHtml,
+          isAppending = true, authorId, tx)
     saveDeleteLinks(editedPost, authorId, tx)
 
     val oldMeta = tx.loadThePageMeta(lastPost.pageId)
@@ -728,7 +742,7 @@ trait PostsDao {
   /** Edits the post, if authorized to edit it.
     */
   def editPostIfAuth(pageId: PageId, postNr: PostNr, deleteDraftNr: Option[DraftNr],
-        who: Who, spamRelReqStuff: SpamRelReqStuff, newTextAndHtml: TextAndHtml): Unit = {
+        who: Who, spamRelReqStuff: SpamRelReqStuff, newTextAndHtml: SourceAndHtml): Unit = {
     val editorId = who.id
 
     // Note: Farily similar to appendChatMessageToLastMessage() just above. [2GLK572]
@@ -736,7 +750,11 @@ trait PostsDao {
     if (newTextAndHtml.safeHtml.trim.isEmpty)
       throwBadReq("DwE4KEL7", EditController.EmptyPostErrorMessage)
 
-    quickCheckIfSpamThenThrow(who, newTextAndHtml, spamRelReqStuff)
+    newTextAndHtml match {
+      case _: TitleSourceAndHtml => ()
+      case postSourceAndHtml: TextAndHtml =>
+        quickCheckIfSpamThenThrow(who, postSourceAndHtml, spamRelReqStuff)
+    }
 
     val anyEditedCategory = readWriteTransaction { tx =>
       val editorAndLevels = loadUserAndLevels(who, tx)
@@ -997,8 +1015,9 @@ trait PostsDao {
       tx.indexPostsSoon(editedPost)
       anySpamCheckTask.foreach(tx.insertSpamCheckTask)
       newRevision.foreach(tx.insertPostRevision)
-      saveDeleteUploadRefs(postToEdit, editedPost = editedPost, editorId, tx)
-      saveDeleteLinks(editedPost, editorId, tx)
+      saveDeleteUploadRefs(postToEdit, editedPost = editedPost, newTextAndHtml,
+            isAppending = false, editorId, tx)
+      saveDeleteLinks(editedPost, newTextAndHtml, editorId, tx)
 
       insertAuditLogEntry(auditLogEntry, tx)
 
@@ -1042,19 +1061,74 @@ trait PostsDao {
   }
 
 
-  private def saveDeleteLinks(editedPost: Post, editorId: UserId,
-    tx: SiteTransaction): Unit = {
+  def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
+          tx: SiteTx): Unit = {
+    if (!post.isCurrentVersionApproved)
+      return
+
+    val linksBefore: Seq[Link] = tx.loadLinksFromPost(post.id)
+    val linkStrsAfter = sourceAndHtml.internalLinks
+    val linksAfter = linkStrsAfter flatMap { linkStr: String =>
+      val uri = new java.net.URI(linkStr)
+      val urlPath = uri.getPath
+      val pagePath = PagePath.fromUrlPath(siteId, urlPath) match {
+        case PagePath.Parsed.Good(path) =>
+          val correctPagePath: Option[PagePath] = checkPagePath(path)
+          val anyPageMeta = correctPagePath.flatMap(_.pageId.flatMap(getPageMeta))
+          ???
+        case PagePath.Parsed.Bad(error) => throwBadRequest("DwE0kI3E4", error)
+        case PagePath.Parsed.Corrected(newPath) => throwTemporaryRedirect(newPath)
+      }
+      ???
+    }
+
+    ???
   }
 
 
-  private def saveDeleteUploadRefs(postToEdit: Post, editedPost: Post, editorId: UserId,
-        tx: SiteTransaction): Unit = {
+  private def saveDeleteUploadRefs(postToEdit: Post, editedPost: Post,
+        sourceAndHtml: SourceAndHtml, isAppending: Boolean,
+        editorId: UserId, tx: SiteTransaction): Unit = {
     // Use findUploadRefsInPost (not ...InText) so we'll find refs both in the hereafter
     // 1) approved version of the post, and 2) the current possibly unapproved version.
     // Because if any of the approved or the current version links to an uploaded file,
     // we should keep the file.
-    val currentUploadRefs = findUploadRefsInPost(editedPost) // NO use TextAndHtml instead
+
     val oldUploadRefs = tx.loadUploadedFileReferences(postToEdit.id)
+
+    val currentUploadRefs: Set[UploadRef] = {
+      if (isAppending) {
+        oldUploadRefs ++ sourceAndHtml.uploadRefs  // [52TKTSJ5]
+      }
+      else {
+        // Tricky! We don't know which of oldUploadRefs are approved,
+        // and which one's aren't, and should be removed because they aren't
+        // in the new edited unapproved source.
+        // This won't work:
+        //
+        // var newRefs = sourceAndHtml.uploadRefs
+        // if (postToEdit.isSomeVersionApproved && !editedPost.isCurrentVersionApproved) {
+        //   // Then any old & approved refs are still in use.
+        //   // But! This might add *too many** refs:
+        //   newRefs ++= oldUploadRefs
+        //   // Because we might need to *remove* some refs from the previous
+        //   // unapproved version, that are not in the ne unapproved version.
+        //   // But we don't know which of oldUploadRefs those are.
+        // }
+        // So, we need to:
+        findUploadRefsInPost_gaah(editedPost) // [nashorn_in_tx]
+
+        // Two solution, to avoid slow things (like Nashorn) inside
+        // a tx, are 1) to add  editedPost  to a background queue,
+        // which re-indexes the post later?
+        // That could actually be index_queue3! Already there, and updated
+        // properly.
+        // Or 2) to generate the prev post's refs in a separate step,
+        // before this tx. And remember which ones are approved, and
+        // which are unapproved.
+      }
+    }
+
     val uploadRefsAdded = currentUploadRefs -- oldUploadRefs
     val uploadRefsRemoved = oldUploadRefs -- currentUploadRefs
 
@@ -1557,7 +1631,7 @@ trait PostsDao {
           anyReviewTask = None)
       }
       else {
-        notfGenerator(tx).generateForEdits(postBefore, postAfter, None)
+        notfGenerator(tx).generateForEdits(postBefore, postAfter, None)  // [nashorn_in_tx]
       }
     tx.saveDeleteNotifications(notifications)
 

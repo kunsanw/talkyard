@@ -24,27 +24,42 @@ import play.api.libs.json.JsArray
 import scala.collection.{immutable, mutable}
 import scala.util.matching.Regex
 import TextAndHtmlMaker._
+import debiki.dao.UploadsDao
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 
 
-case class TitleSourceAndHtml(text: String, safeHtmlSanitized: String) {
-  def source: String = text
+/** Immutable.
+  */
+sealed abstract class SourceAndHtml {
+  def source: String
+  def text: String  // deprecated
+  def safeHtml: String
+
+  REMOVE // from here later, only here for now so [52TKTSJ5] compiles.
+  def uploadRefs: Set[UploadRef] = Set.empty
+  def internalLinks: Set[String] = Set.empty
+
+  // sourceMarkupLang: MarkupLang  // maybe later?
+}
+
+
+case class TitleSourceAndHtml(source: String, safeHtml: String) extends SourceAndHtml {
+  def text: String = source // backw compat
 }
 
 
 object TitleSourceAndHtml {
   def apply(source: String): TitleSourceAndHtml = {
-    //  =  dao.textAndHtmlMaker.forTitle(title)
+    // REMOVE
+    // //  =  dao.textAndHtmlMaker.forTitle(title)
+    // // this.textAndHtmlMaker.forTitle(s"Description of the $name category")
+    // //                            where this = CategoriesDao
+    // // def createForum(options, ...)
+    // // val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
 
-    // this.textAndHtmlMaker.forTitle(s"Description of the $name category")
-    //                            where this = CategoriesDao
-
-
-    // def createForum(options, ...)
-    // val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
-
-    TitleSourceAndHtml(source, ???)
+    val safeHtml = TextAndHtml.sanitizeTitleText(source)
+    TitleSourceAndHtml(source, safeHtml = safeHtml)
   }
 }
 
@@ -53,17 +68,20 @@ object TitleSourceAndHtml {
 /** Immutable. Use linkDomains to check all links against a spam/evil-things domain block list
   * like Spamhaus DBL, https://www.spamhaus.org/faq/section/Spamhaus%20DBL#271.
   */
-sealed trait TextAndHtml {
+sealed abstract class TextAndHtml extends SourceAndHtml {
 
-  def text: String
+  def text: String  ; RENAME // to source
+  def source: String = text
 
   def safeHtml: String
 
   def usernameMentions: Set[String]
 
+  def uploadRefs: Set[UploadRef]
+
   def externalLinks: immutable.Seq[String]
 
-  def internalLinks: Set[String]
+  override def internalLinks: Set[String]
 
   /** Domain names used in links. Check against a domain block list.
     */
@@ -165,7 +183,7 @@ object TextAndHtmlMaker {
   val Ipv4AddressRegex: Regex = """[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+""".r
 
 
-  def findLinks(html: String): immutable.Seq[String] = {
+  def findLinks(html: String): immutable.Seq[String] = {   // and add  noopener ?
     // Tested here:  tests/app/debiki/TextAndHtmlTest.scala
 
     val result = mutable.ArrayBuffer[String]()
@@ -211,8 +229,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     val text: String,
     val safeHtml: String,
     val usernameMentions: Set[String],
+    override val uploadRefs: Set[UploadRef],
     val externalLinks: immutable.Seq[String],
-    val internalLinks: Set[String],
+    override val internalLinks: Set[String],
     val linkDomains: immutable.Set[String],
     val linkIpAddresses: immutable.Seq[String],
     val embeddedOriginOrEmpty: String,
@@ -238,6 +257,7 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
         text + "\n" + more.text,
         safeHtml + "\n" + more.safeHtml,
         usernameMentions = usernameMentions ++ more.usernameMentions,
+        uploadRefs = uploadRefs ++ more.uploadRefs,
         externalLinks = (externalLinks.toSet ++ more.externalLinks.toSet).to[immutable.Seq],
         internalLinks = internalLinks ++ more.internalLinks,
         linkDomains ++ more.linkDomains,
@@ -255,7 +275,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
       new TextAndHtmlImpl(text = formInputs.toString, safeHtml = htmlString,
           // Don't let people @mention anyone when submitting forms?  (5LKATS0)
           // @mentions are only for members who post comments & topics to each other, right.
-          usernameMentions = Set.empty,
+          // Hmm but probably should analyze links! Well this not in use
+          // now anyway, except for via UTX.
+          usernameMentions = Set.empty, uploadRefs = Set.empty,
           externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
           linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
           isTitle = false, followLinks = false, allowClassIdDataAttrs = false)
@@ -267,15 +289,19 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     CompletedFormRenderer.renderJsonToSafeHtml(formInputs) map { htmlString =>
       new TextAndHtmlImpl(text = formInputs.toString, safeHtml = htmlString,
             usernameMentions = Set.empty, // (5LKATS0)
-            externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
+            uploadRefs = Set.empty,
+            externalLinks = Nil, internalLinks = Set.empty,
+            linkDomains = Set.empty,
             linkIpAddresses = Nil, embeddedOriginOrEmpty = "", false, false, false)
     }
   }
 
 
-  def forTitle(title: String): TextAndHtml =
+  CLEAN_UP; REMOVE
+  def forTitle(title: String): TitleSourceAndHtml =
+    TitleSourceAndHtml(title) /*
     apply(title, embeddedOriginOrEmpty = "",
-      isTitle = true, followLinks = false, allowClassIdDataAttrs = false)
+      isTitle = true, followLinks = false, allowClassIdDataAttrs = false) */
 
   def forBodyOrComment(text: String, embeddedOriginOrEmpty: String = "",
         followLinks: Boolean = false, allowClassIdDataAttrs: Boolean = false): TextAndHtml =
@@ -301,10 +327,11 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     followLinks: Boolean,
     allowClassIdDataAttrs: Boolean): TextAndHtml = {
 
-    TESTS_MISSING
-    if (isTitle) {
+    dieIf(isTitle, "TyE593SKD")
+    if (isTitle) {  // REMOVE
       val safeHtml = TextAndHtml.sanitizeTitleText(text)
       new TextAndHtmlImpl(text = text, safeHtml = safeHtml,
+            uploadRefs = Set.empty,
             externalLinks = Nil, internalLinks = Set.empty,
             usernameMentions = Set.empty,
             linkDomains = Set.empty,
@@ -329,6 +356,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
     val allLinks = findLinks(renderResult.safeHtml)
 
+    val uploadRefs: Set[UploadRef] =
+          UploadsDao.findUploadRefsInLinks(allLinks.toSet, site.pubId)
+
     var externalLinks = Vector[String]()
     var internalLinks = Set[String]()
     var linkDomains = Set[String]()
@@ -339,14 +369,27 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           val uri = new java.net.URI(link)
           val domainOrAddress = uri.getHost
 
-          if (domainOrAddress ne null) {
+          val (isUrlPath, isSameHostname) =
+                if (domainOrAddress eq null) (true, false)
+                else {
+                  // Would it be good if hosts3 included any non-standard port number,
+                  // and protocol? In case an old origin was, say, http://ex.com:8080,
+                  // and there was a different site at  http://ex.com  (port 80) ?
+                  // So we won't mistake links to origin = ex.com  for pointing
+                  // to http://ex.com:8080?  [remember_port]
+                  // Doesn't matter in real life, with just http = 80 and https = 443.
+                  val isSameHostname = site.allHostnames.contains(domainOrAddress)
+                  (false, isSameHostname)
+                }
+
+          if (isUrlPath || isSameHostname) {
+            internalLinks += link
+          }
+          else {
             externalLinks :+= link
           }
 
-          if (domainOrAddress eq null) {
-            internalLinks += link
-          }
-          else if (domainOrAddress.startsWith("[")) {
+          if (domainOrAddress.startsWith("[")) {
             if (domainOrAddress.endsWith("]")) {
               // IPv6.
               linkAddresses :+= domainOrAddress
@@ -373,7 +416,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
             // ignore, the href isn't a valid link, it seems
         }
     }
+
     new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
+          uploadRefs = uploadRefs,
           externalLinks = externalLinks, internalLinks = internalLinks,
           linkDomains = linkDomains,
           linkIpAddresses = linkAddresses,
@@ -389,18 +434,23 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     */
   def test(text: String, isTitle: Boolean): TextAndHtml = {
     dieIf(Globals.isProd, "EsE7GPM2")
-    new TextAndHtmlImpl(text, text, externalLinks = Nil, internalLinks = Set.empty,
+    new TextAndHtmlImpl(text, text, uploadRefs = Set.empty,
+          externalLinks = Nil, internalLinks = Set.empty,
           usernameMentions = Set.empty,
           linkDomains = Set.empty, linkIpAddresses = Nil,
           embeddedOriginOrEmpty = "", isTitle = isTitle, followLinks = false,
           allowClassIdDataAttrs = false)
   }
 
-  def testTitle(text: String): TextAndHtml = test(text, isTitle = true)
+  CLEAN_UP; REMOVE // later, just don't want the diff too large now
+  def testTitle(text: String): TitleSourceAndHtml = TitleSourceAndHtml(text)
+
   def testBody(text: String): TextAndHtml = test(text, isTitle = false)
 
   def wrapInParagraphNoMentionsOrLinks(text: String, isTitle: Boolean): TextAndHtml = {
+    // REMOVE all  isTitle
     new TextAndHtmlImpl(text, s"<p>$text</p>", usernameMentions = Set.empty,
+          uploadRefs = Set.empty,
           externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
           linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
           isTitle = isTitle, followLinks = false,
@@ -409,3 +459,20 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
 }
 
+
+
+case class StaticSourceAndHtml(
+  override val source: String,
+  override val safeHtml: String) extends TextAndHtml {
+
+  override def text: String = source
+  override def usernameMentions: Set[String] = Set.empty
+  override def uploadRefs: Set[UploadRef] = Set.empty
+  override def externalLinks: immutable.Seq[String] = Nil
+  override def internalLinks: Set[String] = Set.empty
+  override def linkDomains: Set[String] = Set.empty
+  override def linkIpAddresses: immutable.Seq[String] = Nil
+  override def isTitle: Boolean = false
+  override def append(moreTextAndHtml: TextAndHtml): TextAndHtml = die("TyE50396SK")
+  override def append(text: String): TextAndHtml = die("TyE703RSKTDH")
+}

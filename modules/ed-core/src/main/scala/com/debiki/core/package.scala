@@ -93,6 +93,8 @@ package object core {
   val NoPermissionId = 0
   val PermissionAlreadyExistsMinId = 1
 
+  type SiteTx = SiteTransaction  // renaming it, wip
+
   sealed abstract class MarkupLang
   object MarkupLang {
     case object Html extends MarkupLang

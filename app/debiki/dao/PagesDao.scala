@@ -32,6 +32,14 @@ import math.max
 import org.owasp.encoder.Encode
 
 
+case class CreatePageResult(
+  id: PageId,
+  path: PagePathWithId,
+  bodyPost: Post,
+  anyReviewTask: Option[ReviewTask],
+)
+
+
 /** Creates and deletes pages, changes their states, e.g. Closed or Solved etc.
   *
   * (There's also a class PageDao (with no 's' in the name) that focuses on
@@ -77,7 +85,7 @@ trait PagesDao {
     if (title.source.length > MaxTitleLength)
       throwBadReq("DwE4HEFW8", s"Title too long, max length is $MaxTitleLength")
 
-    if (title.safeHtmlSanitized.trim.isEmpty)
+    if (title.safeHtml.trim.isEmpty)
       throwForbidden("DwE5KPEF21", "Page title should not be empty")
 
     dieIf(discussionIds.exists(_.startsWith("diid:")), "TyE0KRTDT53J")
@@ -89,8 +97,7 @@ trait PagesDao {
             createPageImpl(
                 pageRole, pageStatus, anyCategoryId,
                 anyFolder = anyFolder, anySlug = anySlug, showId = showId,
-                title = title,
-                bodySource = bodyTextAndHtml.text, bodyHtmlSanitized = bodyTextAndHtml.safeHtml,
+                title = title, body = bodyTextAndHtml,
                 pinOrder = None, pinWhere = None, byWho, Some(spamRelReqStuff),
                 tx, discussionIds = discussionIds, embeddingUrl = embeddingUrl, extId = extId)
 
@@ -114,7 +121,7 @@ trait PagesDao {
 
 
   /** Returns (PagePath, body-post)
-    */
+    * /
   def createPageImpl2(pageRole: PageType,
         title: TitleSourceAndHtml, body: TextAndHtml,
         pageStatus: PageStatus = PageStatus.Published,
@@ -131,15 +138,18 @@ trait PagesDao {
       byWho, spamRelReqStuff, tx = tx,
       layout = None)
     (result._1, result._2)
-  }
+  } */
 
+  /** Returns (PagePath, body-post, any-review-task)
+    */
   def createPageImpl(pageRole: PageType, pageStatus: PageStatus,
       anyCategoryId: Option[CategoryId],
       anyFolder: Option[String], anySlug: Option[String], showId: Boolean,
       // titleSource: String, titleHtmlSanitized: String,
       title: TitleSourceAndHtml,
-      bodySource: String, bodyHtmlSanitized: String,  /// wants txt and html?!
-      pinOrder: Option[Int], pinWhere: Option[PinPageWhere],
+      //bodySource: String = null, bodyHtmlSanitized: String = null,  /// wants txt and html?!
+      body: TextAndHtml,
+      pinOrder: Option[Int] = None, pinWhere: Option[PinPageWhere] = None,
       byWho: Who, spamRelReqStuff: Option[SpamRelReqStuff],
       tx: SiteTransaction,
       hidePageBody: Boolean = false,
@@ -168,8 +178,8 @@ trait PagesDao {
 
     require(!anyFolder.exists(_.isEmpty), "EsE6JGKE3")
     // (Empty slug ok though, e.g. homepage.)
-    require(!title.source.isEmpty && !title.safeHtmlSanitized.isEmpty, "EsE7MGK24")
-    require(!bodySource.isEmpty && !bodyHtmlSanitized.isEmpty, "EsE1WKUQ5")
+    require(!title.source.isEmpty && !title.safeHtml.isEmpty, "EsE7MGK24")
+    require(!body.source.isEmpty && !body.safeHtml.isEmpty, "EsE1WKUQ5")
     require(pinOrder.isDefined == pinWhere.isDefined, "Ese5MJK2")
     require(embeddingUrl.trimNoneIfBlank == embeddingUrl, "Cannot have blank emb urls [TyE75SPJBJ]")
 
@@ -235,7 +245,7 @@ trait PagesDao {
       createdAt = now.toJavaDate,
       createdById = authorId,
       source = title.source,
-      htmlSanitized = title.safeHtmlSanitized,
+      htmlSanitized = title.safeHtml,
       approvedById = approvedById)
 
     val bodyPost = Post.createBody(
@@ -243,8 +253,8 @@ trait PagesDao {
       pageId = pageId,
       createdAt = now.toJavaDate,
       createdById = authorId,
-      source = bodySource,
-      htmlSanitized = bodyHtmlSanitized,
+      source = body.source,
+      htmlSanitized = body.safeHtml,
       postType = bodyPostType,
       approvedById = approvedById)
       .copy(
@@ -252,7 +262,7 @@ trait PagesDao {
         bodyHiddenById = ifThenSome(hidePageBody, authorId),
         bodyHiddenReason = None) // add `hiddenReason` function parameter?
 
-    val uploadPaths = findUploadRefsInPost(bodyPost)  // WHAT, why? use TextAndHtml instead?
+    val uploadPaths = body.uploadRefs // findUploadRefsInPost(bodyPost)
 
     val pageMeta = PageMeta.forNewPage(pageId, pageRole, authorId,
       extId = extId,
@@ -305,7 +315,7 @@ trait PagesDao {
               pageId = pageMeta.pageId,
               pageType = pageMeta.pageType,
               pageAvailableAt = When.fromDate(pageMeta.publishedAt getOrElse pageMeta.createdAt),
-              htmlToSpamCheck = bodyHtmlSanitized,
+              htmlToSpamCheck = body.safeHtml,
               language = settings.languageCode)),
             who = byWho,
             requestStuff = spamStuffPageUri))
@@ -352,7 +362,7 @@ trait PagesDao {
     uploadPaths foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
-    // saveDeleteLinks(newPost, authorId, tx)
+    saveDeleteLinks(bodyPost, authorId, tx)
 
     discussionIds.foreach(id => tx.insertAltPageId("diid:" + id, realPageId = pageId))
 

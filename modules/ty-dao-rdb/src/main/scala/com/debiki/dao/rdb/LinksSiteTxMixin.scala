@@ -144,6 +144,19 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
+  override def loadLinksFromPost(postId: PostId): Seq[Link] = {
+    val query = s"""
+          select * from links_t
+          where site_id_c = ?
+            and from_post_id_c = ?
+          """
+    val values = List(siteId.asAnyRef, postId.asAnyRef)
+    runQueryFindMany(query, values, rs => {
+      parseLink(rs)
+    })
+  }
+
+
   override def loadLinksToPage(pageId: PageId): Seq[Link] = {
     val query = s"""
           select * from posts3 ps inner join links_t ls
@@ -152,9 +165,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           where site_id_c = ?
             and ps.page_id = ?
           """
-
     val values = List(siteId.asAnyRef, pageId)
-
     runQueryFindMany(query, values, rs => {
       parseLink(rs)
     })

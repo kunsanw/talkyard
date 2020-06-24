@@ -215,7 +215,8 @@ trait UploadsDao {
   }
 
 
-  def findUploadRefsInPost(post: Post): Set[UploadRef] = {   // find mentions at the same time? [4WKAB02]  move to TextAndHtml?
+  /** Do as part of  [[debiki.TextAndHtmlMaker.findLinksEtc]]  ? */
+  def findUploadRefsInPost_gaah(post: Post): Set[UploadRef] = {   // find mentions at the same time? [4WKAB02]  move to TextAndHtml?
     val pubId = thePubSiteId()
     val approvedRefs = post.approvedHtmlSanitized.map(
       h => findUploadRefsInText(h, pubId)) getOrElse Set.empty
@@ -365,10 +366,15 @@ object UploadsDao {
   }
 
 
-  def findUploadRefsInText(html: String, pubSiteId: String): Set[UploadRef] = {
+  def findUploadRefsInText(html: String, pubSiteId: String): Set[UploadRef] = {  // move to TextAndHtml?
     // Tested here:  tests/app/debiki/dao/UploadsDaoSpec.scala
+    val links: Seq[String] = TextAndHtmlMaker.findLinks(html)
+    findUploadRefsInLinks(links.toSet, pubSiteId)
+  }
 
-    val links: Seq[String] = TextAndHtmlMaker.findLinks(html)  // gah, use TextAndHtml instead!
+
+  def findUploadRefsInLinks(links: Set[String], pubSiteId: String): Set[UploadRef] = {  // move to TextAndHtml?
+
     val references = ArrayBuffer[UploadRef]()
 
     links foreach addUrlIfReferencesUploadedFile
@@ -377,7 +383,7 @@ object UploadsDao {
       val urlPath =
         if (urlString startsWith "/") urlString
         else {
-          try new java.net.URL(urlString).getPath
+          try new java.net.URL(urlString).getPath   // URI !
           catch {
             case _: java.net.MalformedURLException =>
               return

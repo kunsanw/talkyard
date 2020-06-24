@@ -19,7 +19,7 @@ package ed.server.notf
 
 import com.debiki.core.Prelude._
 import com.debiki.core._
-import debiki.{Globals, Nashorn, TextAndHtml}
+import debiki._
 import debiki.EdHttp.throwForbiddenIf
 import ed.server.notf.NotificationGenerator._
 import scala.collection.{immutable, mutable}
@@ -556,7 +556,7 @@ case class NotificationGenerator(
 
   /** Creates and deletes mentions, if '@username's are added/removed by this edit.
     */
-  def generateForEdits(oldPost: Post, newPost: Post, anyNewTextAndHtml: Option[TextAndHtml])
+  def generateForEdits(oldPost: Post, newPost: Post, anyNewSourceAndHtml: Option[SourceAndHtml])
         : Notifications = {
 
     BUG; SHOULD; REFACTOR // [5BKR03] Load users already mentioned — from the database, not
@@ -578,6 +578,17 @@ case class NotificationGenerator(
     if (!newPost.isCurrentVersionApproved) {
       // Wait until the edits get approved and become visible.
       return Notifications.None
+    }
+
+    val anyNewTextAndHtml: Option[TextAndHtml] = anyNewSourceAndHtml map {
+      case _: TitleSourceAndHtml =>
+        // Currently titles cannot mention people, and editing it generates no notfs.
+        // However, maybe later staff wants to get notified if titles of "important"
+        // pages somehow get changed.
+        // For now, do nothing though.
+        return Notifications.None  // or: return generatedNotifications? the same?
+      case x: TextAndHtml =>
+        x
     }
 
     anyAuthor = Some(tx.loadTheParticipant(newPost.createdById))

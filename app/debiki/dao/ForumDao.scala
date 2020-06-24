@@ -21,8 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
-import debiki.{TextAndHtml, TitleSourceAndHtml}
-import talkyard.server.CommonMarkSourceAndHtml
+import debiki.{StaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
 
 
 case class CreateForumOptions(
@@ -98,15 +97,14 @@ trait ForumDao {
       // If is the first forum for this site, we're also creating the first category, id = 1. [8UWKQXN45]
       val isFirstForumForThisSite = rootCategoryId == 1
 
-      // Create forum page.
-      val introText = isForEmbCmts ? EmbeddedCommentsIntroText | ForumIntroText
+      // Create forum page.  ZZZ
+      val introText: TextAndHtml = isForEmbCmts ? EmbeddedCommentsIntroText | ForumIntroText
       val forumPagePath = createPageImpl(
-        PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
-        anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
-        title = titleSourceAndHtml,
-        bodySource = introText.source, bodyHtmlSanitized = introText.html,
-        pinOrder = None, pinWhere = None,
-        byWho, spamRelReqStuff = None, tx, layout = Some(options.topicListStyle))._1
+            PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
+            anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
+            title = titleSourceAndHtml, body = introText,
+            byWho = byWho, spamRelReqStuff = None, tx = tx,
+            layout = Some(options.topicListStyle))._1
 
       val forumPageId = forumPagePath.pageId
 
@@ -369,7 +367,7 @@ trait ForumDao {
     } */
 
     def makeTitle(safeText: String) =
-      TitleSourceAndHtml(safeText, safeHtmlSanitized = safeText)
+      TitleSourceAndHtml(safeText, safeHtml = safeText)
 
     // Create forum welcome topic.
     createPageImpl(
@@ -377,8 +375,7 @@ trait ForumDao {
       anyCategoryId = Some(generalCategoryId),
       anyFolder = None, anySlug = Some("welcome"), showId = true,
       title = makeTitle(WelcomeTopicTitle),
-      bodySource = welcomeTopic.source,
-      bodyHtmlSanitized = welcomeTopic.html,
+      body = welcomeTopic,
       pinOrder = Some(WelcomeToForumTopicPinOrder),
       pinWhere = Some(PinPageWhere.Globally),
       bySystem,
@@ -394,8 +391,8 @@ trait ForumDao {
         anyCategoryId = Some(generalCategoryId), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-discussion"), showId = true,
         title = makeTitle(SampleThreadedDiscussionTitle),
-        bodySource = SampleThreadedDiscussionText,
-        bodyHtmlSanitized = s"<p>$SampleThreadedDiscussionText</p>",
+        body = StaticSourceAndHtml(SampleThreadedDiscussionText,
+                s"<p>$SampleThreadedDiscussionText</p>"),
         pinOrder = None,
         pinWhere = None,
         bySystem,
@@ -419,8 +416,7 @@ trait ForumDao {
         anyCategoryId = anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-problem"), showId = true,
         title = makeTitle(SampleProblemTitle),
-        bodySource = SampleProblemText.source,
-        bodyHtmlSanitized = SampleProblemText.html,
+        body = SampleProblemText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
@@ -433,8 +429,7 @@ trait ForumDao {
         anyCategoryId = anyIdeasCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-idea"), showId = true,
         title = makeTitle(SampleIdeaTitle),
-        bodySource = SampleIdeaText.source,
-        bodyHtmlSanitized = SampleIdeaText.html,
+        body = SampleIdeaText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
@@ -463,8 +458,7 @@ trait ForumDao {
         anyCategoryId = anyQuestionsCategoryId.orElse(Some(generalCategoryId)), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-question"), showId = true,
         title = makeTitle(SampleQuestionTitle),
-        bodySource = SampleQuestionText.source,
-        bodyHtmlSanitized = SampleQuestionText.html,
+        body = SampleQuestionText,
         pinOrder = None,
         pinWhere = None,
         bySystem,
@@ -490,8 +484,7 @@ trait ForumDao {
       anyCategoryId = Some(staffCategoryId),
       anyFolder = None, anySlug = Some("staff-chat"), showId = true,
       title = makeTitle(StaffChatTopicTitle),
-      bodySource = StaffChatTopicText,
-      bodyHtmlSanitized = s"<p>$StaffChatTopicText</p>",
+      body = StaticSourceAndHtml(StaffChatTopicText, s"<p>$StaffChatTopicText</p>"),
       pinOrder = None,
       pinWhere = None,
       bySystem,
@@ -522,22 +515,22 @@ object ForumDao {
   private val DefaultCategoryPosition = 1000
 
 
-  private val ForumIntroText: CommonMarkSourceAndHtml = {
+  private val ForumIntroText: StaticSourceAndHtml = {
     val source = o"""[ Edit this to tell people what they can do here. ]"""
-    CommonMarkSourceAndHtml(source, html = s"<p>$source</p>")
+    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
-  private val EmbeddedCommentsIntroText: CommonMarkSourceAndHtml = {
+  private val EmbeddedCommentsIntroText: StaticSourceAndHtml = {
     val source = o"""Here are comments posted at your website. One topic here,
          for each blog post that got any comments, over at your website."""
-    CommonMarkSourceAndHtml(source, html = s"<p>$source</p>")
+    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
   private val WelcomeTopicTitle = "Welcome to this community"
 
-  private val welcomeTopic: CommonMarkSourceAndHtml = {
+  private val welcomeTopic: StaticSourceAndHtml = {
     val para1Line1 = "[ Edit this to clarify what this community is about. This first paragraph"
     val para1Line2 = "is shown to everyone, on the forum homepage. ]"
     val para2Line1 = "Here, below the first paragraph, add details like:"
@@ -545,7 +538,7 @@ object ForumDao {
     val listItem2 = "What can they do or find here?"
     val listItem3 = "Link to additional info, for example, any FAQ, or main website of yours."
     val toEditText = """To edit this, click the <b class="icon-edit"></b> icon below."""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1Line1
         |$para1Line2
@@ -557,7 +550,7 @@ object ForumDao {
         |
         |$toEditText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1Line1 $para1Line2</p>
         |<p>$para2Line1</p>
         |<ol><li>$listItem1</li><li>$listItem2</li><li>$listItem3</li></ol>
@@ -597,7 +590,7 @@ object ForumDao {
     val para3 = o"""In the topic list, people see if a problem is new, or if it's been solved:
       the <span class="icon-attention-circled"></span> and
       <span class="icon-check"></span> icons."""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -607,7 +600,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |<p>$para3</p>
@@ -624,7 +617,7 @@ object ForumDao {
     val para2 = o"""In the topic list, everyone sees the status of the idea at a glance
       — the status icon is shown to the left (e.g.
       <span class="icon-idea"></span> or <span class="icon-check"></span>).</div>"""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -632,7 +625,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |<p>$ToDeleteText</p>
@@ -668,7 +661,7 @@ object ForumDao {
       and then choose "Only waiting", look:"""
     // (You'll find /-/media/ in the Nginx config [NGXMEDIA] and submodule ty-media.)
     val para3 = """<img class="no-lightbox" src="/-/media/tips/how-click-show-waiting-680px.jpg">"""
-    CommonMarkSourceAndHtml(
+    StaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -678,7 +671,7 @@ object ForumDao {
         |
         |$ToDeleteText
         |""",
-      html = i"""
+      safeHtml = i"""
         |<p>$para1</p>
         |<p>$para2</p>
         |$para3
