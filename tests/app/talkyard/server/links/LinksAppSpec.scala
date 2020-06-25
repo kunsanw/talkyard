@@ -172,6 +172,13 @@ class LinksAppSpec extends DaoAppSuite {
       }
     }
 
+    "find page ids linked from a page" in {
+      daoSite1.readTx { tx =>
+        tx.loadPageIdsLinkedFrom("23456789") mustBe Seq.empty
+        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(linkAToB, linkAToC)
+      }
+    }
+
     "find links to a page" in {
       daoSite1.readTx { tx =>
         tx.loadLinksToPage(pageA.id) mustBe Seq.empty
@@ -192,6 +199,12 @@ class LinksAppSpec extends DaoAppSuite {
       "find links from post" in {
         daoSite1.readTx { tx =>
           tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToC)
+        }
+      }
+
+      "find page ids linked from a page" in {
+        daoSite1.readTx { tx =>
+          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(linkAToB, linkAToC)
         }
       }
 

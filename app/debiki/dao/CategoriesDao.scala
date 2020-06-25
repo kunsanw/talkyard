@@ -617,7 +617,11 @@ trait CategoriesDao {
     if (oldCategory.name != editedCategory.name || permissionsChanged) {
       // All pages in this category need to be regenerated, because the category name is
       // included on the pages. Or if permissions edited: hard to know which pages are affected,
-      // so just empty the whole cache.
+      // so just empty the whole cache. — Not only pages in `editedCategory` are
+      // affected — but also pages *linked from* those pages, since Talkyard shows
+      // which other topics link to a topic. And if one of those linking topics
+      // becomes access-restricted, then, the linked topic needs to be uncached
+      // and rerendered, so the link disappears.
       emptyCache()
     }
     else {

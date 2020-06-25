@@ -180,6 +180,37 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
+  override def loadPageIdsLinkedFrom(pageId: PageId): Seq[PageId] = {
+    val query = s"""
+          select distinct ps.page_id
+          from posts3 ps inner join links_t ls
+            on ps.
+            on ls.site_id_c = ps.site_id and ls.from_post_id_c = ps.unique_post_id
+          where ls.site_id_c = ?
+            and ls.from_post_id_c = ?
+          """
+    val values = List(siteId.asAnyRef, pageId)
+    runQueryFindMany(query, values, rs => {
+      rs.getString("page_id")
+    })
+  }
+
+
+  def loadPageIdsLinkingTo(pageId: PageId): Seq[PageId] = {
+    val query = s"""
+          select distinct ps.page_id
+          from links_t ls inner join posts3 ps
+            on ls.from_post_id_c = ps.unique_post_id and ls.site_id_c = ps.site_id
+          where ls.site_id_c = ?
+            and ls.to_page_id_c = ?
+          """
+    val values = List(siteId.asAnyRef, pageId)
+    runQueryFindMany(query, values, rs => {
+      rs.getString("page_id")
+    })
+  }
+
+
   private def parseLinkPreview(rs: js.ResultSet): LinkPreview = {
     LinkPreview(
           link_url_c = getString(rs, "link_url_c"),

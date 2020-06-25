@@ -362,6 +362,8 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def deleteAllLinksFromPost(postId: PostId): Boolean
   def loadLinksFromPost(postId: PostId): Seq[Link]
   def loadLinksToPage(pageId: PageId): Seq[Link]
+  def loadPageIdsLinkedFrom(pageId: PageId): Seq[PageId]
+  def loadPageIdsLinkingTo(pageId: PageId): Seq[PageId]
 
   def insertInvite(invite: Invite): Unit
   def updateInvite(invite: Invite): Boolean

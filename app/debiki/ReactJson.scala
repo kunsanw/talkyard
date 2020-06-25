@@ -720,6 +720,8 @@ class JsonMaker(dao: SiteDao) {
     val draftsOnThisPage: immutable.Seq[Draft] =
       anyPageId.map(tx.loadDraftsByUserOnPage(requester.id, _)).getOrElse(Nil)
 
+    val anyIntLinksToPage = anyPageId.map(tx.loadLinksToPage)
+
     // Bug: If !isAdmin, might count [review tasks one cannot see on the review page]. [5FSLW20]
     val reviewTasksAndCounts =
       if (requester.isStaff) tx.loadReviewTaskCounts(requester.isAdmin)
