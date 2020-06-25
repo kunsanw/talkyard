@@ -86,6 +86,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def loadTitleAndOrigPost(pageId: PageId): Seq[Post] =
     loadPostsByNrs(Seq(PagePostNr(pageId, PageParts.TitleNr), PagePostNr(pageId, PageParts.BodyNr)))
 
+  /** Also see: [[loadTitlesPreferApproved()]]  */
   def loadTitle(pageId: PageId): Option[Post] =
     loadPostsByNrs(Seq(PagePostNr(pageId, PageParts.TitleNr))).headOption
 
@@ -126,6 +127,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   def loadEmbeddedCommentsApprovedNotDeleted(limit: Int, orderBy: OrderBy): immutable.Seq[Post]
 
+  /** Also see: [[loadTitle()]] and [[loadTitleAndOrigPost()]]. */
   def loadTitlesPreferApproved(pageIds: Iterable[PageId]): Map[PageId, String] = {
     val titlePosts = loadPostsByNrs(pageIds.map(PagePostNr(_, PageParts.TitleNr)))
     Map(titlePosts.map(post => {
@@ -356,7 +358,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def deleteLinkPreviews(linkUrl: String): Boolean
 
   def upsertLink(link: Link): Boolean
-  def deleteLinkFromPost(postId: PostId, url: String): Boolean
+  def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int
   def deleteAllLinksFromPost(postId: PostId): Boolean
   def loadLinksFromPost(postId: PostId): Seq[Link]
   def loadLinksToPage(pageId: PageId): Seq[Link]

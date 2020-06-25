@@ -51,16 +51,16 @@ create table links_t(
   added_by_id_c int not null,
   -- Exactly one of these:
   is_external_c boolean,
-  to_page_id_c int,
+  to_page_id_c varchar,
   to_post_id_c int,
   to_pp_id_c int,
   to_tag_id_c int,
-  to_categoy_id_c int,
+  to_category_id_c int,
 
-  constraint  links_p primary key (site_id_c, from_post_id_c, link_url_c),
+  constraint links_p_postid_url primary key (site_id_c, from_post_id_c, link_url_c),
 
   -- fk index: the primary key.
-  constraint  links_frompost_r_posts foreign key (site_id_c, from_post_id_c)
+  constraint links_frompostid_r_posts foreign key (site_id_c, from_post_id_c)
       references posts3 (site_id, unique_post_id),
 
   -- No:
@@ -68,7 +68,7 @@ create table links_t(
   -- constraint links_linkurl_r_linkpreviews foreign key (site_id_c, link_url_c)
   --    references link_previews_t (site_id_c, link_url_c),
 
-  -- fk index: links_i_addedby
+  -- fk index: links_i_addedbyid
   constraint links_addedby_r_pps foreign key (site_id_c, added_by_id_c)
       references users3 (site_id, user_id),
 
@@ -80,15 +80,15 @@ create table links_t(
   constraint links_topostid_r_posts foreign key (site_id_c, to_post_id_c)
       references posts3 (site_id, unique_post_id),
 
-  -- fk index: links_i_topp
+  -- fk index: links_i_toppid
   constraint links_topp_r_pps foreign key (site_id_c, to_pp_id_c)
       references users3 (site_id, user_id),
 
-  -- fk idnex: links_i_totag
+  -- fk idnex: links_i_totagid
   -- constranit  tag refs tag_defs_t  — table not yet created
 
-  -- fk index: links_i_tocategory
-  constraint links_tocat_r_categories foreign key (site_id_c, to_categoy_id_c)
+  -- fk index: links_i_tocategoryid
+  constraint links_tocat_r_categories foreign key (site_id_c, to_category_id_c)
       references categories3 (site_id, id),
 
   -- Link url length constraint in link_previews_t.
@@ -98,15 +98,15 @@ create table links_t(
 
   constraint links_c_to_just_one check (
       num_nonnulls(is_external_c, to_page_id_c, to_post_id_c,
-                      to_pp_id_c, to_tag_id_c, to_categoy_id_c) = 1)
+                      to_pp_id_c, to_tag_id_c, to_category_id_c) = 1)
 );
 
 
-create index links_i_linkurl    on links_t (site_id_c, link_url_c);
-create index links_i_addedby    on links_t (site_id_c, added_by_id_c);
-create index links_i_topageid    on links_t (site_id_c, to_page_id_c);
-create index links_i_topostid   on links_t (site_id_c, to_post_id_c);
-create index links_i_topp       on links_t (site_id_c, to_pp_id_c);
-create index links_i_totag      on links_t (site_id_c, to_tag_id_c);
-create index links_i_tocategory on links_t (site_id_c, to_categoy_id_c);
+create index links_i_linkurl      on links_t (site_id_c, link_url_c);
+create index links_i_addedbyid    on links_t (site_id_c, added_by_id_c);
+create index links_i_topageid     on links_t (site_id_c, to_page_id_c);
+create index links_i_topostid     on links_t (site_id_c, to_post_id_c);
+create index links_i_toppid       on links_t (site_id_c, to_pp_id_c);
+create index links_i_totagid      on links_t (site_id_c, to_tag_id_c);
+create index links_i_tocategoryid on links_t (site_id_c, to_category_id_c);
 

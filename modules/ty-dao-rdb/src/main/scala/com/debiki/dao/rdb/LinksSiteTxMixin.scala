@@ -90,18 +90,19 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
   override def upsertLink(link: Link): Boolean = {
     val upsertStatement = s"""
-          insert into link_t (
+          insert into links_t (
               site_id_c,
               from_post_id_c,
               link_url_c,
               added_at_c,
               added_by_id_c,
-              is_external,
+              is_external_c,
+              to_page_id_c,
               to_post_id_c,
               to_pp_id_c,
               to_tag_id_c,
-              to_categoy_id_c)
-          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              to_category_id_c)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           on conflict (site_id_c, from_post_id_c, link_url_c)
              do nothing """
 
@@ -111,25 +112,29 @@ trait LinksSiteTxMixin extends SiteTransaction {
       link.link_url_c,
       link.added_at_c.asTimestamp,
       link.added_by_id_c.asAnyRef,
-      link.is_external.asTrueOrNull,
-      link.to_post_id_c.asAnyRef,
-      link.to_pp_id_c.asAnyRef,
-      link.to_tag_id_c.asAnyRef,
-      link.to_categoy_id_c.asAnyRef)
+      link.is_external_c.asTrueOrNull,
+      link.to_page_id_c.orNullVarchar,
+      link.to_post_id_c.orNullInt,
+      link.to_pp_id_c.orNullInt,
+      link.to_tag_id_c.orNullInt,
+      link.to_category_id_c.orNullInt)
 
     runUpdateSingleRow(upsertStatement, values)
   }
 
 
-  override def deleteLinkFromPost(postId: PostId, url: String): Boolean = {
+  override def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int = {
+    if (urls.isEmpty)
+      return 0
+
     val deleteStatement = s"""
           delete from links_t
           where site_id_c = ?
             and from_post_id_c = ?
-            and link_url_c = ?
-          """
-    val values = List(siteId.asAnyRef, postId.asAnyRef, url)
-    runUpdateSingleRow(deleteStatement, values)
+            and link_url_c in (${ makeInListFor(urls) }) """
+
+    val values = List(siteId.asAnyRef, postId.asAnyRef) ::: urls.toList
+    runUpdate(deleteStatement, values)
   }
 
 
@@ -159,13 +164,16 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
   override def loadLinksToPage(pageId: PageId): Seq[Link] = {
     val query = s"""
-          select * from posts3 ps inner join links_t ls
+          select * from links_t
+          where site_id_c = ?
+            and to_page_id_c = ?
+          union
+          select ls.* from posts3 ps inner join links_t ls
             on ps.site_id = ls.site_id_c
             and ps.unique_post_id = ls.to_post_id_c
-          where site_id_c = ?
-            and ps.page_id = ?
-          """
-    val values = List(siteId.asAnyRef, pageId)
+          where ps.site_id = ?
+            and ps.page_id = ? """
+    val values = List(siteId.asAnyRef, pageId, siteId.asAnyRef, pageId)
     runQueryFindMany(query, values, rs => {
       parseLink(rs)
     })
@@ -190,11 +198,12 @@ trait LinksSiteTxMixin extends SiteTransaction {
           link_url_c = getString(rs, "link_url_c"),
           added_at_c = getWhen(rs, "added_at_c"),
           added_by_id_c = getInt(rs, "added_by_id_c"),
-          is_external = getOptBool(rs, "is_external") is true,
+          is_external_c = getOptBool(rs, "is_external_c") is true,
+          to_page_id_c = getOptString(rs, "to_page_id_c"),
           to_post_id_c = getOptInt(rs, "to_post_id_c"),
           to_pp_id_c = getOptInt(rs, "to_pp_id_c"),
           to_tag_id_c = getOptInt(rs, "to_tag_id_c"),
-          to_categoy_id_c = getOptInt(rs, "to_categoy_id_c"))
+          to_category_id_c = getOptInt(rs, "to_category_id_c"))
   }
 
 }

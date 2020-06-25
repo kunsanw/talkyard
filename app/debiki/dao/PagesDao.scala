@@ -33,11 +33,12 @@ import org.owasp.encoder.Encode
 
 
 case class CreatePageResult(
-  id: PageId,
   path: PagePathWithId,
   bodyPost: Post,
-  anyReviewTask: Option[ReviewTask],
-)
+  anyReviewTask: Option[ReviewTask]) {
+
+  def id: PageId = path.pageId
+}
 
 
 /** Creates and deletes pages, changes their states, e.g. Closed or Solved etc.
@@ -58,12 +59,30 @@ trait PagesDao {
   }
 
 
+  REMOVE; CLEAN_UP // use createPage2 instead, and rename it to createPage().
   def createPage(pageRole: PageType, pageStatus: PageStatus, anyCategoryId: Option[CategoryId],
         anyFolder: Option[String], anySlug: Option[String], title: TitleSourceAndHtml,
         bodyTextAndHtml: TextAndHtml, showId: Boolean, deleteDraftNr: Option[DraftNr], byWho: Who,
         spamRelReqStuff: SpamRelReqStuff,
         discussionIds: Set[AltPageId] = Set.empty, embeddingUrl: Option[String] = None,
         extId: Option[ExtId] = None): PagePathWithId = {
+
+    createPage2(pageRole, pageStatus = pageStatus, anyCategoryId = anyCategoryId,
+          anyFolder = anyFolder, anySlug = anySlug, title = title,
+          bodyTextAndHtml = bodyTextAndHtml, showId = showId,
+          deleteDraftNr = deleteDraftNr, byWho = byWho,
+          spamRelReqStuff = spamRelReqStuff,
+          discussionIds = discussionIds, embeddingUrl = embeddingUrl,
+          extId = extId).path
+  }
+
+
+  def createPage2(pageRole: PageType, pageStatus: PageStatus, anyCategoryId: Option[CategoryId],
+        anyFolder: Option[String], anySlug: Option[String], title: TitleSourceAndHtml,
+        bodyTextAndHtml: TextAndHtml, showId: Boolean, deleteDraftNr: Option[DraftNr], byWho: Who,
+        spamRelReqStuff: SpamRelReqStuff,
+        discussionIds: Set[AltPageId] = Set.empty, embeddingUrl: Option[String] = None,
+        extId: Option[ExtId] = None): CreatePageResult = {
 
     if (pageRole.isSection) {
       // Should use e.g. ForumController.createForum() instead.
@@ -92,7 +111,7 @@ trait PagesDao {
 
     quickCheckIfSpamThenThrow(byWho, bodyTextAndHtml, spamRelReqStuff)
 
-    val pagePath = readWriteTransaction { tx =>
+    val result = readWriteTransaction { tx =>
       val (pagePath, bodyPost, anyReviewTask) =
             createPageImpl(
                 pageRole, pageStatus, anyCategoryId,
@@ -111,11 +130,11 @@ trait PagesDao {
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(byWho.id, nr))
 
-      pagePath
+      CreatePageResult(pagePath, bodyPost, anyReviewTask)
     }
 
-    memCache.firePageCreated(pagePath.toOld(siteId))
-    pagePath
+    memCache.firePageCreated(result.path.toOld(siteId))
+    result
     // Don't start rendering any html. See comment below [5KWC58]
   }
 

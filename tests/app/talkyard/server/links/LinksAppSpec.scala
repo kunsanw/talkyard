@@ -18,7 +18,8 @@
 package talkyard.server.links
 
 import com.debiki.core._
-import debiki.dao.{CreateForumResult, DaoAppSuite, SiteDao}
+import debiki.TitleSourceAndHtml
+import debiki.dao.{CreateForumResult, CreatePageResult, DaoAppSuite, SiteDao}
 import play.api.libs.json.{JsObject, JsString, Json}
 
 
@@ -39,6 +40,23 @@ class LinksAppSpec extends DaoAppSuite {
   lazy val forumId: PageId = createForumResult.pagePath.pageId
 
   lazy val categoryId: CategoryId = createForumResult.defaultCategoryId
+
+
+  lazy val pageA: CreatePageResult = createPage2(
+        PageType.Discussion, TitleSourceAndHtml("Title A"),
+        textAndHtmlMaker.testBody("Body A."), authorId = SystemUserId,
+        browserIdData, daoSite1)
+
+  lazy val pageB: CreatePageResult = createPage2(
+        PageType.Discussion, TitleSourceAndHtml("Title B"),
+        textAndHtmlMaker.testBody("Body B."), authorId = SystemUserId,
+        browserIdData, daoSite1)
+
+  lazy val pageC: CreatePageResult = createPage2(
+        PageType.Discussion, TitleSourceAndHtml("Title C"),
+        textAndHtmlMaker.testBody("Body C."), authorId = SystemUserId,
+        browserIdData, daoSite1)
+
 
   /*
   lazy val (site2, daoSite2) = createSite("site2")
@@ -71,6 +89,23 @@ class LinksAppSpec extends DaoAppSuite {
           content_json_c = extWidgetOEmbedJsonEdited)
 
 
+  lazy val linkAToB: Link = Link(
+        from_post_id_c = pageA.bodyPost.id,
+        link_url_c = s"/-${pageB.id}",
+        added_at_c = globals.now(),
+        added_by_id_c = SystemUserId,
+        is_external_c = false,
+        to_page_id_c = Some(pageB.id),
+        to_post_id_c = None,
+        to_pp_id_c = None,
+        to_tag_id_c = None,
+        to_category_id_c = None)
+
+  lazy val linkAToC: Link = linkAToB.copy(
+        link_url_c = s"/-${pageC.id}",
+        to_page_id_c = Some(pageC.id))
+
+
 
   "prepare: create site 1 and 2, and owners, forums" in {
     // Lazy create things:
@@ -79,9 +114,14 @@ class LinksAppSpec extends DaoAppSuite {
     createForumResult
     userOoo
     userMmm
+
+    // Need to create the pages before the links, because if the pages got
+    // created via the `lazy val` links, the page tx:s would start *after* the
+    // link tx:es, and foreign keys would fail.
+    pageA; pageB; pageC
   }
 
-  "insert, find, update, find LinkPreview:s and Link:s" - {
+  "insert, update, find LinkPreview" - {
     "insert" in {
       daoSite1.readWriteTransaction { tx =>
         tx.upsertLinkPreview(linkPreviewOrig)
@@ -89,7 +129,7 @@ class LinksAppSpec extends DaoAppSuite {
     }
 
     "read back" in {
-      daoSite1.readOnlyTransaction { tx =>
+      daoSite1.readTx { tx =>
         tx.loadLinkPreviewByUrl(extWidgetUrl, oembedRequestUrl + "-wrong") mustBe None
         tx.loadLinkPreviewByUrl(extWidgetUrl + "-wrong", oembedRequestUrl) mustBe None
         val prevw = tx.loadLinkPreviewByUrl(extWidgetUrl, oembedRequestUrl).get
@@ -117,40 +157,54 @@ class LinksAppSpec extends DaoAppSuite {
   }
 
 
-  /*
-  lazy val pageAaaId: PageId = createPage(
-        PageType.Discussion,
-        textAndHtmlMaker.testTitle("Page Aaa"),
-        textAndHtmlMaker.testBody("Page body aaa."), userMmm.id, browserIdData, daoSite1,
-        anyCategoryId = Some(categoryId))
-
-  lazy val pageBbbId: PageId = createPage(
-        PageType.Discussion,
-        textAndHtmlMaker.testTitle("Page Bbb"),
-        textAndHtmlMaker.testBody("Page body bbb."), userMmm.id, browserIdData, daoSite1,
-        anyCategoryId = Some(categoryId))
-
-  lazy val linkToPage = Link(
-        from_post_id_c: PostId,
-        link_url_c: String,
-        added_at_c: When,
-        added_by_id_c: UserId,
-        is_external: Boolean,
-        to_post_id_c: Option[PostId],
-        to_pp_id_c: Option[UserId],
-        to_tag_id_c: Option[TagDefId],
-        to_categoy_id_c: Option[CategoryId])
-
-  "remember Link:s between pages and posts" - {
-
-    "create pages and posts" in {
-
-
-      val second = createPage(PageType.Discussion, textAndHtmlMaker.testTitle("Member Page 4ZM2 b"),
-        textAndHtmlMaker.testBody("Page body 4ZM2 b."), member.id, browserIdData, dao,
-        anyCategoryId = Some(categoryId))
+  "insert, update, find Link:s" - {
+    "insert" in {
+      daoSite1.writeTx(retry = false) { tx =>
+        tx.upsertLink(linkAToB)
+        tx.upsertLink(linkAToC)
+      }
     }
-  } */
+
+    "find links from a post" in {
+      daoSite1.readTx { tx =>
+        tx.loadLinksFromPost(345678) mustBe Seq.empty
+        tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToB, linkAToC)
+      }
+    }
+
+    "find links to a page" in {
+      daoSite1.readTx { tx =>
+        tx.loadLinksToPage(pageA.id) mustBe Seq.empty
+        tx.loadLinksToPage(pageB.id) mustBe Seq(linkAToB)
+        tx.loadLinksToPage(pageC.id) mustBe Seq(linkAToC)
+      }
+    }
+
+    "delete links" in {
+      daoSite1.writeTx(retry = false) { tx =>
+        tx.deleteLinksFromPost(pageA.bodyPost.id, Set.empty)
+        tx.deleteLinksFromPost(pageA.bodyPost.id, Set("/wrong-link"))
+        tx.deleteLinksFromPost(pageA.bodyPost.id, Set(linkAToB.link_url_c))
+      }
+    }
+
+    "link gone" - {
+      "find links from post" in {
+        daoSite1.readTx { tx =>
+          tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToC)
+        }
+      }
+
+      "find links to a page" in {
+        daoSite1.readTx { tx =>
+          tx.loadLinksToPage(pageA.id) mustBe Seq.empty
+          tx.loadLinksToPage(pageB.id) mustBe Seq.empty
+          tx.loadLinksToPage(pageC.id) mustBe Seq(linkAToC)
+        }
+      }
+    }
+
+  }
 
 }
 

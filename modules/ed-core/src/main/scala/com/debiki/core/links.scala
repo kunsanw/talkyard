@@ -78,16 +78,28 @@ case class Link(
   link_url_c: String,
   added_at_c: When,
   added_by_id_c: UserId,
-  is_external: Boolean,
-  to_post_id_c: Option[PostId],
-  to_pp_id_c: Option[UserId],
-  to_tag_id_c: Option[TagDefId],
-  to_categoy_id_c: Option[CategoryId]) {
+  is_external_c: Boolean,
+  to_page_id_c: Option[PageId] = None,
+  to_post_id_c: Option[PostId] = None,
+  to_pp_id_c: Option[UserId] = None,
+  to_tag_id_c: Option[TagDefId] = None,
+  to_category_id_c: Option[CategoryId] = None) {
 
-  // Not impl
-  dieIf(to_tag_id_c ne null, "tag links not impl [TyE5928SK]")
+  // Not impl (only to-page links impl)
+  dieIf(to_post_id_c.isDefined, "Post links not impl [TyE5SKDJ02]")
+  dieIf(to_pp_id_c.isDefined, "Participant links not impl [TyE703WKTDL5]")
+  dieIf(to_tag_id_c.isDefined, "Tag links not impl [TyE5928SK]")
+  dieIf(to_category_id_c.isDefined, "Category links not impl [TyE5603RDH6]")
 
-  dieIf(is_external.toZeroOne + to_post_id_c.oneIfDefined + to_pp_id_c.oneIfDefined +
-        to_tag_id_c.oneIfDefined + to_categoy_id_c.oneIfDefined != 1, "TyE063KSUHD5")
-
+  dieIf(is_external_c.toZeroOne + to_page_id_c.oneIfDefined +
+        to_post_id_c.oneIfDefined + to_pp_id_c.oneIfDefined +
+        to_tag_id_c.oneIfDefined + to_category_id_c.oneIfDefined != 1, "TyE063KSUHD5")
 }
+
+
+// !! Oops what if page access restricted?
+case class LinkAndPageIdTitle(
+  link: Link,
+  fromPageId: PageId,
+  fromPageTitle: String)
+

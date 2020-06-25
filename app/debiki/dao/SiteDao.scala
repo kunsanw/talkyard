@@ -193,7 +193,14 @@ class SiteDao(
   private def thisSiteCacheKey = siteCacheKey(this.siteId)
 
 
-  // Rename to ...NoRetry, add readWriteTransactionWithRetry
+  def writeTx[R](retry: Boolean, allowOverQuota: Boolean = false)(
+          fn: SiteTransaction => R): R = {
+    dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
+    readWriteTransaction(fn, allowOverQuota)
+  }
+
+
+  RENAME // to writeTx
   def readWriteTransaction[R](fn: SiteTransaction => R, allowOverQuota: Boolean = false): R = {
     // Serialize writes per site. This avoids all? transaction rollbacks because of
     // serialization errors in Postgres (e.g. if 2 people post 2 comments at the same time).
@@ -212,7 +219,11 @@ class SiteDao(
     }
   }
 
+  RENAME // to just readTx
   def readOnlyTransaction[R](fn: SiteTransaction => R): R =
+    readTx(fn)
+
+  def readTx[R](fn: SiteTx => R): R =
     dbDao2.readOnlySiteTransaction(siteId, mustBeSerializable = true) { fn(_) }
 
   def readOnlyTransactionTryReuse[R](anyTx: Option[SiteTransaction])(fn: SiteTransaction => R): R =

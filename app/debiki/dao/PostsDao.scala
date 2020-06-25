@@ -1061,6 +1061,21 @@ trait PostsDao {
   }
 
 
+  /** If there're many links from page A to B, then ...
+    * For now, remember all of them, per unique url.
+    * Look:
+    *   /some-topic
+    *   /-123-some-topic
+    * Those are two linsk — and if that topic gets moved to:
+    *   /another-url-path
+    * then the  /some-topic  link breaks,
+    * but /-123-some-topic will still work, becaues it includes the page id
+    * in the url.
+    * So links can be different, although they're to the same page. Maybe
+    * therefore makes sense to remember all links, per unique url?
+    *    But no need to remember two different /-123-some-topic  links from the
+    * same post. — That's why [[SourceAndHtml.internalLinks]] is a Set.
+    */
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
           tx: SiteTx): Unit = {
     if (!post.isCurrentVersionApproved)
@@ -1071,7 +1086,6 @@ trait PostsDao {
       return
     }
 
-    /*
     val linksBefore: Seq[Link] = tx.loadLinksFromPost(post.id)
     val linkStrsAfter = sourceAndHtml.internalLinks
     val linksAfter = linkStrsAfter flatMap { linkStr: String =>
@@ -1081,30 +1095,37 @@ trait PostsDao {
         case PagePath.Parsed.Good(maybeOkPath) =>
           // There's a db constraint, pgpths_page_r_pages, so if the page path
           // exists, the page does too.
+          checkPagePath2(maybeOkPath)
+          /* Hmm, no, remember all links for now instead?
           checkPagePath2(maybeOkPath) filter { path =>
             // We remember just one link even if there're many same-post ——> same-page
             // links (many <a href=...> to the same page, from the same post).
-            linksBefore.exists(_.to_post_id_c == path.pageId)
-          }
+            linksBefore.exists(_.to_page_id_c == path.pageId)
+          } */
         case PagePath.Parsed.Bad(error) =>
           None
         case PagePath.Parsed.Corrected(newPath) =>
           None // or checkPagePath2(newPath) ?
       }
-      pagePath map {
-        Link(
-          from_post_id_c = post.id,
-          link_url_c = linkStr,
-          added_at_c = approvedAt,
-          added_by_id_c: UserId,
-          is_external: Boolean,
-          to_post_id_c: Option[PostId],
-          to_pp_id_c: Option[UserId],
-          to_tag_id_c: Option[TagDefId],
-          to_categoy_id_c: Option[CategoryId])
+      pagePath map { path =>
+        Link(from_post_id_c = post.id,
+              link_url_c = linkStr,
+              added_at_c = approvedAt,
+              added_by_id_c = writerId,
+              is_external_c = false,
+              to_page_id_c = Some(path.pageId))
       }
     }
-     */
+
+    // [On2], fine.
+    val newLinks = linksAfter.filterNot(link =>
+          linksBefore.exists(_.link_url_c == link.link_url_c))
+
+    val deletedLinks = linksBefore.filterNot(link =>
+          linkStrsAfter.contains(link.link_url_c))
+
+    tx.deleteLinksFromPost(post.id, deletedLinks.map(_.link_url_c).toSet)
+    newLinks foreach tx.upsertLink
   }
 
 

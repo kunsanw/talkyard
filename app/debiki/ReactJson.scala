@@ -262,6 +262,22 @@ class JsonMaker(dao: SiteDao) {
       makeCategoriesJson(_, authzCtx, exclPublCats = false)) getOrElse JsArray()
     val siteSettings = dao.getWholeSiteSettings()
 
+    /*
+    // ???? how uncache ???  if linking page becomes private.
+    val intLinkedFrom: Seq[Link] = transaction.loadLinksToPage(page.id)
+    val jsIntLinks = intLinkedFrom flatMap { link =>
+      transaction.loadPost(link.from_post_id_c) flatMap { post =>
+        val (maySee, _) = dao.maySeePost(post, None, false)(transaction)
+        if (!maySee.may) None
+        else {
+          val fromPage = transaction.loadTitle(post.pageId)
+          Some(Json.obj(
+            "title" -> link.from_post_id_c
+          ))
+        }
+      }
+    }  */
+
     val anyLatestTopics: JsValue =
       if (page.pageType == PageType.Forum) {
         val rootCategoryId = page.meta.categoryId.getOrDie(
@@ -297,13 +313,15 @@ class JsonMaker(dao: SiteDao) {
     val pagePath =
       page.path getOrElse PagePathWithId.fromIdOnly(page.id, canonical = true)
 
-    val pageJsonObj = Json.obj(
+    val pageJsonObj = Json.obj(  // ts: Page
       "pageId" -> page.id,
       "pageVersion" -> page.meta.version,
       "pageMemberIds" -> pageMemberIds,
       "forumId" -> JsStringOrNull(anyForumId),
       "ancestorsRootFirst" -> ancestorsJsonRootFirst,
       "categoryId" -> JsNumberOrNull(page.meta.categoryId),
+      "intLinkedFrom" -> JsArray(Nil), // intLinkedFrom,
+      "extLinkedFrom" -> JsArray(Nil),
       "pageRole" -> JsNumber(page.pageType.toInt),
       "pagePath" -> JsPagePathWithId(pagePath),
       // --- These and some more, could be in separate objs instead [DBLINHERIT]

@@ -17,20 +17,10 @@ let richBrowserA: TyE2eTestBrowser;
 let richBrowserB: TyE2eTestBrowser;
 let owen: Member;
 let owensBrowser: TyE2eTestBrowser;
-let mons: Member;
-let monsBrowser: TyE2eTestBrowser;
-let modya: Member;
-let modyasBrowser: TyE2eTestBrowser;
-let corax: Member;
-let coraxBrowser: TyE2eTestBrowser;
-let regina: Member;
-let reginasBrowser: TyE2eTestBrowser;
+let memah: Member;
+let memahsBrowser: TyE2eTestBrowser;
 let maria: Member;
 let mariasBrowser: TyE2eTestBrowser;
-let michael: Member;
-let michaelsBrowser: TyE2eTestBrowser;
-let mallory: Member;
-let mallorysBrowser: TyE2eTestBrowser;
 let strangersBrowser: TyE2eTestBrowser;
 
 let site: IdAddress;
@@ -56,11 +46,8 @@ describe("some-e2e-test  TyT1234ABC", () => {
     const builder = buildSite();
     forum = builder.addTwoPagesForum({  // or: builder.addLargeForum
       title: "Some E2E Test",
-      members: undefined, // default = everyone
+      members: ['maria', 'memah', 'michael'],
     });
-
-    // Adding a new member:
-    const newMember: Member = builder.addMmember('hens_username');
 
     const newPage: PageJustAdded = builder.addPage({
       id: 'extraPageId',
@@ -110,47 +97,45 @@ describe("some-e2e-test  TyT1234ABC", () => {
 
     owen = forum.members.owen;
     owensBrowser = richBrowserA;
-    mons = forum.members.mons;
-    monsBrowser = richBrowserA;
-    modya = forum.members.modya;
-    modyasBrowser = richBrowserA;
-    corax = forum.members.corax;
-    coraxBrowser = richBrowserA;
+    memah = forum.members.memah;
+    memahsBrowser = richBrowserA;
 
-    regina = forum.members.regina;
-    reginasBrowser = richBrowserB;
     maria = forum.members.maria;
     mariasBrowser = richBrowserB;
-    michael = forum.members.michael;
-    michaelsBrowser = richBrowserB;
-    mallory = forum.members.mallory;
-    mallorysBrowser = richBrowserB;
     strangersBrowser = richBrowserB;
   });
 
+  /*
   it("Owen logs in to admin area, ... ", () => {
-    owensBrowser.adminArea.goToUsersEnabled(site.origin);
+    owensBrowser.adminArea.goToUsersEnabled(siteIdAddress.origin);
     owensBrowser.loginDialog.loginWithPassword(owen);
+  }); */
+
+  it("Memah logs in", () => {
+    memahsBrowser.go2(site.origin);
+    memahsBrowser.complex.loginWithPasswordViaTopbar(memah);
   });
 
-  it("Maria logs in", () => {
-    mariasBrowser.go2(site.origin + '/' + forum.topics.byMichaelCategoryA.slug);
-    mariasBrowser.complex.loginWithPasswordViaTopbar(maria);
+  const TopicATitle = 'TopicATitle';
+  const TopicABodyOrig = () =>
+          `TopicABodyOrig ${site.origin}/${forum.topics.byMichaelCategoryA.slug}`;
+
+
+  let topicAUrl: string;
+
+  it("Memah posts a topic that links to Michael's page", () => {
+    memahsBrowser.complex.createAndSaveTopic({
+            title: TopicATitle, body: TopicABodyOrig() });
+    topicAUrl = memahsBrowser.getUrl();
   });
 
-  // For embedded comments:  EMBCMTS
-  it("Creates an embedding page", () => {
-    /*
-    const dir = 'target';
-    fs.writeFileSync(`${dir}/page-a-slug`, makeHtml('b3c-aaa', '#500'));
-    fs.writeFileSync(`${dir}/page-b-slug}`, makeHtml('b3c-bbb', '#040'));
-    function makeHtml(pageName: string, bgColor: string): string {
-      return utils.makeEmbeddedCommentsHtml({ pageName, discussionId: '', localHostname, bgColor});
-    }
-    */
+  it("Maria goes to the new topic", () => {
+    mariasBrowser.go2(topicAUrl);
   });
 
-  // ...
+  it("... follows the link to Michael's page", () => {
+    mariasBrowser.waitAndClick('#post-1 a');
+  });
 
 });
 

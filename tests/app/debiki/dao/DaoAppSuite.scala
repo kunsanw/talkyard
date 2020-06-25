@@ -308,17 +308,27 @@ class DaoAppSuite(
       categoryData, permissions.to[immutable.Seq], request.who)
   } */
 
-
+  REMOVE; CLEAN_UP // use createPage2 instead, and rename it to createPage().
   def createPage(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,
         bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
         dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
         extId: Option[ExtId] = None, discussionIds: Set[AltPageId] = Set.empty): PageId = {
-    dao.createPage(pageRole, PageStatus.Published, anyCategoryId = anyCategoryId,
+    createPage2(pageRole, titleTextAndHtml = titleTextAndHtml,
+          bodyTextAndHtml = bodyTextAndHtml, authorId = authorId, browserIdData = browserIdData,
+          dao = dao, anyCategoryId = anyCategoryId,
+          extId = extId, discussionIds = discussionIds).id
+  }
+
+  def createPage2(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,
+        bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
+        dao: SiteDao, anyCategoryId: Option[CategoryId] = None,
+        extId: Option[ExtId] = None, discussionIds: Set[AltPageId] = Set.empty): CreatePageResult = {
+    dao.createPage2(
+      pageRole, PageStatus.Published, anyCategoryId = anyCategoryId,
       anyFolder = Some("/"), anySlug = Some(""),
       title = titleTextAndHtml, bodyTextAndHtml = bodyTextAndHtml,
       showId = true, deleteDraftNr = None, Who(authorId, browserIdData), dummySpamRelReqStuff,
-      discussionIds = discussionIds, extId = extId
-    ).pageId
+      discussionIds = discussionIds, extId = extId)
   }
 
 
