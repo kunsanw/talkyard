@@ -39,7 +39,9 @@ case class PageStuff(
   lastReplyerId: Option[UserId],
   frequentPosterIds: Seq[UserId]) extends PageTitleRole {
 
-  def role: PageType = pageRole
+  def role: PageType = pageRole  // DELETE
+  def pageType: PageType = pageMeta.pageType
+  def doingStatus: PageDoingStatus = pageMeta.doingStatus
 
   def pageRole: PageType = role  // DELETE
 

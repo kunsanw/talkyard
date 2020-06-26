@@ -133,7 +133,7 @@ trait PagesDao {
       CreatePageResult(pagePath, bodyPost, anyReviewTask)
     }
 
-    memCache.firePageCreated(result.path.toOld(siteId))
+    memCache.firePageCreated(siteId, result.path)
     result
     // Don't start rendering any html. See comment below [5KWC58]
   }

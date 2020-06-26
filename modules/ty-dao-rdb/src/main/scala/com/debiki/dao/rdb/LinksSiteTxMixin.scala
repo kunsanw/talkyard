@@ -164,10 +164,12 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
   override def loadLinksToPage(pageId: PageId): Seq[Link] = {
     val query = s"""
+          -- Post to page links.
           select * from links_t
           where site_id_c = ?
             and to_page_id_c = ?
           union
+          -- Post to post links. Not implemented (except for here) [post_2_post_ln].
           select ls.* from posts3 ps inner join links_t ls
             on ps.site_id = ls.site_id_c
             and ps.unique_post_id = ls.to_post_id_c
@@ -181,17 +183,19 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
 
   override def loadPageIdsLinkedFrom(pageId: PageId): Set[PageId] = {
+    // Later, do  union  with post—>post links. [post_2_post_ln]
+    // Right now, only post to page links.
     val query = s"""
-          select distinct ps.page_id
+          select distinct ls.to_page_id_c
           from posts3 ps inner join links_t ls
-            on ps.
-            on ls.site_id_c = ps.site_id and ls.from_post_id_c = ps.unique_post_id
-          where ls.site_id_c = ?
-            and ls.from_post_id_c = ?
+             on ps.unique_post_id = ls.from_post_id_c
+            and ps.site_id = ls.site_id
+          where ps.site_id = ?
+            and ps.page_id = ?
           """
     val values = List(siteId.asAnyRef, pageId)
-    runQueryFindMany(query, values, rs => {
-      rs.getString("page_id")
+    runQueryFindManyAsSet(query, values, rs => {
+      rs.getString("to_page_id_c")
     })
   }
 
@@ -205,7 +209,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
             and ls.to_page_id_c = ?
           """
     val values = List(siteId.asAnyRef, pageId)
-    runQueryFindMany(query, values, rs => {
+    runQueryFindManyAsSet(query, values, rs => {
       rs.getString("page_id")
     })
   }

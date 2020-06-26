@@ -46,7 +46,10 @@ private case class RendererWithSettings(
 }
 
 private case class RestrTopicsCatsLinks(
-  categoriesJson: JsArray, topicsJson: Seq[JsValue], usersJson: Seq[JsObject])
+  categoriesJson: JsArray,
+  topicsJson: Seq[JsValue],
+  usersJson: Seq[JsObject],
+  linkedFromJson: Seq[JsValue])
 
 class HowRenderPostInPage(
   val summarize: Boolean,
@@ -69,7 +72,7 @@ case class FindHeadTagsResult(
   adminOnlyTags: String)
 
 object FindHeadTagsResult {
-  val None = FindHeadTagsResult(false, false, "", "")
+  val None: FindHeadTagsResult = FindHeadTagsResult(false, false, "", "")
 }
 
 
@@ -264,7 +267,7 @@ class JsonMaker(dao: SiteDao) {
       makeCategoriesJson(_, authzCtx, exclPublCats = false)) getOrElse JsArray()
     val siteSettings = dao.getWholeSiteSettings()
 
-    val linkingPagesJson = makeLinkingPagesJson(page.id, Left(dao), requester = None)
+    val linkingPagesJson = makeLinkingPagesJson(page.id, authzCtx, dao)
 
     val anyLatestTopics: JsValue =
       if (page.pageType == PageType.Forum) {
@@ -272,7 +275,6 @@ class JsonMaker(dao: SiteDao) {
           // Constraint `dw1_pages__c_has_category` ensures there's a category id.
           "DwE7KYP2", s"Forum page '${page.id}', site '${transaction.siteId}', has no category id")
         val orderOffset = renderParams.anyPageQuery getOrElse defaultPageQuery(siteSettings)
-        val authzCtx = dao.getForumAuthzContext(user = None)
         val topics = dao.listMaySeeTopicsInclPinned(rootCategoryId, orderOffset,
           includeDescendantCategories = true,
           authzCtx,
@@ -666,15 +668,14 @@ class JsonMaker(dao: SiteDao) {
       }
     }
     val watchbarWithTitles = dao.fillInWatchbarTitlesEtc(watchbar)
-    val RestrTopicsCatsLinks(restrCategories, restrTopics, restrTopicUsers) =
-          listRestrictedCategoriesAndTopics(pageRequest)
+    val restrTopicsCatsLinks = listRestrictedCategoriesAndTopics(pageRequest)
     val myGroupsEveryoneLast: Seq[Group] =
           pageRequest.authzContext.groupIdsEveryoneLast map dao.getTheGroup
 
     dao.readOnlyTransaction { tx =>
-      Some(requestersJsonImpl(requester, pageRequest.pageId, watchbarWithTitles, restrCategories,
-        restrictedTopics = restrTopics, restrictedTopicsUsers = restrTopicUsers, permissions,
-        unapprovedPostAuthorIds, myGroupsEveryoneLast, tx))
+      Some(requestersJsonImpl(requester, pageRequest.pageId, watchbarWithTitles,
+            restrTopicsCatsLinks, permissions,
+            unapprovedPostAuthorIds, myGroupsEveryoneLast, tx))
     }
   }
 
@@ -688,23 +689,25 @@ class JsonMaker(dao: SiteDao) {
     val permissions = authzContext.tooManyPermissions
     val watchbar = dao.getOrCreateWatchbar(requester.id)
     val watchbarWithTitles = dao.fillInWatchbarTitlesEtc(watchbar)
-    val restrictedCategories = JsArray()
     val myGroupsEveryoneLast: Seq[Group] =
       request.authzContext.groupIdsEveryoneLast map dao.getTheGroup
 
     dao.readOnlyTransaction { tx =>
       requestersJsonImpl(requester, anyPageId = None, watchbarWithTitles,
-        restrictedCategories, restrictedTopics = Nil, restrictedTopicsUsers = Nil,
-        permissions, unapprovedPostAuthorIds = Set.empty, myGroupsEveryoneLast, tx)
+            RestrTopicsCatsLinks(JsArray(), Nil, Nil, Nil),
+            permissions, unapprovedPostAuthorIds = Set.empty, myGroupsEveryoneLast, tx)
     }
   }
 
 
   private def requestersJsonImpl(requester: Participant, anyPageId: Option[PageId],
-        watchbar: WatchbarWithTitles, restrictedCategories: JsArray,
-        restrictedTopics: Seq[JsValue], restrictedTopicsUsers: Seq[JsObject],
+        watchbar: WatchbarWithTitles, restrTopicsCatsLinks: RestrTopicsCatsLinks,
         permissions: Seq[PermsOnPages], unapprovedPostAuthorIds: Set[UserId],
         myGroupsEveryoneLast: Seq[Group], tx: SiteTransaction): JsObject = {
+
+    val restrictedCategories: JsArray = restrTopicsCatsLinks.categoriesJson
+    val restrictedTopics: Seq[JsValue] = restrTopicsCatsLinks.topicsJson
+    val restrictedTopicsUsers: Seq[JsObject] = restrTopicsCatsLinks.usersJson
 
     val draftsOnThisPage: immutable.Seq[Draft] =
       anyPageId.map(tx.loadDraftsByUserOnPage(requester.id, _)).getOrElse(Nil)
@@ -781,7 +784,7 @@ class JsonMaker(dao: SiteDao) {
             "groupsPageNotfPrefs" -> pageNotfPrefs.filter(_.peopleId != requester.id).map(JsPageNotfPref),
             "readingProgress" -> anyReadingProgressJson,
             "votes" -> votes,
-            "linkedFrom" -> linkedFromJson,
+            "linkedFrom" -> restrTopicsCatsLinks.linkedFromJson,
             // later: "flags" -> JsArray(...) [7KW20WY1]
             "unapprovedPosts" -> unapprovedPosts,
             "unapprovedPostAuthors" -> unapprovedAuthors,  // should remove [5WKW219] + search for elsewhere
@@ -847,7 +850,7 @@ class JsonMaker(dao: SiteDao) {
 
   COULD ; REFACTOR // move to CategoriesDao? and change from param PageRequest to
   // user + pageMeta?
-  def listRestrictedCategoriesAndTopics(request: PageRequest[_])
+  private def listRestrictedCategoriesAndTopics(request: PageRequest[_])
         : RestrTopicsCatsLinks = {
     // OLD: Currently there're only 2 types of "personal" topics: unlisted, & staff-only.
     // DON'T: if (!request.isStaff)
@@ -859,20 +862,20 @@ class JsonMaker(dao: SiteDao) {
 
     val categoryId = request.thePageMeta.categoryId getOrElse {
       // Not a forum topic. Could instead show an option to add the page to the / a forum?
-      return RestrTopicsCatsLinks(JsArray(), Nil, Nil)
+      val linkedFromJson = Nil // later
+      return RestrTopicsCatsLinks(JsArray(), Nil, Nil, linkedFromJson)
     }
 
     // SHOULD avoid starting a new transaction, so can remove workaround [7YKG25P].
     // (request.dao might start a new transaction)
     val categoriesJson = makeCategoriesJson(categoryId, authzCtx, exclPublCats = true)
 
-    val (topics: Seq[PagePathAndMeta], pageStuffById) =
+    val (topics: Seq[PagePathAndMeta], pageStuffById, linkedFromJson: Seq[JsObject]) =
       if (request.thePageRole != PageType.Forum) {
-        // Then won't list topics; no need to load any.
-        // No!  List pages *linking* to here — backlinks.
-        request.pageId.map(id => makeLinkingPagesJson(id, authzCtx, Left(dao)))
-
-        (Nil, Map[PageId, PageStuff]())
+        // Then won't list forum topics; instead, load backlinks.
+        val linkedFromJson = request.pageId.map(id =>
+              makeLinkingPagesJson(id, authzCtx, dao)) getOrElse Nil
+        (Nil, Map[PageId, PageStuff](), linkedFromJson)
       }
       else {
         // BUG (minor): To include restricted categories & topics, sorted in the correct order, need
@@ -886,7 +889,7 @@ class JsonMaker(dao: SiteDao) {
           authzCtx,
           limit = ForumController.NumTopicsToList)
         val pageStuffById = dao.getPageStuffById(topics.map(_.pageId))
-        (topics, pageStuffById)
+        (topics, pageStuffById, Nil)
       }
 
     val userIds = mutable.Set[UserId]()
@@ -894,9 +897,10 @@ class JsonMaker(dao: SiteDao) {
     val users = dao.getUsersAsSeq(userIds)
 
     RestrTopicsCatsLinks(
-          categoriesJson,
-          topics.map(ForumController.topicToJson(_, pageStuffById)),
-          users.map(JsUser))
+          categoriesJson = categoriesJson,
+          topicsJson = topics.map(ForumController.topicToJson(_, pageStuffById)),
+          usersJson = users.map(JsUser),
+          linkedFromJson = linkedFromJson)
   }
 
 
@@ -978,21 +982,31 @@ class JsonMaker(dao: SiteDao) {
   }
 
 
-  def makeLinkingPagesJson(toPageId: PageId, daoOrTx: Either[SiteDao, SiteTx],
-        authzCtx: ForumAuthzContext): JsValue = {
+  def makeLinkingPagesJson(toPageId: PageId, authzCtx: ForumAuthzContext,
+          daoOrTx: SiteDao): Seq[JsObject] = {
     daoOrTx match {
-      case Left(dao: SiteDao) =>
-        val linkedFromPageIds: Set[PageId] = dao.getPageIdsLinkingTo(toPageId)
-        val linkingPagesMaybeSee: Map[PageId, PageStuff] =
-              dao.getPageStuffById(linkedFromPageIds)
-        val linkingPagesOkSee: Iterable[PageStuff] =
-              linkingPagesMaybeSee.values.filter { page: PageStuff =>
-                val (maySee, _) = dao.maySeePageUseCache(
-                      page.pageMeta, None, maySeeUnlisted = false)
+      case dao: SiteDao =>
+        val linkerIds: Set[PageId] = dao.getPageIdsLinkingTo(toPageId)
+        val linkersMaybeSee: Map[PageId, PageStuff] =
+              dao.getPageStuffById(linkerIds)
+        val linkersOkSee: Iterable[PageStuff] =
+              linkersMaybeSee.values.filter { page: PageStuff =>
+                val (maySee, _) = dao.maySeePageUseCacheAndAuthzCtx(
+                      page.pageMeta, authzCtx, maySeeUnlisted = false)
                 maySee
               }
+        val linksJson = linkersOkSee map { pageStuff =>
+          Json.obj(
+                "titleHtmlSanitized" -> pageStuff.title,
+                "pageId" -> pageStuff.pageId,
+                "pageType" -> pageStuff.pageType.toInt,
+                "doingStatus" -> pageStuff.doingStatus.toInt)
+        }
+        linksJson.toSeq
+    }
+
+      /*
       case Right(tx) =>
-        ??? /*
         val linkedFromPageIds: Set[PageId] = tx.loadPageIdsLinkingTo(toPageId)
         val linkedFromPageMetas: Seq[PageMeta] = tx.loadPageMetas(linkedFromPageIds)
         val linkedFromMaySee = linkedFromPageMetas flatMap { pageMeta =>
@@ -1003,8 +1017,6 @@ class JsonMaker(dao: SiteDao) {
 
         val linkingPageTitles = tx.loadPostsByNrs(
           linkedFromMaySee.map(pm => PagePostNr(pm.pageId, PageParts.TitleNr)))
-          */
-    }
 
     val linkingPagesJson = linkingPageTitles flatMap { titlePost =>
       if (!titlePost.isSomeVersionApproved) None
@@ -1018,8 +1030,8 @@ class JsonMaker(dao: SiteDao) {
         }
       }
     }
-
     JsArray(linkingPagesJson)
+          */
   }
 
 

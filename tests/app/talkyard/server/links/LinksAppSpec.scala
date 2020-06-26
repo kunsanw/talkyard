@@ -175,7 +175,9 @@ class LinksAppSpec extends DaoAppSuite {
     "find page ids linked from a page" in {
       daoSite1.readTx { tx =>
         tx.loadPageIdsLinkedFrom("23456789") mustBe Seq.empty
-        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(linkAToB, linkAToC)
+        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(pageB.id, pageC.id)
+        tx.loadPageIdsLinkedFrom(pageB.id) mustBe Nil
+        tx.loadPageIdsLinkedFrom(pageC.id) mustBe Nil
       }
     }
 
@@ -187,7 +189,15 @@ class LinksAppSpec extends DaoAppSuite {
       }
     }
 
-    "delete links" in {
+    "find page ids linking to a page" in {
+      daoSite1.readTx { tx =>
+        tx.loadPageIdsLinkingTo(pageA.id) mustBe Nil
+        tx.loadPageIdsLinkingTo(pageB.id) mustBe Seq(pageA.id)
+        tx.loadPageIdsLinkingTo(pageC.id) mustBe Seq(pageA.id)
+      }
+    }
+
+    "delete link A —> B" in {
       daoSite1.writeTx(retry = false) { tx =>
         tx.deleteLinksFromPost(pageA.bodyPost.id, Set.empty)
         tx.deleteLinksFromPost(pageA.bodyPost.id, Set("/wrong-link"))
@@ -202,9 +212,11 @@ class LinksAppSpec extends DaoAppSuite {
         }
       }
 
-      "find page ids linked from a page" in {
+      "find page ids linked from a page — now only C, not B" in {
         daoSite1.readTx { tx =>
-          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(linkAToB, linkAToC)
+          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(pageC.id)
+          tx.loadPageIdsLinkedFrom(pageB.id) mustBe Nil
+          tx.loadPageIdsLinkedFrom(pageC.id) mustBe Nil
         }
       }
 
@@ -213,6 +225,14 @@ class LinksAppSpec extends DaoAppSuite {
           tx.loadLinksToPage(pageA.id) mustBe Seq.empty
           tx.loadLinksToPage(pageB.id) mustBe Seq.empty
           tx.loadLinksToPage(pageC.id) mustBe Seq(linkAToC)
+        }
+      }
+
+      "find page ids linking to a page" in {
+        daoSite1.readTx { tx =>
+          tx.loadPageIdsLinkingTo(pageA.id) mustBe Nil
+          tx.loadPageIdsLinkingTo(pageB.id) mustBe Nil
+          tx.loadPageIdsLinkingTo(pageC.id) mustBe Seq(pageA.id)
         }
       }
     }
