@@ -109,6 +109,7 @@ class SiteDao(
   with CategoriesDao
   with PagesDao
   with PagePathMetaDao
+  with PageLinksDao
   with PageStuffDao
   with PagePopularityDao
   with RenderedPageHtmlDao

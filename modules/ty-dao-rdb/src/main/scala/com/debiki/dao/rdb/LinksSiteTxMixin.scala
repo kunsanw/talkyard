@@ -180,7 +180,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  override def loadPageIdsLinkedFrom(pageId: PageId): Seq[PageId] = {
+  override def loadPageIdsLinkedFrom(pageId: PageId): Set[PageId] = {
     val query = s"""
           select distinct ps.page_id
           from posts3 ps inner join links_t ls
@@ -196,7 +196,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  def loadPageIdsLinkingTo(pageId: PageId): Seq[PageId] = {
+  def loadPageIdsLinkingTo(pageId: PageId): Set[PageId] = {
     val query = s"""
           select distinct ps.page_id
           from links_t ls inner join posts3 ps

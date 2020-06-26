@@ -44,19 +44,19 @@ class MemCache(val siteId: SiteId, val cache: DaoMemCache, mostMetrics: MostMetr
   // - change firePageCreated() to uncacheStuffBecausePageCreated(pageId)
   // - change firePageSaved() to uncacheStuffBecausePageSaved(pageId)
   // ... etc
-  private var pageCreatedListeners = List[(PagePath => Unit)]()
+  private var pageCreatedListeners = List[(SiteId, PagePathWithId) => Unit]()
   private var pageSavedListeners = List[(SitePageId => Unit)]()
   private var pageMovedListeners = List[(PagePath => Unit)]()
   private var userCreatedListeners = List[(Participant => Unit)]()
 
 
-  def onPageCreated(callback: (PagePath => Unit)): Unit = {
+  def onPageCreated(callback: (SiteId, PagePathWithId) => Unit): Unit = {
     pageCreatedListeners ::= callback
   }
 
 
-  def firePageCreated(pagePath: PagePath): Unit = {
-    pageCreatedListeners foreach (_(pagePath))
+  def firePageCreated(siteId: SiteId, pagePath: PagePathWithId): Unit = {
+    pageCreatedListeners foreach (_(siteId, pagePath))
   }
 
 
