@@ -189,7 +189,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           select distinct ls.to_page_id_c
           from posts3 ps inner join links_t ls
              on ps.unique_post_id = ls.from_post_id_c
-            and ps.site_id = ls.site_id
+            and ps.site_id = ls.site_id_c
           where ps.site_id = ?
             and ps.page_id = ?
           """

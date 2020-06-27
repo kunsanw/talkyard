@@ -174,10 +174,10 @@ class LinksAppSpec extends DaoAppSuite {
 
     "find page ids linked from a page" in {
       daoSite1.readTx { tx =>
-        tx.loadPageIdsLinkedFrom("23456789") mustBe Seq.empty
-        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(pageB.id, pageC.id)
-        tx.loadPageIdsLinkedFrom(pageB.id) mustBe Nil
-        tx.loadPageIdsLinkedFrom(pageC.id) mustBe Nil
+        tx.loadPageIdsLinkedFrom("23456789") mustBe Set.empty
+        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Set(pageB.id, pageC.id)
+        tx.loadPageIdsLinkedFrom(pageB.id) mustBe Set.empty
+        tx.loadPageIdsLinkedFrom(pageC.id) mustBe Set.empty
       }
     }
 
@@ -191,9 +191,9 @@ class LinksAppSpec extends DaoAppSuite {
 
     "find page ids linking to a page" in {
       daoSite1.readTx { tx =>
-        tx.loadPageIdsLinkingTo(pageA.id) mustBe Nil
-        tx.loadPageIdsLinkingTo(pageB.id) mustBe Seq(pageA.id)
-        tx.loadPageIdsLinkingTo(pageC.id) mustBe Seq(pageA.id)
+        tx.loadPageIdsLinkingTo(pageA.id) mustBe Set.empty
+        tx.loadPageIdsLinkingTo(pageB.id) mustBe Set(pageA.id)
+        tx.loadPageIdsLinkingTo(pageC.id) mustBe Set(pageA.id)
       }
     }
 
@@ -214,9 +214,9 @@ class LinksAppSpec extends DaoAppSuite {
 
       "find page ids linked from a page — now only C, not B" in {
         daoSite1.readTx { tx =>
-          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Seq(pageC.id)
-          tx.loadPageIdsLinkedFrom(pageB.id) mustBe Nil
-          tx.loadPageIdsLinkedFrom(pageC.id) mustBe Nil
+          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Set(pageC.id)
+          tx.loadPageIdsLinkedFrom(pageB.id) mustBe Set.empty
+          tx.loadPageIdsLinkedFrom(pageC.id) mustBe Set.empty
         }
       }
 
@@ -230,9 +230,9 @@ class LinksAppSpec extends DaoAppSuite {
 
       "find page ids linking to a page" in {
         daoSite1.readTx { tx =>
-          tx.loadPageIdsLinkingTo(pageA.id) mustBe Nil
-          tx.loadPageIdsLinkingTo(pageB.id) mustBe Nil
-          tx.loadPageIdsLinkingTo(pageC.id) mustBe Seq(pageA.id)
+          tx.loadPageIdsLinkingTo(pageA.id) mustBe Set.empty
+          tx.loadPageIdsLinkingTo(pageB.id) mustBe Set.empty
+          tx.loadPageIdsLinkingTo(pageC.id) mustBe Set(pageA.id)
         }
       }
     }
