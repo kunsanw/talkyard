@@ -278,6 +278,29 @@ h1.dw-p-ttl a:not(.icon-edit):not(.dw-forum-intro-show)
     text-decoration: underline;
 
 
+// Internal backlinks
+.s_InLns
+  float: left;
+  margin: 20px 30px 0 0;
+  li
+    margin: 0 0 8px -1px;
+    list-style: none;
+
+.s_InLns_Ttl
+  padding-top: 8px; // align w Like, Reply etc button icons and text
+  margin: 0 0 5px;
+  color: hsl(0, 0%, 43%);
+  font-style: italic;
+  letter-spacing: 0.2px;
+  word-spacing: 0.5px;
+
+a.s_InLns_Ln
+  color: hsl(0, 0%, 43%) !important;
+  margin-right: 20px;
+  &::before
+    margin-right: 5px;
+
+
 // The append-bottom comments section
 //==============================
 

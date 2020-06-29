@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 Kaj Magnus Lindberg
+ * Copyright (c) 2014-2020 Kaj Magnus Lindberg
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,12 +26,10 @@ import debiki._
 import debiki.EdHttp._
 import ed.server.pubsub.StorePatchMessage
 import play.api.libs.json.{JsObject, JsValue}
-import play.{api => p}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import PostsDao._
 import com.debiki.core
-import com.sun.java.swing.plaf.gtk.GTKConstants.PositionType
 import ed.server.auth.Authz
 import ed.server.spam.SpamChecker
 import org.scalactic.{Bad, Good, One, Or}
@@ -94,7 +92,7 @@ trait PostsDao {
         now, authorId, tx)
     }
 
-    refreshPageInMemCache(pageId)
+    refreshPageInMemCache(pageId)  // + linked pages too, have  insertReplyImpl return links?
 
     val storePatchJson = jsonMaker.makeStorePatch(newPost, author, showHidden = true)
     pubSub.publish(StorePatchMessage(siteId, pageId, storePatchJson, notifications),
@@ -274,12 +272,13 @@ trait PostsDao {
         // Should be the same — the page type didn't change (we're just adding a reply).
         postsOrderNesting = page.parts.postsOrderNesting)
       updatePagePopularity(pagePartsInclNewPost, tx)
+
+      SHOULD // bump linked page versions, so html uncached and backlinks appear.
+      // And return linked page ids, so can be uncached from mem cache too.
+      saveDeleteLinks(newPost, textAndHtml, authorId, tx)
     }
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
-    }
-    if (newPost.isCurrentVersionApproved) {
-      saveDeleteLinks(newPost, textAndHtml, authorId, tx)
     }
     insertAuditLogEntry(auditLogEntry, tx)
     anyReviewTask.foreach(tx.upsertReviewTask)
@@ -625,6 +624,7 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
+    SHOULD // bump linked page versions + return linking pages, uncache from mem cache.
     saveDeleteLinks(newPost, textAndHtml, authorId, tx)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     insertAuditLogEntry(auditLogEntry, tx)
@@ -718,6 +718,8 @@ trait PostsDao {
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     saveDeleteUploadRefs(lastPost, editedPost = editedPost, textAndHtml,
           isAppending = true, authorId, tx)
+
+    SHOULD // bump linked page versions + return linking pages, uncache from mem cache.
     saveDeleteLinks(editedPost, combinedTextAndHtml, authorId, tx)
 
     val oldMeta = tx.loadThePageMeta(lastPost.pageId)
@@ -1017,6 +1019,8 @@ trait PostsDao {
       newRevision.foreach(tx.insertPostRevision)
       saveDeleteUploadRefs(postToEdit, editedPost = editedPost, newTextAndHtml,
             isAppending = false, editorId, tx)
+
+      SHOULD // bump linked page versions + return linking pages, uncache from mem cache.
       saveDeleteLinks(editedPost, newTextAndHtml, editorId, tx)
 
       insertAuditLogEntry(auditLogEntry, tx)
@@ -1768,12 +1772,15 @@ trait PostsDao {
         browserIdData: BrowserIdData): Unit = {
     readWriteTransaction(deletePostImpl(
       pageId, postNr = postNr, deletedById = deletedById, doingReviewTask = None, browserIdData, _))
-    refreshPageInMemCache(pageId)
+    refreshPageInMemCache(pageId)   // + refreshLinkedPagesToo: Boolean
   }
 
 
   def deletePostImpl(pageId: PageId, postNr: PostNr, deletedById: UserId,
         doingReviewTask: Option[ReviewTask], browserIdData: BrowserIdData,  tx: SiteTransaction): Unit = {
+    SHOULD // delete links to other pages? Or mark as deleted?
+    // A  is_deleted_c column? true iff linking post — or linked page too? is deleted.
+
     val result = changePostStatusImpl(pageId = pageId, postNr = postNr,
       action = PostStatusAction.DeletePost(clearFlags = false), userId = deletedById,
       doingReviewTask = doingReviewTask,
@@ -1996,6 +2003,9 @@ trait PostsDao {
           refreshPageMetaBumpVersion(fromPage.id, markSectionPageStale = true, tx)
           refreshPageMetaBumpVersion(toPage.id, markSectionPageStale = true, tx)
 
+          // (Need not update links_t or upload_refs3, because links and upload refs
+          // are from a *post* not from a *page*.)
+
           postAfter
         }
 
@@ -2042,6 +2052,7 @@ trait PostsDao {
     if (wasHidden) {
       postsHidden :+= postAfter
       refreshPageInMemCache(pageId)
+      SHOULD // temp hide links too, and refresh linked pages
     }
     postsHidden
   }
@@ -2183,6 +2194,9 @@ trait PostsDao {
         hidePostsOnPage(posts, pageId, "Many posts by this author got flagged, hiding all")(tx)
         pageIdsToRefresh += pageId
       }
+
+      SHOULD // hide links too, and refresh linked pages
+
       postToHide
     }
 

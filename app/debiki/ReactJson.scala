@@ -996,11 +996,8 @@ class JsonMaker(dao: SiteDao) {
                 maySee
               }
         val linksJson = linkersOkSee map { pageStuff =>
-          Json.obj(
-                "titleHtmlSanitized" -> pageStuff.title,
-                "pageId" -> pageStuff.pageId,
-                "pageType" -> pageStuff.pageType.toInt,
-                "doingStatus" -> pageStuff.doingStatus.toInt)
+          val pageId = pageStuff.pageId
+          ForumController.topicToJson(pageStuff.pageMeta, pageStuff, s"/-$pageId")
         }
         linksJson.toSeq
     }

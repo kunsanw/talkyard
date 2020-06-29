@@ -758,7 +758,7 @@ interface Page
   forumId?: string;
   ancestorsRootFirst?: Ancestor[];
   categoryId?: number;
-  intLinkedFrom?: LinkTitleUrl[];
+  intLinkedFrom?: Topic[];
   extLinkedFrom?: LinkTitleUrl[];
   pageRole: PageRole;
   pagePath: PagePath;
