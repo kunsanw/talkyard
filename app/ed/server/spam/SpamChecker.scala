@@ -324,6 +324,8 @@ class SpamChecker(
       return Future.successful(Nil)
     }
 
+    // Save links and @mentions in posts3 / posts_t /  [save_post_lns_mentions]
+    // post_revisions_t, so won't need to find again here.
     val textAndHtmlMaker = new TextAndHtmlMaker(site, nashorn)
     val textAndHtml = textAndHtmlMaker.forHtmlAlready(postToSpamCheck.htmlToSpamCheck)
 

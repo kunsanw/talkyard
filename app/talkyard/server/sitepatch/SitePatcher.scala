@@ -1015,7 +1015,8 @@ case class SitePatcher(globals: debiki.Globals) {
           // Has no effet as of now — currently only one new post / page at a time,
           // via /-/v0/upsert-simple.
           notfGenerator.generateForNewPost(
-            dao.newPageDao(post.pageId, tx), post, anyNewTextAndHtml = None, anyReviewTask = None)
+                dao.newPageDao(post.pageId, tx), post,
+                sourceAndHtml = None, anyReviewTask = None)
         }
 
         // Group chats, direct messages:

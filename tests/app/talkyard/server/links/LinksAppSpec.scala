@@ -159,7 +159,7 @@ class LinksAppSpec extends DaoAppSuite {
 
   "insert, update, find Link:s" - {
     "insert" in {
-      daoSite1.writeTx(retry = false) { tx =>
+      daoSite1.writeTx(retry = false) { (tx, _) =>
         tx.upsertLink(linkAToB)
         tx.upsertLink(linkAToC)
       }
@@ -174,10 +174,10 @@ class LinksAppSpec extends DaoAppSuite {
 
     "find page ids linked from a page" in {
       daoSite1.readTx { tx =>
-        tx.loadPageIdsLinkedFrom("23456789") mustBe Set.empty
-        tx.loadPageIdsLinkedFrom(pageA.id) mustBe Set(pageB.id, pageC.id)
-        tx.loadPageIdsLinkedFrom(pageB.id) mustBe Set.empty
-        tx.loadPageIdsLinkedFrom(pageC.id) mustBe Set.empty
+        tx.loadPageIdsLinkedFromPage("23456789") mustBe Set.empty
+        tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageB.id, pageC.id)
+        tx.loadPageIdsLinkedFromPage(pageB.id) mustBe Set.empty
+        tx.loadPageIdsLinkedFromPage(pageC.id) mustBe Set.empty
       }
     }
 
@@ -191,14 +191,14 @@ class LinksAppSpec extends DaoAppSuite {
 
     "find page ids linking to a page" in {
       daoSite1.readTx { tx =>
-        tx.loadPageIdsLinkingTo(pageA.id) mustBe Set.empty
-        tx.loadPageIdsLinkingTo(pageB.id) mustBe Set(pageA.id)
-        tx.loadPageIdsLinkingTo(pageC.id) mustBe Set(pageA.id)
+        tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+        tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set(pageA.id)
+        tx.loadPageIdsLinkingTo(pageC.id, inclDeletedHidden = false) mustBe Set(pageA.id)
       }
     }
 
     "delete link A —> B" in {
-      daoSite1.writeTx(retry = false) { tx =>
+      daoSite1.writeTx(retry = false) { (tx, _) =>
         tx.deleteLinksFromPost(pageA.bodyPost.id, Set.empty)
         tx.deleteLinksFromPost(pageA.bodyPost.id, Set("/wrong-link"))
         tx.deleteLinksFromPost(pageA.bodyPost.id, Set(linkAToB.link_url_c))
@@ -214,9 +214,9 @@ class LinksAppSpec extends DaoAppSuite {
 
       "find page ids linked from a page — now only C, not B" in {
         daoSite1.readTx { tx =>
-          tx.loadPageIdsLinkedFrom(pageA.id) mustBe Set(pageC.id)
-          tx.loadPageIdsLinkedFrom(pageB.id) mustBe Set.empty
-          tx.loadPageIdsLinkedFrom(pageC.id) mustBe Set.empty
+          tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageC.id)
+          tx.loadPageIdsLinkedFromPage(pageB.id) mustBe Set.empty
+          tx.loadPageIdsLinkedFromPage(pageC.id) mustBe Set.empty
         }
       }
 
@@ -230,9 +230,9 @@ class LinksAppSpec extends DaoAppSuite {
 
       "find page ids linking to a page" in {
         daoSite1.readTx { tx =>
-          tx.loadPageIdsLinkingTo(pageA.id) mustBe Set.empty
-          tx.loadPageIdsLinkingTo(pageB.id) mustBe Set.empty
-          tx.loadPageIdsLinkingTo(pageC.id) mustBe Set(pageA.id)
+          tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+          tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set.empty
+          tx.loadPageIdsLinkingTo(pageC.id, inclDeletedHidden = false) mustBe Set(pageA.id)
         }
       }
     }

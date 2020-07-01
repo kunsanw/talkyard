@@ -640,8 +640,8 @@ trait CategoriesDao {
 
   def createCategory(newCategoryData: CategoryToSave, permissions: immutable.Seq[PermsOnPages],
         byWho: Who): CreateCategoryResult = {
-    val result = readWriteTransaction { tx =>
-      createCategoryImpl(newCategoryData, permissions, byWho)(tx)
+    val result = writeTx { (tx, staleStuff) =>
+      createCategoryImpl(newCategoryData, permissions, byWho)(tx, staleStuff)
     }
     // Need to reload permissions and categories, so this new category and its permissions
     // also get included.
@@ -654,7 +654,7 @@ trait CategoriesDao {
 
 
   def createCategoryImpl(newCategoryData: CategoryToSave, permissions: immutable.Seq[PermsOnPages],
-        byWho: Who)(tx: SiteTransaction): CreateCategoryResult = {
+        byWho: Who)(tx: SiteTransaction, staleStuff: StaleStuff): CreateCategoryResult = {
 
     val categoryId = tx.nextCategoryId()  // [4GKWSR1]
     newCategoryData.anyId foreach { id =>
@@ -685,7 +685,7 @@ trait CategoriesDao {
         anyFolder = None, anySlug = Some("about-" + newCategoryData.slug), showId = true,
         title = titleSourceAndHtml, body = bodyTextAndHtml,
         pinOrder = None, pinWhere = None,
-        byWho, spamRelReqStuff = None, tx,
+        byWho, spamRelReqStuff = None, tx, staleStuff,
         // if createDeletedAboutTopic, then TESTS_MISSING [5WAKR02], e2e test won't get created.
         createAsDeleted = newCategoryData.createDeletedAboutTopic)._1
 
@@ -716,7 +716,10 @@ trait CategoriesDao {
       tx.updateCategoryMarkSectionPageStale(categoryAfter)
     }
     // All pages in the category now needs to be rerendered.
-    COULD_OPTIMIZE // only remove-from-cache / mark-as-dirty pages inside the category.
+    // And pages *linked from* pages in the categories — for the correct
+    // backlinks to appear.
+    COULD_OPTIMIZE // only remove-from-cache / mark-as-dirty pages inside the category,
+    // plus linked pages — but that's not so easy? Wait with that.
     emptyCache()
   }
 

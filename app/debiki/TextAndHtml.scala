@@ -64,6 +64,14 @@ object TitleSourceAndHtml {
 }
 
 
+case class LinksFound(  // Oops not needed, can remove again
+  uploadRefs: Set[UploadRef],
+  externalLinks: immutable.Seq[String],
+  internalLinks: Set[String],
+  linkDomains: Set[String],
+  linkIpAddresses: immutable.Seq[String])
+
+
 
 /** Immutable. Use linkDomains to check all links against a spam/evil-things domain block list
   * like Spamhaus DBL, https://www.spamhaus.org/faq/section/Spamhaus%20DBL#271.
@@ -350,11 +358,29 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     }
   }
 
-  private def findLinksEtc(text: String, renderResult: RenderCommonmarkResult,
-        embeddedOriginOrEmpty: String,
-        followLinks: Boolean, allowClassIdDataAttrs: Boolean): TextAndHtmlImpl = {
 
-    val allLinks = findLinks(renderResult.safeHtml)
+  private def findLinksEtc(text: String, renderResult: RenderCommonmarkResult,
+        embeddedOriginOrEmpty: String, followLinks: Boolean,
+        allowClassIdDataAttrs: Boolean): TextAndHtmlImpl = {
+
+    val linksFound = findLinksAndUplRefs(renderResult.safeHtml)
+
+    new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
+          uploadRefs = linksFound.uploadRefs,
+          externalLinks = linksFound.externalLinks,
+          internalLinks = linksFound.internalLinks,
+          linkDomains = linksFound.linkDomains,
+          linkIpAddresses = linksFound.linkIpAddresses,
+          embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+          isTitle = false,
+          followLinks = followLinks,
+          allowClassIdDataAttrs = allowClassIdDataAttrs)
+  }
+
+
+  def findLinksAndUplRefs(safeHtml: String): LinksFound = {  // rm?
+
+    val allLinks = TextAndHtmlMaker.findLinks(safeHtml)
 
     val uploadRefs: Set[UploadRef] =
           UploadsDao.findUploadRefsInLinks(allLinks.toSet, site.pubId)
@@ -417,14 +443,12 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
         }
     }
 
-    new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
+    LinksFound(
           uploadRefs = uploadRefs,
-          externalLinks = externalLinks, internalLinks = internalLinks,
+          externalLinks = externalLinks,
+          internalLinks = internalLinks,
           linkDomains = linkDomains,
-          linkIpAddresses = linkAddresses,
-          embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-          isTitle = false, followLinks = followLinks,
-          allowClassIdDataAttrs = allowClassIdDataAttrs)
+          linkIpAddresses = linkAddresses)
   }
 
 

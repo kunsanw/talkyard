@@ -111,14 +111,15 @@ trait PagesDao {
 
     quickCheckIfSpamThenThrow(byWho, bodyTextAndHtml, spamRelReqStuff)
 
-    val result = readWriteTransaction { tx =>
+    val result = writeTx { (tx, staleStuff) =>
       val (pagePath, bodyPost, anyReviewTask) =
             createPageImpl(
                 pageRole, pageStatus, anyCategoryId,
                 anyFolder = anyFolder, anySlug = anySlug, showId = showId,
                 title = title, body = bodyTextAndHtml,
                 pinOrder = None, pinWhere = None, byWho, Some(spamRelReqStuff),
-                tx, discussionIds = discussionIds, embeddingUrl = embeddingUrl, extId = extId)
+                tx, staleStuff, discussionIds = discussionIds,
+                embeddingUrl = embeddingUrl, extId = extId)
 
       val notifications = notfGenerator(tx).generateForNewPost(
         newPageDao(pagePath.pageId, tx),
@@ -171,6 +172,7 @@ trait PagesDao {
       pinOrder: Option[Int] = None, pinWhere: Option[PinPageWhere] = None,
       byWho: Who, spamRelReqStuff: Option[SpamRelReqStuff],
       tx: SiteTransaction,
+      staleStuff: StaleStuff,
       hidePageBody: Boolean = false,
       layout: Option[PageLayout] = None,
       bodyPostType: PostType = PostType.Normal,
@@ -376,12 +378,13 @@ trait PagesDao {
     if (approvedById.isDefined) {
       updatePagePopularity(
         PreLoadedPageParts(pageMeta, Vector(titlePost, bodyPost)), tx)
+
+      saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff)
     }
 
     uploadPaths foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
-    saveDeleteLinks(bodyPost, body, authorId, tx)
 
     discussionIds.foreach(id => tx.insertAltPageId("diid:" + id, realPageId = pageId))
 
@@ -560,20 +563,21 @@ trait PagesDao {
 
   def deletePagesIfAuth(pageIds: Seq[PageId], deleterId: UserId, browserIdData: BrowserIdData,
         undelete: Boolean): Unit = {
-    readWriteTransaction { tx =>
+    writeTx { (tx, staleStuff) =>
       // SHOULD LATER: [4GWRQA28] If is sub community (= forum page), delete the root category too,
       // so all topics in the sub community will get deleted.
       // And remove the sub community from the watchbar's Communities section.
       // (And if undeleting the sub community, undelete the root category too.)
       deletePagesImpl(pageIds, deleterId, browserIdData, doingReviewTask = None,
-          undelete = undelete)(tx)
+            undelete = undelete)(tx, staleStuff)
     }
     refreshPagesInAnyCache(pageIds.toSet)
   }
 
 
   def deletePagesImpl(pageIds: Seq[PageId], deleterId: UserId, browserIdData: BrowserIdData,
-        doingReviewTask: Option[ReviewTask], undelete: Boolean = false)(tx: SiteTransaction): Unit = {
+        doingReviewTask: Option[ReviewTask], undelete: Boolean = false)(
+        tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
 
     val deleter = tx.loadTheParticipant(deleterId)
     if (!deleter.isStaff)

@@ -65,7 +65,7 @@ trait ForumDao {
     val titleSourceAndHtml = TitleSourceAndHtml(options.title)
     val isForEmbCmts = options.isForEmbeddedComments
 
-    val result = readWriteTransaction { tx =>
+    val result = writeTx { (tx, staleStuff) =>
       val oldForumPagePath = tx.checkPagePath(PagePath(
         siteId = siteId, folder = options.folder, pageId = None, showId = false, pageSlug = ""))
       if (oldForumPagePath.isDefined) {
@@ -103,13 +103,13 @@ trait ForumDao {
             PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
             anyFolder = Some(options.folder), anySlug = Some(""), showId = false,
             title = titleSourceAndHtml, body = introText,
-            byWho = byWho, spamRelReqStuff = None, tx = tx,
+            byWho = byWho, spamRelReqStuff = None, tx = tx, staleStuff = staleStuff,
             layout = Some(options.topicListStyle))._1
 
       val forumPageId = forumPagePath.pageId
 
       val partialResult: CreateForumResult = createDefaultCategoriesAndTopics(
-        forumPageId, rootCategoryId, options, byWho, tx)
+        forumPageId, rootCategoryId, options, byWho, tx, staleStuff)
 
       // Delaying configuration of these settings until here, instead of here: [493MRP1],
       // lets us let people choose to create embedded comments sites, also
@@ -156,7 +156,7 @@ trait ForumDao {
 
 
   private def createDefaultCategoriesAndTopics(forumPageId: PageId, rootCategoryId: CategoryId,
-        options: CreateForumOptions, byWho: Who, tx: SiteTransaction)
+        options: CreateForumOptions, byWho: Who, tx: SiteTransaction, staleStuff: StaleStuff)
         : CreateForumResult = {
 
     val staffCategoryId = rootCategoryId + 1
@@ -197,21 +197,21 @@ trait ForumDao {
         includeInSummaries = IncludeInSummaries.Default),
       immutable.Seq[PermsOnPages](
         makeStaffCategoryPerms(staffCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     if (options.isForEmbeddedComments)
       createEmbeddedCommentsCategory(forumPageId, rootCategoryId, defaultCategoryId,
-        staffCategoryId, options, bySystem, tx)
+            staffCategoryId, options, bySystem, tx, staleStuff)
     else
       createForumCategories(forumPageId, rootCategoryId, defaultCategoryId,
-        staffCategoryId, options, bySystem, tx)
+            staffCategoryId, options, bySystem, tx, staleStuff)
   }
 
 
   private def createEmbeddedCommentsCategory(
     forumPageId: PageId, rootCategoryId: CategoryId, defaultCategoryId: CategoryId,
     staffCategoryId: CategoryId, options: CreateForumOptions,
-    bySystem: Who, tx: SiteTransaction): CreateForumResult = {
+    bySystem: Who, tx: SiteTransaction, staleStuff: StaleStuff): CreateForumResult = {
 
     dieIf(!options.isForEmbeddedComments, "TyE7HQT42")
 
@@ -240,7 +240,7 @@ trait ForumDao {
       immutable.Seq[PermsOnPages](
         makeEveryonesDefaultCategoryPerms(defaultCategoryId),
         makeStaffCategoryPerms(defaultCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     CreateForumResult(null, defaultCategoryId = defaultCategoryId,
       staffCategoryId = staffCategoryId)
@@ -250,7 +250,7 @@ trait ForumDao {
   private def createForumCategories(
     forumPageId: PageId, rootCategoryId: CategoryId, defaultCategoryId: CategoryId,
     staffCategoryId: CategoryId, options: CreateForumOptions,
-    bySystem: Who, tx: SiteTransaction): CreateForumResult = {
+    bySystem: Who, tx: SiteTransaction, staleStuff: StaleStuff): CreateForumResult = {
 
     dieIf(options.isForEmbeddedComments, "TyE2PKQ9")
 
@@ -284,7 +284,7 @@ trait ForumDao {
       immutable.Seq[PermsOnPages](
         makeEveryonesDefaultCategoryPerms(generalCategoryId),
         makeStaffCategoryPerms(generalCategoryId)),
-      bySystem)(tx)
+      bySystem)(tx, staleStuff)
 
     // Talkyard is advertised as Question-Answers and crowdsource ideas forum software,
     // so makes sense to create Questions and Ideas categories?
@@ -310,7 +310,7 @@ trait ForumDao {
         immutable.Seq[PermsOnPages](
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     }
 
     // Create an Ideas category.
@@ -334,7 +334,7 @@ trait ForumDao {
         immutable.Seq[PermsOnPages](
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     }
 
     /*
@@ -363,7 +363,7 @@ trait ForumDao {
         immutable.Seq[PermsOnPages](
           makeEveryonesDefaultCategoryPerms(categoryId),
           makeStaffCategoryPerms(categoryId)),
-        bySystem)(tx)
+        bySystem)(tx, staleStuff)
     } */
 
     def makeTitle(safeText: String) =
@@ -380,7 +380,7 @@ trait ForumDao {
       pinWhere = Some(PinPageWhere.Globally),
       bySystem,
       spamRelReqStuff = None,
-      tx)
+      tx, staleStuff)
 
     if (options.createSampleTopics) {
       def wrap(text: String) = textAndHtmlMaker.wrapInParagraphNoMentionsOrLinks(text, isTitle = false)
@@ -397,17 +397,20 @@ trait ForumDao {
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with a brief discussion.
       insertReplyImpl(wrap(SampleDiscussionReplyOne),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleDiscussionReplyTwo),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleDiscussionReplyThree),
-        discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            discussionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
 
       /*
       // Create sample problem. — maybe it's enough, with a sample Idea.
@@ -421,7 +424,7 @@ trait ForumDao {
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx) */
+        tx, staleStuff) */
 
       // Create sample idea.
       val ideaPagePath = createPageImpl(
@@ -434,23 +437,28 @@ trait ForumDao {
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with some sample Discussion and Progress replies.
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyOne),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyTwo),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaDiscussionReplyThree),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr + 1),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaProgressReplyOne),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.BottomComment,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.BottomComment, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleIdeaProgressReplyTwo),
-        ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.BottomComment,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            ideaPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.BottomComment, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
 
       // Create sample question.
       val questionPagePath = createPageImpl(
@@ -463,17 +471,20 @@ trait ForumDao {
         pinWhere = None,
         bySystem,
         spamRelReqStuff = None,
-        tx)._1
+        tx, staleStuff)._1
       // ... with two answers and a comment:
       insertReplyImpl(wrap(SampleAnswerText),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleAnswerCommentText),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.FirstReplyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
       insertReplyImpl(wrap(SampleAnswerText2),
-        questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr), PostType.Normal,
-        bySystem, SystemSpamStuff, globals.now(), SystemUserId, tx, skipNotifications = true)
+            questionPagePath.pageId, replyToPostNrs = Set(PageParts.BodyNr),
+            PostType.Normal, bySystem, SystemSpamStuff, globals.now(), SystemUserId,
+            tx, staleStuff, skipNotifications = true)
     }
 
     // Create staff chat.
@@ -489,7 +500,7 @@ trait ForumDao {
       pinWhere = None,
       bySystem,
       spamRelReqStuff = None,
-      tx)
+      tx, staleStuff)
 
     CreateForumResult(null, defaultCategoryId = defaultCategoryId,
       staffCategoryId = staffCategoryId)

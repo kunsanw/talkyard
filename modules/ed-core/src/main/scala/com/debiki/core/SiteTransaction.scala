@@ -148,6 +148,9 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def insertPost(newPost: Post): Unit
   def updatePost(newPost: Post): Unit
 
+  /** We index any approed text, and also any unapproved source, see:
+    * [[ed.server.search.makeElasticSearchJsonDocFor]]. [ix_unappr]
+    */
   def indexPostsSoon(posts: Post*): Unit
   def indexAllPostsOnPage(pageId: PageId): Unit
   def indexPagesSoon(pageMeta: PageMeta*): Unit
@@ -284,6 +287,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
         markSectionPageStale: Boolean): Unit
 
   def markPagesWithUserAvatarAsStale(userId: UserId): Unit
+  def markPagesHtmlStale(pageIds: Set[PageId]): Unit
   def markSectionPageContentHtmlAsStale(categoryId: CategoryId): Unit
   def loadCachedPageContentHtml(pageId: PageId, renderParams: PageRenderParams)
         : Option[(String, CachedPageVersion)]
@@ -332,7 +336,10 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
     */
   def updateUploadedFileReferenceCount(uploadRef: UploadRef): Unit
 
-  /** Remembers that an uploaded file is referenced from this post. */
+  /** Remembers that an uploaded file is referenced from this post.
+    * This needs to be done also for not-yet-approved posts — otherwise,
+    * the uploaded things might look unused, and get deleted and would
+    * then be missing, if the post gets approved, later.  */
   def insertUploadedFileReference(postId: PostId, uploadRef: UploadRef, addedById: UserId): Unit
   def deleteUploadedFileReference(postId: PostId, uploadRef: UploadRef): Boolean
   def loadUploadedFileReferences(postId: PostId): Set[UploadRef]
@@ -362,8 +369,11 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def deleteAllLinksFromPost(postId: PostId): Boolean
   def loadLinksFromPost(postId: PostId): Seq[Link]
   def loadLinksToPage(pageId: PageId): Seq[Link]
-  def loadPageIdsLinkedFrom(pageId: PageId): Set[PageId]
-  def loadPageIdsLinkingTo(pageId: PageId): Set[PageId]
+  def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId]
+  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]
+  def loadPageIdsLinkedFromPost(postId: PostId): Set[PageId] =
+        loadPageIdsLinkedFromPosts(Set(postId))
+  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId]
 
   def insertInvite(invite: Invite): Unit
   def updateInvite(invite: Invite): Boolean

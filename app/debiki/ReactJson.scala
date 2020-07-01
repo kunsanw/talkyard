@@ -986,7 +986,8 @@ class JsonMaker(dao: SiteDao) {
           daoOrTx: SiteDao): Seq[JsObject] = {
     daoOrTx match {
       case dao: SiteDao =>
-        val linkerIds: Set[PageId] = dao.getPageIdsLinkingTo(toPageId)
+        val linkerIds: Set[PageId] =
+              dao.getPageIdsLinkingTo(toPageId, inclDeletedHidden = false)
         val linkersMaybeSee: Map[PageId, PageStuff] =
               dao.getPageStuffById(linkerIds)
         val linkersOkSee: Iterable[PageStuff] =
@@ -1004,7 +1005,8 @@ class JsonMaker(dao: SiteDao) {
 
       /*
       case Right(tx) =>
-        val linkedFromPageIds: Set[PageId] = tx.loadPageIdsLinkingTo(toPageId)
+        val linkedFromPageIds: Set[PageId] =
+              tx.loadPageIdsLinkingTo(toPageId, inclDeletedHidden = false)
         val linkedFromPageMetas: Seq[PageMeta] = tx.loadPageMetas(linkedFromPageIds)
         val linkedFromMaySee = linkedFromPageMetas flatMap { pageMeta =>
           val (maySee, _) = dao.maySeePageUseCache(pageMeta, None, maySeeUnlisted = false)
@@ -1674,6 +1676,7 @@ object JsonMaker {
         (None, post.approvedSource, post.approvedAt.isDefined)
       }
       else if (includeUnapproved) {
+        // Later: Save sanitized html in the post always.  [nashorn_in_tx]
         val htmlString = renderer.renderAndSanitize(post, IfCached.Use)
         (Some(htmlString), Some(post.currentSource), post.isCurrentVersionApproved)
       }

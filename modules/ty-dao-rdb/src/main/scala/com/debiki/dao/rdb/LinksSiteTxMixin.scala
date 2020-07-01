@@ -23,6 +23,7 @@ import java.{sql => js}
 import Rdb._
 import RdbUtil.makeInListFor
 import play.api.libs.json.JsNull
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -170,11 +171,11 @@ trait LinksSiteTxMixin extends SiteTransaction {
             and to_page_id_c = ?
           union
           -- Post to post links. Not implemented (except for here) [post_2_post_ln].
-          select ls.* from posts3 ps inner join links_t ls
-            on ps.site_id = ls.site_id_c
-            and ps.unique_post_id = ls.to_post_id_c
-          where ps.site_id = ?
-            and ps.page_id = ? """
+          select ls.* from posts3 po inner join links_t ls
+            on po.site_id = ls.site_id_c
+            and po.unique_post_id = ls.to_post_id_c
+          where po.site_id = ?
+            and po.page_id = ? """
     val values = List(siteId.asAnyRef, pageId, siteId.asAnyRef, pageId)
     runQueryFindMany(query, values, rs => {
       parseLink(rs)
@@ -182,32 +183,67 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  override def loadPageIdsLinkedFrom(pageId: PageId): Set[PageId] = {
+  def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId] = {
+    loadPageIdsLinkedImpl(Left(pageId))
+  }
+
+
+  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId] = {
+    loadPageIdsLinkedImpl(Right(postIds))
+  }
+
+
+  def loadPageIdsLinkedImpl(pageIdOrPostIds: Either[PageId, Set[PostId]])
+        : Set[PageId] = {
     // Later, do  union  with post—>post links. [post_2_post_ln]
     // Right now, only post to page links.
+    val values = mutable.ArrayBuffer[AnyRef](siteId.asAnyRef)
+    val andWhat = pageIdOrPostIds match {
+      case Left(pageId) =>
+        values.append(pageId)
+        "and po.page_id = ?"
+      case Right(postIds) =>
+        values.appendAll(postIds.map(_.asAnyRef))
+        s"and po.unique_post_id in (${ makeInListFor(postIds) })"
+    }
     val query = s"""
           select distinct ls.to_page_id_c
-          from posts3 ps inner join links_t ls
-             on ps.unique_post_id = ls.from_post_id_c
-            and ps.site_id = ls.site_id_c
-          where ps.site_id = ?
-            and ps.page_id = ?
-          """
-    val values = List(siteId.asAnyRef, pageId)
-    runQueryFindManyAsSet(query, values, rs => {
+          from posts3 po inner join links_t ls
+              on po.unique_post_id = ls.from_post_id_c
+              and po.site_id = ls.site_id_c
+          where po.site_id = ?
+            $andWhat """
+    runQueryFindManyAsSet(query, values.toList, rs => {
       rs.getString("to_page_id_c")
     })
   }
 
 
-  def loadPageIdsLinkingTo(pageId: PageId): Set[PageId] = {
+  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
+    unimplementedIf(inclDeletedHidden, "inclDeletedHidden must be false [TyE593RKD]")
     val query = s"""
-          select distinct ps.page_id
-          from links_t ls inner join posts3 ps
-            on ls.from_post_id_c = ps.unique_post_id and ls.site_id_c = ps.site_id
+          select distinct po.page_id
+          from links_t ls
+              inner join posts3 po
+                  on ls.from_post_id_c = po.unique_post_id and ls.site_id_c = po.site_id
+          ---- (this filters out deleted and hidden things [q_deld_lns])  TESTS_MISSING
+                  -- Need not check approved_* — links aren't added until a new post,
+                  -- or new edits, got approved.
+                  and po.deleted_status = ${DeletedStatus.NotDeleted.toInt}
+                  and po.hidden_at is null
+              inner join pages3 pg
+                  on po.site_id = pg.site_id
+                  and po.page_id = pg.page_id
+                  and pg.deleted_at is null
+              -- Not inner join — it's fine with page not in any category.
+              left join categories3 cs
+                  on pg.site_id = cs.site_id
+                  and pg.category_id = cs.id
+                  and cs.deleted_at is null
+          ---- (END filter)
           where ls.site_id_c = ?
-            and ls.to_page_id_c = ?
-          """
+            and ls.to_page_id_c = ? """
+
     val values = List(siteId.asAnyRef, pageId)
     runQueryFindManyAsSet(query, values, rs => {
       rs.getString("page_id")

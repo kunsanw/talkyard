@@ -55,7 +55,7 @@ trait MessagesDao {
 
     quickCheckIfSpamThenThrow(sentByWho, body, spamRelReqStuff)
 
-    val (pagePath, notfs, sender) = readWriteTransaction { tx =>
+    val (pagePath, notfs, sender) = writeTx { (tx, staleStuff) =>
       val sender = loadUserAndLevels(sentByWho, tx)
 
       // 1) Don't let unpolite users start private-messaging other well behaved users.
@@ -75,7 +75,8 @@ trait MessagesDao {
             pageRole, PageStatus.Published, anyCategoryId = None,
             anyFolder = None, anySlug = None, showId = true,
             title = title, body = body,
-            byWho = sentByWho, spamRelReqStuff = Some(spamRelReqStuff), tx = tx)
+            byWho = sentByWho, spamRelReqStuff = Some(spamRelReqStuff),
+            tx = tx, staleStuff = staleStuff)
 
       // If this is a private topic, they'll get notified about all posts,
       // by default, although no notf pref configured here. [PRIVCHATNOTFS]
@@ -90,7 +91,7 @@ trait MessagesDao {
           Notifications.None
         }
         else {
-          notfGenerator(tx).generateForMessage(sender.user, bodyPost, toUserIds)  // [nashorn_in_tx]
+          notfGenerator(tx).generateForMessage(sender.user, bodyPost, toUserIds)
         }
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(sentByWho.id, nr))

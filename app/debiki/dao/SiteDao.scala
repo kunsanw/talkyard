@@ -194,14 +194,27 @@ class SiteDao(
   private def thisSiteCacheKey = siteCacheKey(this.siteId)
 
 
-  def writeTx[R](retry: Boolean, allowOverQuota: Boolean = false)(
-          fn: SiteTransaction => R): R = {
+  def writeTx[R](fn: (SiteTransaction, StaleStuff) => R): R = {
+    writeTx()(fn)
+  }
+
+
+  def writeTx[R](retry: Boolean = false, allowOverQuota: Boolean = false)(
+          fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
-    readWriteTransaction(fn, allowOverQuota)
+    val staleStuff = new StaleStuff()
+    val r = readWriteTransaction(tx => {
+      val r = fn(tx, staleStuff)
+      tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
+      r
+    }, allowOverQuota)
+    staleStuff.stalePageIdsInDb foreach refreshPageInMemCache
+    r
   }
 
 
   RENAME // to writeTx
+  @deprecated("now", "use writeTx { (tx, staleStuff) => ... } instead")
   def readWriteTransaction[R](fn: SiteTransaction => R, allowOverQuota: Boolean = false): R = {
     // Serialize writes per site. This avoids all? transaction rollbacks because of
     // serialization errors in Postgres (e.g. if 2 people post 2 comments at the same time).

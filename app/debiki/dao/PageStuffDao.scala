@@ -141,8 +141,6 @@ trait PageStuffDao {
         JsonMaker.htmlToExcerpt(html, length, firstParagraphOnly)
       })
 
-      val linkedFromPageIds = transaction.loadPageIdsLinkingTo(pageId)
-
       val summary = PageStuff(
         pageId,
         pageMeta,

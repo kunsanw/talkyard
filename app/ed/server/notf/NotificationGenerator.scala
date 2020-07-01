@@ -62,11 +62,16 @@ case class NotificationGenerator(
       toDelete = notfsToDelete.toVector)
 
 
-  def generateForNewPost(page: Page, newPost: Post, anyNewTextAndHtml: Option[TextAndHtml],
+  def generateForNewPost(page: Page, newPost: Post, sourceAndHtml: Option[SourceAndHtml],
         anyReviewTask: Option[ReviewTask],
         skipMentions: Boolean = false): Notifications = {
 
     require(page.id == newPost.pageId, "TyE74KEW9")
+
+    if (newPost.isTitle)
+      return generatedNotifications  // [no_title_notfs]
+
+    val anyNewTextAndHtml = sourceAndHtml.map(_.asInstanceOf[TextAndHtml])
 
     // A new embedded discussions page shouldn't generate a notification, [new_emb_pg_notf]
     // because those pages are lazy auto created – and uninteresting event.
@@ -144,7 +149,7 @@ case class NotificationGenerator(
     BUG // harmless. If a mention is removed, and added back, a new notf is sent. TyT2ABKS057
     // Probably don't want that?
     if (!skipMentions) {
-      val mentionedUsernames = anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(  // [nashorn_in_tx]
+      val mentionedUsernames = anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(  // [nashorn_in_tx] [save_post_lns_mentions]
             newPost.approvedSource getOrDie "DwE82FK4", site, nashorn)
 
       var mentionedMembers: Set[Participant] = mentionedUsernames.flatMap(tx.loadMemberByUsername)
@@ -584,8 +589,7 @@ case class NotificationGenerator(
       case _: TitleSourceAndHtml =>
         // Currently titles cannot mention people, and editing it generates no notfs.
         // However, maybe later staff wants to get notified if titles of "important"
-        // pages somehow get changed.
-        // For now, do nothing though.
+        // pages somehow get changed. For now, do nothing though. [no_title_notfs]
         return Notifications.None  // or: return generatedNotifications? the same?
       case x: TextAndHtml =>
         x
@@ -601,10 +605,10 @@ case class NotificationGenerator(
     }
 
     val oldMentions: Set[String] =
-          findMentions(oldPost.approvedSource getOrDie "TyE0YKW3", site, nashorn)
+          findMentions(oldPost.approvedSource getOrDie "TyE0YKW3", site, nashorn)  // [nashorn_in_tx]
 
     val newMentions: Set[String] =
-          anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(
+          anyNewTextAndHtml.map(_.usernameMentions) getOrElse findMentions(  // [nashorn_in_tx]
                 newPost.approvedSource getOrDie "DwE2BF81", site, nashorn)
 
     val deletedMentions = oldMentions -- newMentions
