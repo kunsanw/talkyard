@@ -1446,17 +1446,28 @@ trait PostsDao {
     var numOrigPostVisibleRepliesGone = 0
     var numOrigPostVisibleRepliesBack = 0
 
-    def updateNumVisible(postBefore: Post, postAfter: Post): Unit = {
+    val uncacheBacklinksFromPostIds = mutable.Set[PostId]()
+
+    def rememberBacklinksUpdCounts(postBefore: Post, postAfter: Post): Unit = {
+      if (postBefore.isVisible == postAfter.isVisible)
+        return
+
+      // The post got un/deleted, or un/hidden — so now internal links might
+      // have dis/appeared. Remember this post id, so we can uncache pages
+      // it links to, so their backlinks get refreshed.
+      uncacheBacklinksFromPostIds += postBefore.id
+
       if (!postBefore.isReply)
         return
-      if (postBefore.isVisible && !postAfter.isVisible) {
+
+      if (!postAfter.isVisible) {
         dieIf(numVisibleRepliesBack > 0, "EdE6PK4W0")
         numVisibleRepliesGone += 1
         if (postBefore.isOrigPostReply) {
           numOrigPostVisibleRepliesGone += 1
         }
       }
-      if (!postBefore.isVisible && postAfter.isVisible) {
+      if (postAfter.isVisible) {
         dieIf(numVisibleRepliesGone > 0, "EdE7BST2Z")
         numVisibleRepliesBack += 1
         if (postBefore.isOrigPostReply) {
@@ -1479,7 +1490,7 @@ trait PostsDao {
       case PSA.DeleteTree => postBefore.copyWithNewStatus(now, userId, treeDeleted = true)
     }
 
-    updateNumVisible(postBefore, postAfter = postAfter)
+    rememberBacklinksUpdCounts(postBefore, postAfter = postAfter)
 
     val postsDeleted = ArrayBuffer[Post]()
     val postsUndeleted = ArrayBuffer[Post]()
@@ -1520,7 +1531,7 @@ trait PostsDao {
 
       var postsToReindex = Vector[Post]()
       anyUpdatedSuccessor foreach { updatedSuccessor =>
-        updateNumVisible(postBefore = successor, postAfter = updatedSuccessor)
+        rememberBacklinksUpdCounts(postBefore = successor, postAfter = updatedSuccessor)
         tx.updatePost(updatedSuccessor)
         if (successor.isDeleted != updatedSuccessor.isDeleted) {
           postsToReindex :+= updatedSuccessor
@@ -1531,12 +1542,12 @@ trait PostsDao {
 
     // ----- Update related things
 
-    if (postsDeleted.nonEmpty || postsUndeleted.nonEmpty) {
+    if (uncacheBacklinksFromPostIds.nonEmpty) {
       // Uncache backlinked pages. [uncache_blns]
       // (We don't delete links, when soft-deleting a post or page. Instead, such
       // links are filtered out when querying. [q_deld_lns] )
-      val changedPostIds = postsDeleted.map(_.id).toSet ++ postsUndeleted.map(_.id).toSet
-      val staleBacklinksPageIds = tx.loadPageIdsLinkedFromPosts(changedPostIds)
+      val staleBacklinksPageIds = tx.loadPageIdsLinkedFromPosts(
+            uncacheBacklinksFromPostIds.toSet)
       staleStuff.addPageIds(staleBacklinksPageIds)
     }
 
@@ -2116,7 +2127,6 @@ trait PostsDao {
     if (wasHidden) {
       postsHidden :+= postAfter
       refreshPageInMemCache(pageId)
-      SHOULD // temp hide links too, and refresh linked pages
     }
     postsHidden
   }
@@ -2124,7 +2134,7 @@ trait PostsDao {
 
   private def doFlagPost(pageId: PageId, postNr: PostNr, flagType: PostFlagType,
         flaggerId: UserId): (Post, Boolean) = {
-    readWriteTransaction { tx =>
+    writeTx { (tx, staleStuff) =>
       val flagger = tx.loadTheUser(flaggerId)
       val postBefore = tx.loadThePost(pageId, postNr)
       val pageMeta = tx.loadThePageMeta(pageId)
@@ -2149,7 +2159,7 @@ trait PostsDao {
       // Hide post, update page?
       val shallHide = newNumFlags >= settings.numFlagsToHidePost && !postBefore.isBodyHidden
       if (shallHide) {
-        hidePostsOnPage(Vector(postAfter), pageId, "This post was flagged")(tx)
+        hidePostsOnPage(Vector(postAfter), pageId, "This post was flagged")(tx, staleStuff)
       }
       else {
         tx.updatePost(postAfter)
@@ -2169,7 +2179,7 @@ trait PostsDao {
   private def ifBadAuthorCensorEverything(post: Post): immutable.Seq[Post] = {
     val userId = post.createdById
     val pageIdsToRefresh = mutable.Set[PageId]()
-    val postsHidden = readWriteTransaction { tx =>
+    val postsHidden = writeTx { (tx, staleStuff) =>
       val user = tx.loadParticipant(userId) getOrDie "EdE6FKW02"
       if (user.effectiveTrustLevel != TrustLevel.NewMember)
         return Nil
@@ -2234,7 +2244,7 @@ trait PostsDao {
 
       // Find the user's posts — we'll hide them.
       // (The whole page gets hidden by hidePostsOnPage() below, if all posts get hidden.)
-      val postToMaybeHide =
+      val postsToMaybeHide =
         if (user.isMember) {
           tx.loadPostsByQuery(limit = numThings, OrderBy.MostRecentFirst,
                 byUserId = Some(userId), includeTitlePosts = false,
@@ -2247,21 +2257,20 @@ trait PostsDao {
 
       // Don't hide posts that have been reviewed and deemed okay.
       // (Hmm, could hide them anyway if they were edited later ... oh now gets too complicated.)
-      val postToHide = postToMaybeHide filter { post =>
+      val postsToHide = postsToMaybeHide filter { post =>
         // This is O(n^2), so keep numThings small (6WKUT02), like <= 100.
         val anyReviewTask = tasks.find(_.postId.contains(post.id))
         !anyReviewTask.exists(_.decision.exists(_.isFine))
       }
 
-      val postToHideByPage = postToHide.groupBy(_.pageId)
+      val postToHideByPage = postsToHide.groupBy(_.pageId)
       for ((pageId, posts) <- postToHideByPage) {
-        hidePostsOnPage(posts, pageId, "Many posts by this author got flagged, hiding all")(tx)
+        hidePostsOnPage(posts, pageId, "Many posts by this author got flagged, hiding all")(
+              tx, staleStuff)
         pageIdsToRefresh += pageId
       }
 
-      SHOULD // hide links too, and refresh linked pages
-
-      postToHide
+      postsToHide
     }
 
     removeUserFromMemCache(userId)
@@ -2285,7 +2294,7 @@ trait PostsDao {
 
 
   private def hidePostsOnPage(posts: Iterable[Post], pageId: PageId, reason: String)(
-        tx: SiteTransaction): Unit = {
+        tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
     dieIf(posts.exists(_.pageId != pageId), "EdE7GKU23Y4")
     dieIf(posts.exists(_.isTitle), "EdE5KP0WY2") ; SECURITY ; ANNOYING // end users can trigger internal error
     val postsToHide = posts.filter(!_.isBodyHidden)
@@ -2309,6 +2318,10 @@ trait PostsDao {
 
       tx.updatePost(postAfter)
     }
+
+    // Uncache backlinked pages. [uncache_blns]
+    val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsToHide.map(_.id).toSet)
+    staleStuff.addPageIds(linkedPageIds)
 
     var pageMetaAfter = pageMetaBefore.copy(
       numRepliesVisible = pageMetaBefore.numRepliesVisible - numRepliesHidden,
