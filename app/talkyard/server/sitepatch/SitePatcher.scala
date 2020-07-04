@@ -606,6 +606,8 @@ case class SitePatcher(globals: debiki.Globals) {
             TESTS_MISSING // this test: [2WBKP05] commented out, assumes isn't indexed.
             tx.indexPostsSoon(postReal)
 
+            // Backlinks  [imp_exp_blns] [readlater]
+
             postsRealByTempId.put(postInPatch.id, postReal)
             postsRealByTempPagePostNr.put(postInPatch.pagePostNr, postReal)
 
@@ -1303,6 +1305,8 @@ case class SitePatcher(globals: debiki.Globals) {
         }
         else {
           tx.indexPostsSoon(post) // [TyT036WKHW2]
+
+          // Backlinks  [imp_exp_blns] [readlater]
         }
       }
 
