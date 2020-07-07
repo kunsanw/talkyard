@@ -441,6 +441,9 @@ export class TyE2eTestBrowser {
     // inside be just an empty obj {}.  — Mabe I forgot 'this'? Should be: this.$().
     // Anyway, this wait fn logs a message about what we're waiting for, can be nice.
     //
+    // Returns true iff the event / condition happened, that is, if fn()
+    // returned true before timeout.
+    //
     waitUntil(fn: () => Boolean, ps: {
         timeoutMs?: number,
         timeoutIsFine?: boolean,
@@ -852,9 +855,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    switchToFrame(selector: string) {
+    switchToFrame(selector: string, ps: { timeoutMs?: number } = {}) {
       printBoringToStdout(`Switching to frame ${selector}...`);
-      this.waitForExist(selector);
+      this.waitForExist(selector, ps);
       const iframe = this.$(selector);
       this.#br.switchToFrame(iframe);
       printBoringToStdout(` done, now in frame  ${selector}.\n`);
@@ -1261,8 +1264,8 @@ export class TyE2eTestBrowser {
         message: `Waiting until exists:  ${selector}`,
       });
 
-      if (ps.howMany && ps.howMany >= 2) {
-        this.waitForAtLeast(ps.howMany, selector);
+      if (ps.howMany) {
+        this.waitForExactly(ps.howMany, selector);
       }
     }
 
@@ -1343,25 +1346,42 @@ export class TyE2eTestBrowser {
     _waitForClickable (selector: string,  // RENAME? to scrollToAndWaitUntilCanInteract
           opts: { maybeMoves?: boolean, timeoutMs?: number, mayScroll?: boolean,
               okayOccluders?: string, waitUntilNotOccluded?: boolean } = {}) {
-      this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
-      this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
-      if (opts.mayScroll !== false) {
-        this.scrollIntoViewInPageColumn(selector);
-      }
-      if (opts.maybeMoves) {
-        this.waitUntilDoesNotMove(selector);
-      }
+      this.waitUntil(() => {   // CR_DONE this fn, 07-14
+        this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
+        this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
+        if (opts.mayScroll !== false) {
+          this.scrollIntoViewInPageColumn(selector);
+        }
+        if (opts.maybeMoves) {
+          this.waitUntilDoesNotMove(selector);
+        }
 
-      // Sometimes, a not-yet-done-loading-data-from-server overlays the element and steals
-      // any click. Or a modal dialog, or nested modal dialog, that is fading away, steals
-      // the click. Unless:
-      if (opts.waitUntilNotOccluded !== false) {
-        this.waitUntilElementNotOccluded(selector, { okayOccluders: opts.okayOccluders });
-      }
-      else {
-        // We can at least do this — until then, nothing is clickable.
-        this.waitUntilLoadingOverlayGone();
-      }
+        // Sometimes, a not-yet-done-loading-data-from-server overlays the element and steals
+        // any click. Or a modal dialog, or nested modal dialog, that is fading away, steals
+        // the click. Unless:
+        if (opts.waitUntilNotOccluded !== false) {
+          const notOccluded = this.waitUntilElementNotOccluded(
+                  selector, { okayOccluders: opts.okayOccluders, timeoutMs: 700,
+                      timeoutIsFine: true });
+          if (notOccluded)
+            return true;
+
+          // Else: This can happen if something above `selector`, maybe an iframe or
+          // image, just finished loading, and is a bit tall so it pushed `selector`
+          // downwards, outside the viewport. Then, waitUntilElementNotOccluded() times
+          // out, returns false.
+          // — Maybe we need to scroll down to `selector` again, at its new position,
+          // so run this fn again (waitUntil() above will do for us).
+        }
+        else {
+          // We can at least do this — until then, nothing is clickable.
+          this.waitUntilLoadingOverlayGone();
+          return true;
+        }
+      }, {
+        timeoutMs: opts.timeoutMs,
+        message: `Waiting for  ${selector}  to be clickable`
+      });
     }
 
 
@@ -1486,11 +1506,13 @@ export class TyE2eTestBrowser {
       this.waitUntilGone('.fade.modal');
     }
 
+    // Returns true iff the elem is no longer occluded.
+    //
     waitUntilElementNotOccluded(selector: string, opts: {
-          okayOccluders?: string, timeoutMs?: number, timeoutIsFine?: boolean } = {}) {
+          okayOccluders?: string, timeoutMs?: number, timeoutIsFine?: boolean } = {}): boolean {
       dieIf(!selector, '!selector,  [TyE7WKSH206]');
       let result: string | true;
-      this.waitUntil(() => {
+      return this.waitUntil(() => {
         result = <string | true> this.#br.execute(function(selector, okayOccluders): boolean | string {
           var elem = document.querySelector(selector);
           if (!elem)
@@ -1563,22 +1585,28 @@ export class TyE2eTestBrowser {
     }
 
     waitForAtLeast(num: number, selector: string) {
-      let numNow = 0;
-      this.waitUntil(() => {
-        numNow = this.count(selector);
-        return numNow >= num;
-      }, {
-        message: () => `Waiting for >= ${num}  ${selector}  there are only: ${numNow}`
-      });
+      this._waitForHowManyImpl(num, selector, '>= ');
     }
 
     waitForAtMost(num: number, selector: string) {
+      this._waitForHowManyImpl(num, selector, '<= ');
+    }
+
+    waitForExactly(num: number, selector: string) {
+      this._waitForHowManyImpl(num, selector, '');
+    }
+
+    _waitForHowManyImpl(num: number, selector: string, compareHow: '>= ' | '<= ' | '') {
       let numNow = 0;
       this.waitUntil(() => {
         numNow = this.count(selector);
-        return numNow <= num;
+        switch (compareHow) {
+          case '>= ': return numNow >= num;
+          case '<= ': return numNow <= num;
+          default: return numNow === num;
+        }
       }, {
-        message: () => `Waiting for <= ${num}  ${selector}  there are: ${numNow}`
+        message: () => `Waiting for ${compareHow}${num}  ${selector}  there are: ${numNow}`
       });
     }
 
@@ -1673,6 +1701,12 @@ export class TyE2eTestBrowser {
 
           if (opts.append) {
             dieIf(!value, 'TyE29TKP0565');
+            // Move the cursor to the end — it might be at the beginning, if text got
+            // loaded from the server and inserted after [the editable elem had appeared
+            // already, with the cursor at the beginning].
+            this.focus(selector);
+            this.#br.keys(Array('Control', 'End'));
+            // Now we can append.
             elem.addValue(value);
           }
           else if (_.isNumber(value)) {
@@ -4257,12 +4291,12 @@ export class TyE2eTestBrowser {
 
     linkPreview = {
       waitUntilLinkPreviewMatches: (ps: { postNr: PostNr, timeoutMs?: number,
-            regex: string | RegExp, whicLinkPreviewSelector?: string,
+            regex: string | RegExp, whichLinkPreviewSelector?: string,
             inSandboxedIframe: boolean }) => {
-        const linkPrevwSel = ' .s_LnPv' + (ps.whicLinkPreviewSelector || '');
+        const linkPrevwSel = ' .s_LnPv' + (ps.whichLinkPreviewSelector || '');
         if (ps.inSandboxedIframe) {
           this.topic.waitForExistsInIframeInPost({ postNr: ps.postNr,
-                iframeSelector: linkPrevwSel + ' iframe', //'.s_LnPv' + (ps.whicLinkPreviewSelector || '')
+                iframeSelector: linkPrevwSel + ' iframe',
                 textToMatch: ps.regex,
                 timeoutMs: ps.timeoutMs });
         }
@@ -4294,16 +4328,15 @@ export class TyE2eTestBrowser {
       },
 
       waitUntilPreviewHtmlMatches: (text: string,
-            opts: { where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string }) => {
+            opts: { where: 'InEditor' | 'InPage', whichLinkPreviewSelector?: string }) => {
         this.preview.__checkPrevw(opts, (prevwSelector: string) => {
           this.waitUntilHtmlMatches(prevwSelector, text);
         });
       },
 
       // ^--REMOVE, use --v  instead
-      waitUntilPreviewTextMatches: (
-            regex: string | RegExp, opts: {
-                  where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string,
+      waitUntilPreviewTextMatches: (regex: string | RegExp,
+            opts: { where: 'InEditor' | 'InPage', whichLinkPreviewSelector?: string,
                   inSandboxedIframe: boolean }) => {
         this.preview.__checkPrevw(opts, (prevwSelector: string) => {
           if (opts.inSandboxedIframe) {
@@ -4312,14 +4345,14 @@ export class TyE2eTestBrowser {
             this.switchToTheParentFrame();
           }
           else {
-            this.waitUntilTextMatches(prevwSelector, regex);
+            this.waitUntilTextMatches(`${prevwSelector}.s_LnPv`, regex);  // or just prevwSelector ?
           }
         });
       },
 
       __checkPrevw: <R>(opts: { where: 'InEditor' | 'InPage',
-              whicLinkPreviewSelector?: string }, fn: (string) => R): R => {
-        const lnPvSelector = opts.whicLinkPreviewSelector || '';
+              whichLinkPreviewSelector?: string }, fn: (string) => R): R => {
+        const lnPvSelector = opts.whichLinkPreviewSelector || '';
         if (opts.where === 'InEditor') {
           this.switchToEmbEditorIframeIfNeeded();
           return fn(`${this.preview.__inEditorPreviewSelector} ${lnPvSelector}`);
@@ -4560,7 +4593,7 @@ export class TyE2eTestBrowser {
             thingInIframeSelector?: string, textToMatch?: string | RegExp,
             timeoutMs?: number, howMany?: number }) => {
         const complIfrSel = this.topic.postBodySelector(ps.postNr) + ' ' + ps.iframeSelector;
-        this.switchToFrame(complIfrSel);
+        this.switchToFrame(complIfrSel, { timeoutMs: ps.timeoutMs });
         const thingInIframeSelector = ps.thingInIframeSelector || 'body';
         this.waitForExist(thingInIframeSelector, { timeoutMs: ps.timeoutMs });
         if (ps.textToMatch) {

@@ -1,5 +1,7 @@
 /// <reference path="../test-types.ts"/>
 
+// CR_DONE  07-13
+
 import * as _ from 'lodash';
 import assert = require('../utils/ty-assert');
 import server = require('../utils/server');
@@ -12,7 +14,6 @@ import c = require('../test-constants');
 
 let browser: TyE2eTestBrowser;
 
-let everyone;
 let owen;
 let owensBrowser: TyE2eTestBrowser;
 let maria;
@@ -22,12 +23,8 @@ let idAddress: IdAddress;
 let forumTitle = "Editor Onebox Forum";
 let tweetTopicTitle = "Tweet Topic Title";
 
-let dotOneboxClass = '.onebox';
-
-
-
-const brokenPreview = '.s_LnPv-Err';
-const tweetPrevwOk  = `.s_LnPv-Twitter:not(${brokenPreview})`;
+const brokenPreview   = '.s_LnPv-Err';
+const tweetPrevwOk    = `.s_LnPv-Twitter:not(${brokenPreview})`;
 const tweetPrevwError = `.s_LnPv-Twitter${brokenPreview}`;
 
 
@@ -35,7 +32,6 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
 
   it("initialize people", () => {
     browser = new TyE2eTestBrowser(wdioBrowser);
-    everyone = browser;
     owen = make.memberOwenOwner();
     owensBrowser = browser;
     maria = make.memberMaria();
@@ -43,7 +39,7 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
   });
 
   it("import a site", () => {
-    let site: SiteData = make.forumOwnedByOwen('editor-onebox', { title: forumTitle });
+    let site: SiteData = make.forumOwnedByOwen('tweets-forum', { title: forumTitle });
     site.settings.allowGuestLogin = true;
     site.settings.requireVerifiedEmail = false;
     site.members.push(maria);
@@ -60,7 +56,7 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
     owensBrowser.forumButtons.clickCreateTopic();
   });
 
-  it("Owen types a title", () => {
+  it("... types a title", () => {
     owensBrowser.editor.editTitle(tweetTopicTitle);
   });
 
@@ -73,9 +69,12 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
           // 'https://twitter.com/jacindaardern/status/1106397870628847617'
   });
 
-  it("The tweet link becomes a Twitter Tweet Preview iframe", () => {
-    // Something in here timed out once. So do in two steps, simpler to troubleshoot. First: ...
+  it("The tweet link becomes a Twitter Tweet preview", () => {
     owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor' });
+  });
+
+  it("Wait until any editor pending refresh done, otherwise can mess up test", () => {
+    owensBrowser.pause(333 + 100);  // [upd_ed_pv_delay]
   });
 
 
@@ -157,6 +156,12 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
     owensBrowser.preview.waitForExist(tweetPrevwError, { where: 'InEditor' });
   });
 
+  /* No they're still there, doesn't really matter.
+  it("... but the in-page previews are gone", () => {
+    assert.not(owensBrowser.preview.exists(tweetPrevwOk, { where: 'InPage' }));
+    assert.not(owensBrowser.preview.exists(tweetPrevwError, { where: 'InPage' }));
+  }); */
+
   it("Owen tiles the editor horizontally", () => {
     owensBrowser.waitAndClick('.esEdtr_cycleMaxHzBtn');
   });
@@ -173,17 +178,17 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
   // ----- Two tweets
 
   it("Owen adds text and a 2nd not-broken tweet", () => {
-    /// Ooops this once appended in the middle of the text :- (
-    // on my lt-19 but not lt-17  weird
     owensBrowser.editor.editText('\n\n' +
           'Wow_wow!\n\n' +
           'https://twitter.com/GreatOzGovTweet/status/707747970695962624',
           { append: true });
+  });
 
+  it("... the new tweet appears in the preview, so now 2 ok tweets", () => {
     owensBrowser.preview.waitForExist(tweetPrevwOk, { where: 'InEditor', howMany: 2 });
   });
 
-  it("... saves", () => {
+  it("Owne saves", () => {
     owensBrowser.editor.save();
   });
 
@@ -196,7 +201,7 @@ describe("Twitter link previews  TyT0JSM8PF68", () => {
   });
 
   it("... and the broken tweet too", () => {
-    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwError);
+    owensBrowser.topic.waitForExistsInPost(c.BodyNr, tweetPrevwError, { howMany: 1 });
   });
 
 });

@@ -15,25 +15,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.onebox.engines
+// CR_DONE except for rename file to  LinkPreviewEngines
+
+package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.Globals
+import debiki.{Globals, TextAndHtml}
+import debiki.onebox.{InstantLinkPrevwRendrEng, LinkPreviewProblem}
+import org.scalactic.{Bad, Good, Or}
 import scala.util.matching.Regex
 
 
-// These oEmbed engines are sorted alphabetically, index:   (Soon)
-// Facebook posts
-// Facebook videos
-// Instagram
-// Reddit
-// TikTok
-// Twitter
-// YouTube
+// These oEmbed engines are sorted alphabetically, index:
+//   - Facebook posts
+//   - Facebook videos
+//   - Instagram
+//   - Reddit
+//   - Telegram
+//   - TikTok
+//   - Twitter
+//   - YouTube
 
 
-// ===== Facebook posts
+
+// ====== Facebook posts
 
 
 object FacebookPostPrevwRendrEng {
@@ -90,27 +96,23 @@ object FacebookPostPrevwRendrEng {
 
 
 class FacebookPostPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Facebook")
-  def widgetName = "Facebook post"
+  def widgetName = "post"
   def providerLnPvCssClassName = "s_LnPv-FbPost"
   def providerEndpoint = "https://www.facebook.com/plugins/post/oembed.json"
-  //override def sanitizeInsteadOfSandbox = true
-  override def sandboxInIframe = false
+  // override def sandboxInIframe = false
   override def handles(url: String): Boolean = FacebookPostPrevwRendrEng.handles(url)
 }
 
 
 
-// ===== Facebook videos
+// ====== Facebook videos
 
 
 object FacebookVideoPrevwRendrEng {
-
-  // maxwidth=...
-  // omitscript=...
 
   // Facebook videos URL scheme, from https://oembed.com:
   //
@@ -125,7 +127,7 @@ object FacebookVideoPrevwRendrEng {
   //   https://www.facebook.com/video.php?id={video-id}
   //   https://www.facebook.com/video.php?v={video-id}
   //
-  // Response looks like:
+  // FB's response looks like:
   //   {
   //     "author_name": "Facebook",
   //     "author_url": "https://www.facebook.com/facebook/",
@@ -133,7 +135,9 @@ object FacebookVideoPrevwRendrEng {
   //     "provider_name": "Facebook",
   //     "success": true,
   //     "height": null,
-  //     "html": "<div id=\"fb-root\"></div>\n<script>(function(d, s, id) {\n  var js, fjs = d.getElementsByTagName(s)[0];\n  if (d.getElementById(id)) return;\n  js = d.createElement(s); js.id = id;\n  js.src = \"https://connect.facebook.net/en_US/sdk.js#xfbml=1&amp;version=v2.9\";\n  fjs.parentNode.insertBefore(js, fjs);\n}(document, 'script', 'facebook-jssdk'));</script><div class=\"fb-video\" data-href=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><div class=\"fb-xfbml-parse-ignore\"><blockquote cite=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><a href=\"https://www.facebook.com/facebook/videos/10153231379946729/\">How to Share With Just Friends</a><p>How to share with just friends.</p>Posted by <a href=\"https://www.facebook.com/facebook/\">Facebook</a> on Friday, December 5, 2014</blockquote></div></div>",
+  //     "html": "<div id=\"fb-root\"></div>\n<script>...</script>
+  //               <div class=\"fb-video\" data-href=\"https://www.facebook.com/...">...
+  //               <blockquote ...",
   //     "type": "video",
   //     "version": "1.0",
   //     "url": "https://www.facebook.com/facebook/videos/10153231379946729/",
@@ -160,11 +164,11 @@ object FacebookVideoPrevwRendrEng {
 
 
 class FacebookVideoPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Facebook")
-  def widgetName = "Facebook post"
+  def widgetName = "video"
   def providerLnPvCssClassName = "s_LnPv-FbVideo"
   def providerEndpoint = "https://www.facebook.com/plugins/video/oembed.json"
   override def handles(url: String): Boolean = FacebookVideoPrevwRendrEng.handles(url)
@@ -172,7 +176,7 @@ class FacebookVideoPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch:
 
 
 
-// ===== Instagram
+// ====== Instagram
 
 
 object InstagramPrevwRendrEng {
@@ -207,22 +211,101 @@ object InstagramPrevwRendrEng {
 }
 
 class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Instagram")
-  def widgetName = "Instagram post"
+  def widgetName = "post"
   def providerLnPvCssClassName = "s_LnPv-Instagram"
   def providerEndpoint = "https://api.instagram.com/oembed"
   override def regex: Regex = InstagramPrevwRendrEng.regex
 }
 
 
+//CR_DONE
+// ====== Internal links
 
-// ===== Reddit
+// Talkayrd internal links, i.e. to other pages within the same site.
 
-// Reddit's embedding script is buggy: it breaks in Talkyard's sandboxed iframe,
-// when it cannot access document.cookie. It won't render any link preview
+class InternalLinkPrevwRendrEng(globals: Globals, siteId: SiteId)
+  extends InstantLinkPrevwRendrEng(globals) {
+
+  def providerLnPvCssClassName: String = "s_LnPv-Int"
+
+  override def providerName: Option[String] = None
+  override def alreadySanitized = true
+  override def addViewAtLink = false
+
+
+  override def handles(url: String): Boolean = {
+    val uri = new java.net.URI(url)
+    val domainOrAddress: String = uri.getHost  // can be null, fine
+
+    // If no hostname, then it's a local link (right?).
+    if (domainOrAddress eq null)
+      return true
+
+    val site = globals.siteDao(siteId).getSite() getOrElse {
+      return false // weird
+    }
+
+    site.allHostnames.contains(domainOrAddress)  // [find_int_links]
+  }
+
+
+  protected def renderInstantly(unsafeUrl: String): Good[String] = {
+    COULD_OPTIMIZE // have handles(url) above pass back the URI and pass on to this fn,
+    // so ned not parse the url again? — Don't use any state, better stay thread safe.
+    val uri = new java.net.URI(unsafeUrl)
+
+    val urlPath = uri.getPathEmptyNotNull
+
+    // If the link is broken, let's use the link url as the visible text — that's
+    // a [good enough hint for the person looking at the edits preview] that
+    // the link doesn't work? (when a linked page preview won't appear)
+    var unsafeTitle = unsafeUrl
+    var unsafeExcerpt = ""
+
+    val dao = globals.siteDao(siteId)
+    dao.getPagePathForUrlPath(urlPath) match {
+      case None =>
+      case Some(pagePath) =>
+        dao.getOnePageStuffById(pagePath.pageId) match {
+          case None =>
+          case Some(pageStuff) =>
+            unsafeTitle = pageStuff.title
+            val inline = false  // for now
+            if (!inline) {
+              unsafeExcerpt = pageStuff.bodyExcerpt.getOrElse("").trim
+            }
+        }
+    }
+
+    val safeUrlAttr = TextAndHtml.safeEncodeForHtmlAttrOnly(unsafeUrl)
+    val safeTitle = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeTitle)
+    val safeLink = s"""<a href="$safeUrlAttr">$safeTitle</a>"""
+    var safePreview =
+          if (unsafeExcerpt.isEmpty) safeLink
+          else {
+            val safeExcerpt = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeExcerpt)
+            s"""<div>$safeLink</div><blockquote>$safeExcerpt</blockquote>"""
+          }
+
+    // Not needed, do anyway:
+    safePreview = TextAndHtml.sanitizeInternalLinksAndQuotes(safePreview)
+
+    Good(safePreview)
+  }
+
+}
+
+
+
+// ====== Reddit
+
+
+// Reddit's embedding script is buggy [buggy_oembed]: it breaks in Talkyard's sandboxed
+// iframe, when it cannot access document.cookie. It won't render any link preview
 // — *however*, reddit comment replies use another Reddit script,
 // which works (not buggy).
 //
@@ -250,12 +333,13 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 //  - https://www.reddit.com/r/*/comments/*/*
 
 object RedditPrevwRendrEng {
-  val regex: Regex =
-    """^https://(www\.)?(reddit\.com|instagr\.am)/r/[^/]+/comments/[^/]+/.*$""".r
+
+  val regex: Regex = """^https://(www\.)?reddit\.com/r/[^/]+/comments/[^/]+/.*$""".r
+
 }
 
 class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Reddit")
@@ -267,10 +351,103 @@ class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 
 
 
-// ===== TikTok
+// ====== Telegram
 
-// TikTok's embed script (they include in the oEmbed html field) is buggy —
-// it breaks when it cannot access localStorage in Talkyard's sandboxed iframe:
+
+object TelegramPrevwRendrEng {
+
+  val regex: Regex = """^https://t\.me/([a-zA-Z0-9]+/[0-9]+)$""".r
+
+}
+
+class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
+
+  override def regex: Regex =
+    TelegramPrevwRendrEng.regex
+
+  def providerLnPvCssClassName = "s_LnPv-Telegram"
+
+  override def alreadySanitized = true
+
+
+  def renderInstantly(unsafeUrl: String): String Or LinkPreviewProblem = {
+    val messageId = (regex findGroupIn unsafeUrl) getOrElse {
+      return Bad(LinkPreviewProblem(
+            "Couldn't find message id in Telegram link",
+            unsafeUrl = unsafeUrl, "TyE0TLGRMID"))
+    }
+
+    //"durov/68" "telegram/83"
+
+    val safeMessageId = TextAndHtml.safeEncodeForHtmlAttrOnly(messageId)
+
+    // Look at the regex — messageId should be safe already.
+    dieIf(safeMessageId != messageId, "TyE50SKDGJ5")
+
+    // This is what Telegram's docs says we should embed: ...
+    /*
+    val unsafeScriptWithMessageId =
+          """<script async src="https://telegram.org/js/telegram-widget.js?9" """ +
+            s"""data-telegram-post="$safeMessageId" data-width="100%"></script>"""
+
+    val safeHtml = sandboxedLinkPreviewIframeHtml(
+          unsafeUrl = unsafeUrl, unsafeHtml = unsafeScriptWithMessageId,
+          unsafeProviderName = Some("Telegram"),
+          extraLnPvCssClasses = extraLnPvCssClasses)
+
+    return Good(safeHtml)   */
+
+    // ... HOWEVER then Telegram refuses to show that contents — because
+    // Telegram creates an iframe that refuses to appear when nested in
+    // Talkyard's sandboxed iframe.  [buggy_oembed]
+    // There's this error:
+    //   68:1 Access to XMLHttpRequest at 'https://t.me/durov/68?embed=1' from
+    //   origin 'null' has been blocked by CORS policy: No 'Access-Control-Allow-Origin'
+    //   header is present on the requested resource.
+    // Happens in Telegram's  'initWidget',
+    //   https://telegram.org/js/telegram-widget.js?9   line 199:
+    //       widgetEl.parentNode.insertBefore(iframe, widgetEl);
+    // apparently Telegram loads its own iframe, but that won't work, because
+    // Talkyard's sandboxed iframe is at cross-origin domain "null",
+    // and becasue (?) Telegram's iframe request has:
+    //    Sec-Fetch-Site: cross-site
+    // but Telegram's response lacks any Access-Control-Allow-Origin header.
+
+    // Instead, let's load the Telegram iframe ourselves instead;
+    // this seems to work:
+
+    // Iframe sandbox permissions. [IFRMSNDBX]
+    val permissions =
+          "allow-popups " +
+          "allow-popups-to-escape-sandbox " +
+          "allow-top-navigation-by-user-activation"
+
+    // So let's copy-paste Telegram's iframe code to here, and sandbox it.
+    // This'll be slightly fragile, in that it'll break if Telegram makes "major"
+    // change to their iframe and its url & params.
+    val safeTelegramIframeUrl =
+          TextAndHtml.safeEncodeForHtmlAttrOnly(s"$unsafeUrl?embed=1")
+
+    val safeSandboxedIframe =
+          s"""<iframe sandbox="$permissions" src="$safeTelegramIframeUrl"></iframe>"""
+    // Telegarm's script would add: (I suppose the height is via API?)
+    //  width="100%" height="" frameborder="0" scrolling="no"
+    //  style="border: none; overflow: hidden; min-width: 320px; height: 96px;">
+
+    // Unfortunately, now Telegram's iframe tends to become a bit too tall. [TELEGRIFR]
+
+    Good(safeSandboxedIframe)
+  }
+
+}
+
+
+
+// ====== TikTok
+
+
+// TikTok's embed script (they include in the oEmbed html field) is buggy  [buggy_oembed]
+// — it breaks when it cannot access localStorage in Talkyard's sandboxed iframe:
 //
 //   > VM170 embed_v0.0.6.js:1 Uncaught DOMException: Failed to read the 'localStorage'
 //   >      property from 'Window': The document is sandboxed and lacks the
@@ -287,7 +464,7 @@ object TikTokPrevwRendrEng {
 }
 
 class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("TikTok")
@@ -305,7 +482,8 @@ class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 
 
 
-// ===== Twitter
+// ====== Twitter
+
 
 // What about Twitter Moments?
 // https://developer.twitter.com/en/docs/twitter-for-websites/moments/guides/oembed-api
@@ -317,17 +495,6 @@ class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 // Links look like:
 //   https://twitter.com/TwitterDev
 
-// omit_script=1  ?
-// theme  = {light, dark}
-// link_color  = #zzz   [ty_themes]
-// lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
-// see:
-// https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview
-// dnt  ?
-
-// Wants:  theme: light / dark.  Primary color / link color.
-// And device:  mobile / tablet / laptop ?  for maxwidth.
-
 object TwitterPrevwRendrEng {
   // URL scheme, from https://oembed.com:
   // >  https://twitter.com/*/status/*
@@ -336,7 +503,7 @@ object TwitterPrevwRendrEng {
 }
 
 class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
         globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Twitter")
@@ -347,19 +514,22 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   override def regex: Regex = TwitterPrevwRendrEng.regex
 
   // Twitter tweets are 598 px over at Twitter.com
-  // Twitter wants 'maxwidth' not 'max_width'.
   // omit_script=1  ?
   // theme  = {light, dark}
-  // link_color  = #zzz   [ty_themes]
+  // link_color  =   [ty_themes]
   // lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
   // see:
   // https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview
   // dnt  ?
   // Wants:  theme: light / dark.  Primary color / link color.
   // And device:  mobile / tablet / laptop ?  for maxwidth.
-  override def queryParamsEndAmp = "maxwidth=600&align=center&"
+  override def moreQueryParamsEndAmp = "align=center&"
 
 }
+
+
+
+// ====== YouTube
 
 
 // From oembed.com:
@@ -379,7 +549,7 @@ object YouTubePrevwRendrEngOEmbed {
 }
 
 /* Doesn't work, just gets 404 Not Found oEmbed responses. Use instead:
-    YouTubePrevwRendrEng extends InstantLinkPreviewEngine
+    YouTubePrevwRendrEng extends InstantLinkPrevwRendrEng
 
 class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
   extends OEmbedPrevwRendrEng(
@@ -388,7 +558,7 @@ class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   def providerName = Some("YouTube")
   def widgetName = "video"
   def providerLnPvCssClassName = "s_LnPv-YouTube"
-  def providerEndpoint = "https://www.reddit.com/oembed"
+  def providerEndpoint = "https://www.youtube.com/oembed"
   override def handles(url: String): Boolean = {
     YouTubePrevwRendrEng.handles(url)
   }

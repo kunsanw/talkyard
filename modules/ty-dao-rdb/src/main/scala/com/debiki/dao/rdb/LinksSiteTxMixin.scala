@@ -26,7 +26,7 @@ import play.api.libs.json.JsNull
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-
+// CR_DONE  2020-07-12
 
 trait LinksSiteTxMixin extends SiteTransaction {
   self: RdbSiteTransaction =>
@@ -39,14 +39,16 @@ trait LinksSiteTxMixin extends SiteTransaction {
               link_url_c,
               downloaded_from_url_c,
               downloaded_at_c,
+              cache_max_secs_c,
               status_code_c,
               preview_type_c,
               first_linked_by_id_c,
               content_json_c)
-          values (?, ?, ?, ?, ?, ?, ?, ?)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
           on conflict (site_id_c, link_url_c, downloaded_from_url_c)
           do update set
               downloaded_at_c = excluded.downloaded_at_c,
+              cache_max_secs_c = excluded.cache_max_secs_c,
               status_code_c = excluded.status_code_c,
               preview_type_c = excluded.preview_type_c,
               content_json_c = excluded.content_json_c """
@@ -56,6 +58,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           linkPreview.link_url_c,
           linkPreview.downloaded_from_url_c,
           linkPreview.downloaded_at_c.asTimestamp,
+          NullInt, // linkPreview.cache_max_secs_c, — later
           linkPreview.status_code_c.asAnyRef,
           linkPreview.preview_type_c.asAnyRef,
           linkPreview.first_linked_by_id_c.asAnyRef,
@@ -66,7 +69,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
 
   override def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String)
-  : Option[LinkPreview] = {
+        : Option[LinkPreview] = {
     val query = s"""
           select * from link_previews_t
           where site_id_c = ?
@@ -79,13 +82,25 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  override def deleteLinkPreviews(linkUrl: String): Boolean = {
+  override def loadAllLinkPreviewsByUrl(linkUrl: String): Seq[LinkPreview] = {
+    val query = s"""
+          select * from link_previews_t
+          where site_id_c = ?
+            and link_url_c = ?  """
+    val values = List(siteId.asAnyRef, linkUrl)
+    runQueryFindMany(query, values, rs => {
+      parseLinkPreview(rs)
+    })
+  }
+
+
+  override def deleteLinkPreviews(linkUrl: String): Int = {
     val deleteStatement = s"""
           delete from link_previews_t
           where site_id_c = ?
             and link_url_c = ?  """
     val values = List(siteId.asAnyRef, linkUrl)
-    runUpdateSingleRow(deleteStatement, values)
+    runUpdate(deleteStatement, values)
   }
 
 
@@ -133,20 +148,19 @@ trait LinksSiteTxMixin extends SiteTransaction {
           where site_id_c = ?
             and from_post_id_c = ?
             and link_url_c in (${ makeInListFor(urls) }) """
-
-    val values = List(siteId.asAnyRef, postId.asAnyRef) ::: urls.toList
+    val values = siteId.asAnyRef :: postId.asAnyRef :: urls.toList
     runUpdate(deleteStatement, values)
   }
 
 
-  override def deleteAllLinksFromPost(postId: PostId): Boolean = {
+  override def deleteAllLinksFromPost(postId: PostId): Int = {
+    unused("TyE406MRUKT", "deleteAllLinksFromPost(postId")
     val deleteStatement = s"""
           delete from links_t
           where site_id_c = ?
-            and from_post_id_c = ?
-          """
+            and from_post_id_c = ? """
     val values = List(siteId.asAnyRef, postId.asAnyRef)
-    runUpdateSingleRow(deleteStatement, values)
+    runUpdate(deleteStatement, values)
   }
 
 
@@ -175,7 +189,9 @@ trait LinksSiteTxMixin extends SiteTransaction {
             on po.site_id = ls.site_id_c
             and po.unique_post_id = ls.to_post_id_c
           where po.site_id = ?
-            and po.page_id = ? """
+            and po.page_id = ?
+          order by
+            from_post_id_c, link_url_c """
     val values = List(siteId.asAnyRef, pageId, siteId.asAnyRef, pageId)
     runQueryFindMany(query, values, rs => {
       parseLink(rs)
@@ -203,6 +219,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
         values.append(pageId)
         "and po.page_id = ?"
       case Right(postIds) =>
+        if (postIds.isEmpty) return Set.empty
         values.appendAll(postIds.map(_.asAnyRef))
         s"and po.unique_post_id in (${ makeInListFor(postIds) })"
     }
@@ -212,37 +229,51 @@ trait LinksSiteTxMixin extends SiteTransaction {
               on po.unique_post_id = ls.from_post_id_c
               and po.site_id = ls.site_id_c
           where po.site_id = ?
-            $andWhat """
+            $andWhat
+          order by
+            to_page_id_c"""
     runQueryFindManyAsSet(query, values.toList, rs => {
       rs.getString("to_page_id_c")
     })
   }
 
 
-  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
-    unimplementedIf(inclDeletedHidden, "inclDeletedHidden must be false [TyE593RKD]")
+  def loadPageIdsLinkingToPage(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
+    unimplementedIf(inclDeletedHidden,
+          "inclDeletedHidden must be false  [TyE593RKD]  [q_deld_lns]")
+
     val query = s"""
           select distinct po.page_id
           from links_t ls
               inner join posts3 po
                   on ls.from_post_id_c = po.unique_post_id and ls.site_id_c = po.site_id
-          ---- (this filters out deleted and hidden things [q_deld_lns])  TESTS_MISSING
-                  -- Need not check approved_* — links aren't added until a new post,
-                  -- or new edits, got approved.
+                  -- Excl links from deleted posts  TyT602AMDUN   [q_deld_lns]
+                  -- and from hidden posts  TyT5KD20G7)
+                  -- Need not check approved_* — links aren't inserted until the
+                  -- new post or new edits got approved.
                   and po.deleted_status = ${DeletedStatus.NotDeleted.toInt}
                   and po.hidden_at is null
               inner join pages3 pg
                   on po.site_id = pg.site_id
                   and po.page_id = pg.page_id
+                  -- Excl links from deleted pages  TyT7RD3LM5  [q_deld_lns]
+                  -- and hidden pages TESTS_MISSING.
+                  -- But incl links from not yet published pages — that's
+                  -- more author friendly? Handled in Scala code instead.
                   and pg.deleted_at is null
-              -- Not inner join — it's fine with page not in any category.
-              left join categories3 cs
-                  on pg.site_id = cs.site_id
-                  and pg.category_id = cs.id
-                  and cs.deleted_at is null
-          ---- (END filter)
+                  and pg.hidden_at is null
           where ls.site_id_c = ?
-            and ls.to_page_id_c = ? """
+            and ls.to_page_id_c = ?
+            -- Not in a deleted category  TyT042RKD36  [q_deld_lns]
+            -- (But if the page is not in any category — that's fine.)
+            -- This does an Anti Join with categories3, good.
+            and not exists (
+                select 1 from categories3 cs
+                where pg.site_id = cs.site_id
+                  and pg.category_id = cs.id
+                  and cs.deleted_at is not null)
+          order by
+            page_id """
 
     val values = List(siteId.asAnyRef, pageId)
     runQueryFindManyAsSet(query, values, rs => {
@@ -256,6 +287,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           link_url_c = getString(rs, "link_url_c"),
           downloaded_from_url_c = getString(rs, "downloaded_from_url_c"),
           downloaded_at_c = getWhen(rs, "downloaded_at_c"),
+          // cache_max_secs_c = ... — later
           status_code_c = getInt(rs, "status_code_c"),
           preview_type_c = getInt(rs, "preview_type_c"),
           first_linked_by_id_c = getInt(rs, "first_linked_by_id_c"),
@@ -270,6 +302,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           added_at_c = getWhen(rs, "added_at_c"),
           added_by_id_c = getInt(rs, "added_by_id_c"),
           is_external_c = getOptBool(rs, "is_external_c") is true,
+          //to_staff_page: getOptBool(rs, "to_staff_page") is true,
           to_page_id_c = getOptString(rs, "to_page_id_c"),
           to_post_id_c = getOptInt(rs, "to_post_id_c"),
           to_pp_id_c = getOptInt(rs, "to_pp_id_c"),

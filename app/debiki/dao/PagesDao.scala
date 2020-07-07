@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Kaj Magnus Lindberg (born 1979)
+ * Copyright (c) 2014-2020 Kaj Magnus Lindberg
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import ed.server.auth.Authz
 import ed.server.spam.SpamChecker
 import java.{util => ju}
 import scala.collection.immutable
+import talkyard.server.dao._
 import math.max
 import org.owasp.encoder.Encode
 
@@ -35,7 +36,8 @@ import org.owasp.encoder.Encode
 case class CreatePageResult(
   path: PagePathWithId,
   bodyPost: Post,
-  anyReviewTask: Option[ReviewTask]) {
+  anyReviewTask: Option[ReviewTask],
+  anyCategoryId: Option[CategoryId]) {
 
   def id: PageId = path.pageId
 }
@@ -131,7 +133,8 @@ trait PagesDao {
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(byWho.id, nr))
 
-      CreatePageResult(pagePath, bodyPost, anyReviewTask)
+      CreatePageResult(
+            pagePath, bodyPost, anyReviewTask, anyCategoryId = anyCategoryId)
     }
 
     memCache.firePageCreated(siteId, result.path)
@@ -283,7 +286,11 @@ trait PagesDao {
         bodyHiddenById = ifThenSome(hidePageBody, authorId),
         bodyHiddenReason = None) // add `hiddenReason` function parameter?
 
-    val uploadPaths = body.uploadRefs // findUploadRefsInPost(bodyPost)
+    val uploadRefs = body.uploadRefs
+    if (Globals.isDevOrTest) {
+      val uplRefs2 = findUploadRefsInPost(bodyPost)
+      dieIf(uploadRefs != uplRefs2, "TyE7RTEGP04", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+    }
 
     val pageMeta = PageMeta.forNewPage(pageId, pageRole, authorId,
       extId = extId,
@@ -382,7 +389,7 @@ trait PagesDao {
       saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff)
     }
 
-    uploadPaths foreach { hashPathSuffix =>
+    uploadRefs foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
 

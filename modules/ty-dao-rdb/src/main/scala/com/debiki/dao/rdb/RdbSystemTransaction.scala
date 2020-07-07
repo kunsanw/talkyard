@@ -156,8 +156,8 @@ class RdbSystemTransaction(val daoFactory: RdbDaoFactory, val now: When)
 
   def runUpdateSingleRow(statement: String, values: List[AnyRef] = Nil): Boolean = {
     val numRowsUpdated = runUpdate(statement, values)
-    dieIf(numRowsUpdated > 1, "DwE2KESW7", o"""This statement modified $numRowsUpdated rows
-         but should have touched one row only: $statement""")
+    dieIf(numRowsUpdated > 1, "TyE2KESW7", o"""This statement modified $numRowsUpdated rows
+          but should have modified one row only: $statement""")
     numRowsUpdated == 1
   }
 

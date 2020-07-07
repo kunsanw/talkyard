@@ -151,7 +151,7 @@ object Rdb {
   }
 
   def getJsObject(rs: js.ResultSet, column: String): JsObject = {
-    getOptJsObject(rs, column) getOrDie "TyE60KDHG4"
+    getOptJsObject(rs, column).getOrDie("TyE603DTJ0M", s"Column is null: $column")
   }
 
   def getOptJsObject(rs: js.ResultSet, column: String): Option[JsObject] = {

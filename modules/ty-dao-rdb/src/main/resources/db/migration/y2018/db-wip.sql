@@ -2,6 +2,8 @@
 --  alter table users3 drop constraint dw1_users_emlntf__c;
 -- later, change col type to Int, add 0 < ... < 1000 constraint?
 
+-- add:  upload_refs3.is_approved  ?   [is_upl_ref_aprvd]
+
 
 alter table settings3 add column media_in_posts int;
 alter table settings3 add constraint settings_c_mediainposts check (

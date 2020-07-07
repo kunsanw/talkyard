@@ -1,5 +1,7 @@
 /// <reference path="../test-types.ts"/>
 
+// SHOULD_CODE_REVIEW this whole file, later.
+
 import * as _ from 'lodash';
 import assert = require('../utils/ty-assert');
 import server = require('../utils/server');
@@ -42,7 +44,8 @@ type ProvidersMap = { [name: string]: LinkPreviewProvider };
 // wdio command line, for exampe. Or just:  --o3 reddit
 
 let providersToTest: ProvidersMap = {
-  facebook: {
+  /* Doesn't work without trusting FB's js, skip for now.
+  facebookPosts: {
     name: "Facebook",
     sandboxedIframe: false,
     lnPvClassSuffix: 'FbPost',
@@ -54,6 +57,11 @@ let providersToTest: ProvidersMap = {
     linkInReply:
         'https://www.facebook.com/65239508296/photos/a.318899128296/10155689214983297/?type=3',
   },
+  */
+
+  // facebookVideos:  TESTS_MISSING
+
+  // giphy:  TESTS_MISSING
 
   instagram: {
     name: "Instagram",
@@ -123,7 +131,8 @@ let providersToTest: ProvidersMap = {
 
 
 if (settings.only3rdParty) {
-  const provider = providersToTest[settings.only3rdParty];
+  const provider = providersToTest[settings.only3rdParty] ||
+        _.find(providersToTest, provider => provider.name.startsWith(settings.only3rdParty));
   dieIf(!provider, `No such 3rd party provider: ${provider.name} [TyE402SKD7]`);
   providersToTest = { x: provider };
 }
@@ -138,7 +147,7 @@ const makePreviewBrokenSelector = (provider: LinkPreviewProvider) =>
   `.s_LnPv-${provider.lnPvClassSuffix || provider.name}${brokenPreview}`;
 
 
-describe("'All other' link previews  TyT0JSM8PF68", () => {
+describe("'All other' link previews  TyT550RMHJ25", () => {
 
   it("initialize people", () => {
     browser = new TyE2eTestBrowser(wdioBrowser);
@@ -219,7 +228,7 @@ describe("'All other' link previews  TyT0JSM8PF68", () => {
       it(`... with text: "${provider.linkTwoExpectedPrevwText}"`, () => {
         owensBrowser.preview.waitUntilPreviewHtmlMatches(
               provider.linkTwoExpectedPrevwText,
-              { where: 'InEditor', whicLinkPreviewSelector: '.s_LnPv-Err' });
+              { where: 'InEditor', whichLinkPreviewSelector: '.s_LnPv-Err' });
       });
     }
 
@@ -265,7 +274,7 @@ describe("'All other' link previews  TyT0JSM8PF68", () => {
         owensBrowser.linkPreview.waitUntilLinkPreviewMatches({
               postNr: c.BodyNr, inSandboxedIframe: provider.sandboxedIframe,
               // or just the 1st one
-              whicLinkPreviewSelector: previewOkSelector,
+              whichLinkPreviewSelector: previewOkSelector,
               regex: provider.linkInTopicExpectedPreviewText });
       });
     }
@@ -282,9 +291,10 @@ describe("'All other' link previews  TyT0JSM8PF68", () => {
       });
 
       if (provider.linkTwoExpectedPrevwText) {
-        const noPreviewText = `No preview for ${provider.name}`; // [0LNPV]
-        it(`... with text: "${noPreviewText} ..."`, () => {
-          owensBrowser.topic.waitUntilPostTextMatches(c.BodyNr, noPreviewText,
+        const noPreviewText = `No preview for ${provider.name}`; // what? why  [0LNPV]
+        it(`... with text: "${provider.linkTwoExpectedPrevwText} ..."`, () => {
+          owensBrowser.topic.waitUntilPostTextMatches(
+                c.BodyNr, provider.linkTwoExpectedPrevwText,
                 { thingInPostSelector: '.s_LnPv-Err' });
         });
       }
@@ -293,8 +303,11 @@ describe("'All other' link previews  TyT0JSM8PF68", () => {
 
     // ----- Link preview in a Talkyard reply post
 
-    it(`Owen starts typing a reply`, () => {
+    it(`Owen clicks Reply`, () => {
       owensBrowser.topic.clickReplyToOrigPost();
+    });
+
+    it("... starts typing a reply", () => {
       owensBrowser.editor.editText(provider.linkInReply);
     });
 

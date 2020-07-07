@@ -27,7 +27,6 @@ import org.scalatest._
 class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
 
   "TextAndHtml can" - {
-    import TextAndHtml.{sanitizeTitleText => san}
 
     def checkRemovesScriptTags(fn: String => String): Unit = {
       fn("""<script>alert("123")</script>Title""") mustBe "Title"
@@ -42,39 +41,43 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
     }
 
     def checkRemovesScriptAttributes(fn: String => String, keepTag: Boolean): Unit = {
-      val (start, end) = if (keepTag) ("<a>", "</a>") else ("", "")
-      san("""<a href="javascript:alert(123)">Title</a>""") mustBe s"${start}Title$end"
-      san("""Hi <a onclick="alert(123)">Title</a>""") mustBe s"Hi ${start}Title$end"
+      val (start, end) = if (keepTag) ("""<a rel="nofollow noopener">""", "</a>") else ("", "")
+      fn("""<a href="javascript:alert(123)">Title</a>""") mustBe s"${start}Title$end"
+      fn("""Hi <a onclick="alert(123)">Title</a>""") mustBe s"Hi ${start}Title$end"
     }
 
 
     "sanitize titles  TyT6RKKDJ563" - {
+      import TextAndHtml.{sanitizeTitleText => sanTitle}
+
       "remove <script> and anything inside" in {
-        checkRemovesScriptTags(san)
+        checkRemovesScriptTags(sanTitle)
       }
 
       "remove attribs w javascript, in fact, the whole <a> too" in {
-        checkRemovesScriptAttributes(san, keepTag = false)
+        checkRemovesScriptAttributes(sanTitle, keepTag = false)
       }
 
       "delete unknown tags but keep the text inside" in {
-        san("""<unknown>alert("123")</unknown>Title""") mustBe """alert("123")Title"""
-        san("""<unknown>single ' double " </unknown>Title"""
+        sanTitle("""<unknown>alert("123")</unknown>Title""") mustBe """alert("123")Title"""
+        sanTitle("""<unknown>single ' double " </unknown>Title"""
               ) mustBe """single ' double " Title"""
       }
 
       "delete other bad stuff" in {
-        san("""<unknown>whatever </unknown>Title""") mustBe "whatever Title"
-        san("""<a href="whatever:no-no">Title</a> more""") mustBe "Title more"
+        sanTitle("""<unknown>whatever </unknown>Title""") mustBe "whatever Title"
+        sanTitle("""<a href="whatever:no-no">Title</a> more""") mustBe "Title more"
       }
 
-      "no links or anchors inside titles — titles link to the topics already" in {
-        san("""<a id="whatever">Title</a>""") mustBe "Title"
-        san("""<a href="https://ex.com">Title</a>""") mustBe "Title"
-        san("""<a target="_blank">Title</a>""") mustBe "Title"
-        san("""<a rel="follow">Title</a>""") mustBe "Title"
-        san("""<a rel="nofollow">Title</a>""") mustBe "Title"
-        san("""<a>Title</a>""") mustBe "Title"
+      "no links or anchors in titles — titles are links themselves (to the topics)" in {
+        sanTitle("""<a id="whatever">Title</a>""") mustBe "Title"
+        sanTitle("""<a href="https://ex.com">Title</a>""") mustBe "Title"
+        sanTitle("""<a target="_blank">Title</a>""") mustBe "Title"
+        sanTitle("""<a rel="follow">Title</a>""") mustBe "Title"
+        sanTitle("""<a rel="nofollow">Title</a>""") mustBe "Title"
+        sanTitle("""<a>Title</a>""") mustBe "Title"
+
+        sanTitle("""<img src="https://ex.com">Title Text</img>""") mustBe "Title Text"
       }
 
       "allow some tags" in {
@@ -86,57 +89,120 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
               """<small>but not tiny</small>""",
               """<b>bold</b> and <i>it</i> is <strong>ok</strong>""")
         for (title <- okTitles) {
-          san(title) mustBe title
+          sanTitle(title) mustBe title
         }
       }
 
       "escape" in {
-        san("&") mustBe "&amp;"
-        san("less < than") mustBe "less &lt; than"
-        san("gr > than") mustBe "gr &gt; than"
-        san("all < fun & escapes > here") mustBe "all &lt; fun &amp; escapes &gt; here"
+        sanTitle("&") mustBe "&amp;"
+        sanTitle("less < than") mustBe "less &lt; than"
+        sanTitle("gr > than") mustBe "gr &gt; than"
+        sanTitle("all < fun & escapes > here") mustBe "all &lt; fun &amp; escapes &gt; here"
       }
 
       "not escape already escaped html" in {
-        san("&amp;") mustBe "&amp;"
-        san("&lt;") mustBe "&lt;"
-        san("&gt;") mustBe "&gt;"
+        sanTitle("&amp;") mustBe "&amp;"
+        sanTitle("&lt;") mustBe "&lt;"
+        sanTitle("&gt;") mustBe "&gt;"
+        sanTitle("greater &gt; is &lt; smaller") mustBe "greater &gt; is &lt; smaller"
       }
 
       "handle missing tags" in {
-        san("""why </b> this""") mustBe "why  this"
-        san("""why <b>this""") mustBe "why <b>this</b>"
+        sanTitle("""why </b> this""") mustBe "why  this"
+        sanTitle("""why <b>this""") mustBe "why <b>this</b>"
       }
 
       "delete block elems" in {
-        san("""<p>no paras</p>""") mustBe "no paras"
-        san("""<div>no divs</div>""") mustBe "no divs"
-        san("""<div>really no divs""") mustBe "really no divs"
+        sanTitle("""<p>no paras</p>""") mustBe "no paras"
+        sanTitle("""<div>no divs</div>""") mustBe "no divs"
+        sanTitle("""<div>really no divs""") mustBe "really no divs"
+        sanTitle("""what no divs</div>""") mustBe "what no divs"
+      }
+
+      "compact title html output" in {
+        sanTitle(" <b> bold </b> <i>it</i> \n") mustBe "<b> bold </b> <i>it</i>"
+
+        val title = "<b>    bold  </b> \n \n <i>it</i>"
+        sanTitle(s"\n$title \n") mustBe title
+
+        sanTitle(s" \n <p> \n text \n text2 \n </p> \n ") mustBe "text \n text2"
       }
     }
 
     "sanitize posts  TyT03386KTDGR" - {
-      import TextAndHtml.relaxedHtmlTagWhitelist
-
-      def san(text: String) = Jsoup.clean(text, relaxedHtmlTagWhitelist)
+      import TextAndHtml.{sanitizePost => sanPost}
 
       "remove <script> and anything inside" in {
-        checkRemovesScriptTags(san)
+        checkRemovesScriptTags(sanPost)
       }
 
       "remove attribs w javascript, but allow <a>" in {
-        checkRemovesScriptAttributes(san, keepTag = false)
+        checkRemovesScriptAttributes(sanPost, keepTag = true)
       }
 
       "add rel=nofollow" in {
-        san("""<a href="https://x.co">x.co</a>"""
-              ) mustBe """<a href="https://x.co" rel="nofollow">x.co</a>"""
+        sanPost("""<a href="https://x.co">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
+      }
+
+      "add rel='nofollow noopener'  if _blank  —  oh, actually removes _blank" in {
+        sanPost("""<a href="https://x.co" target="_blank">x.co</a>""") mustBe (
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
       }
 
       "change rel=follow to nofollow" in {
-        san("""<a href="https://x.co" rel="follow">x.co</a>"""
-              ) mustBe """<a href="https://x.co" rel="nofollow">x.co</a>"""
+        sanPost("""<a href="https://x.co" rel="follow">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
+
+      "change rel=follow to 'nofollow noopener'  if _blank  —  oh, removes _blank" in {
+        sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe (
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
+      }
+
+      "compact posts html output" in {
+        sanPost(" \n <b>\nbold\n</b>\n \n<i>it</i> \n <script>var x;</script>") mustBe
+                    "<b>\nbold\n</b>\n \n<i>it</i>"
+        val manyLines = i"""
+              |<div>
+              |  Text text <b>bold</b>!
+              |</div>
+              |<p><a href="https://ex.co" rel="nofollow noopener">Link title</a>
+              |</p>""".trim
+        sanPost(manyLines + "\n <script>var x;\n</script>\n \n") mustBe manyLines
+      }
+    }
+
+
+    "sanitize internal links and quotes  TyT7J03SKD5" in {
+      import TextAndHtml.{sanitizeInternalLinksAndQuotes => sanInt}
+      sanInt("aa <script>alert(1)</script> <a>link</a>") mustBe "aa  <a>link</a>"
+      sanInt("""<iframe src="https://z" sandbox="allow-scripts"></iframe>""") mustBe ""
+      val t = """<div><a href="/page/path/">Page Title</a>""" +
+              """<blockquote>Excerpt</blockquote></div>"""
+      sanInt(t) mustBe t
+
+      // Compact output: (no pretty printing and extra indentation)
+      val t2 = i"""
+          |<div>
+          |  <a href="x">Pg T</a>
+          |<blockquote>Bq
+          |</blockquote>
+          |</div>""".trim
+      sanInt(t2) mustBe t2
+    }
+
+
+    "sanitize iframe  TyT603RKDL56" in {
+      import TextAndHtml.{sanitizeAllowIframeOnly => sanIfr}
+      sanIfr("<b>zz</b>") mustBe "zz"
+      sanIfr("<script>alert(1)</script>") mustBe ""
+
+      val ifr01 = """<iframe src="https://zzz" sandbox="allow-scripts"></iframe>"""
+      sanIfr(ifr01) mustBe ifr01
+
+      val ifr02 = """<iframe sandbox="allow-scripts" srcdoc="alert('hi')"></iframe>"""
+      sanIfr(ifr02) mustBe ifr02
     }
   }
 

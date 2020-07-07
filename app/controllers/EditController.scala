@@ -224,16 +224,19 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
 
 
   /** Returns html for embedding the contents at the url in a Talkyard post.
-    * Does this by sending a request to the content provider, for example, if the url
-    * is a Twitter tweet, then, calls:
+    * Does this by sending a request to the content provider, for example, calls:
     *   https://publish.twitter.com/oembed?url=the_url
-    * and gets back from Twitter json that shows how to embed the tweet (incl
-    * html in the json), then creates and returns sanitized onebox html.
+    * and gets back Twitter tweet json that shows how to embed the tweet,
+    * then creates and returns sanitized onebox html.
+    *
+    * RENAME to fetchLinkPreview, & client side too
     */
-  def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(RateLimits.LoadOnebox) {
-        request =>
+  def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(
+        RateLimits.FetchLinkPreview) { request =>
     import edContext.globals
     import request.{siteId, requesterOrUnknown}
+
+    val inline = false  // later, query param
 
     val renderer = new LinkPreviewRenderer(
           globals, siteId = siteId, mayHttpFetch = true,
@@ -242,7 +245,7 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
     // link_previews_t.link_url_c is max 500.
     throwForbiddenIf(url.length >= 450, "TyELNPVURLLEN", "URL too long")
 
-    val response = renderer.loadRenderSanitize(url).transform(
+    val response = renderer.fetchRenderSanitize(url, inline).transform(
           html => Ok(html),
           throwable => throwable match {
             case ex: DebikiException =>

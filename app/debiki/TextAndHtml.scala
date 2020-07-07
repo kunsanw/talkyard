@@ -28,6 +28,7 @@ import debiki.dao.UploadsDao
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 
+// CR_DONE  07-09
 
 /** Immutable.
   */
@@ -44,27 +45,33 @@ sealed abstract class SourceAndHtml {
 }
 
 
-case class TitleSourceAndHtml(source: String, safeHtml: String) extends SourceAndHtml {
-  def text: String = source // backw compat
+sealed trait TitleSourceAndHtml extends SourceAndHtml {
+  def source: String
+  def safeHtml: String
 }
 
 
 object TitleSourceAndHtml {
-  def apply(source: String): TitleSourceAndHtml = {
-    // REMOVE
-    // //  =  dao.textAndHtmlMaker.forTitle(title)
-    // // this.textAndHtmlMaker.forTitle(s"Description of the $name category")
-    // //                            where this = CategoriesDao
-    // // def createForum(options, ...)
-    // // val titleHtmlSanitized = TextAndHtml.sanitizeTitleText(options.title)
+  def alreadySanitized(source: String, safeHtml: String): TitleSourceAndHtml = {
+    // (These xParam avoid `def x = x`, which the compiler apparently tail optimizes
+    // into a forever eternal loop.)
+    val sourceParam = source
+    val safeHtmlParam = safeHtml
+    new TitleSourceAndHtml {
+      def source: String = sourceParam
+      def text: String = sourceParam
+      def safeHtml: String = safeHtmlParam
+    }
+  }
 
+  def apply(source: String): TitleSourceAndHtml = {
     val safeHtml = TextAndHtml.sanitizeTitleText(source)
-    TitleSourceAndHtml(source, safeHtml = safeHtml)
+    alreadySanitized(source, safeHtml = safeHtml)
   }
 }
 
 
-case class LinksFound(  // Oops not needed, can remove again
+case class LinksFound(
   uploadRefs: Set[UploadRef],
   externalLinks: immutable.Seq[String],
   internalLinks: Set[String],
@@ -76,7 +83,7 @@ case class LinksFound(  // Oops not needed, can remove again
 /** Immutable. Use linkDomains to check all links against a spam/evil-things domain block list
   * like Spamhaus DBL, https://www.spamhaus.org/faq/section/Spamhaus%20DBL#271.
   */
-sealed abstract class TextAndHtml extends SourceAndHtml {
+sealed abstract class TextAndHtml extends SourceAndHtml {  RENAME // to PostSourceAndHtml ?
 
   def text: String  ; RENAME // to source
   def source: String = text
@@ -87,9 +94,16 @@ sealed abstract class TextAndHtml extends SourceAndHtml {
 
   def uploadRefs: Set[UploadRef]
 
-  def externalLinks: immutable.Seq[String]
-
+  /** Maybe convert all absolute url links to just url path-query-hash (uri)?
+    * Relative links are better, for internal links — still works, if
+    * moves website to other domain (and no real downsides — e.g. if an
+    * attacker wants to clone the site, a regex-replace origin is quick).
+    * See *the first reply* here:
+    * https://moz.com/blog/relative-vs-absolute-urls-whiteboard-friday
+    */
   override def internalLinks: Set[String]
+
+  def externalLinks: immutable.Seq[String]
 
   /** Domain names used in links. Check against a domain block list.
     */
@@ -99,8 +113,6 @@ sealed abstract class TextAndHtml extends SourceAndHtml {
     * domain names. If there is any, the post should probably be blocked as spam?
     */
   def linkIpAddresses: immutable.Seq[String]
-
-  def isTitle: Boolean
 
   def htmlLinksOnePerLine: String = {
     TESTS_MISSING
@@ -119,13 +131,14 @@ sealed abstract class TextAndHtml extends SourceAndHtml {
 object TextAndHtml {
 
   /** The result can be incl in html anywhere: As html tags contents,
-    * or in a html attribute.
+    * or in a html attribute — you need to add the attr quotes youreslf (!).
     */
   def safeEncodeForHtml(unsafe: String): String = {
     org.owasp.encoder.Encode.forHtml(unsafe)
   }
 
   /** Can *only* be incl in html attributes — not as tags contents.
+    * You need to add the attr quotes yourself (!).
     */
   def safeEncodeForHtmlAttrOnly(unsafe: String): String = {
     org.owasp.encoder.Encode.forHtmlAttribute(unsafe)
@@ -137,37 +150,59 @@ object TextAndHtml {
     org.owasp.encoder.Encode.forHtmlContent(unsafe)
   }
 
-  /** Removes bad tags and attributes from a html string.
-    * The result is html tags content — and can *not* be incl in an attribute.
+  /** Sanitizes title html. The result is html tags content
+    * — can *not* be incl in an attribute.
     */
   def sanitizeTitleText(unsafe: String): String = {
     // Tested here: TyT6RKKDJ563
-    Jsoup.clean(unsafe, titleHtmlTagsWhitelist)
+    compactClean(unsafe, titleHtmlTagsWhitelist)
   }
 
   /** More restrictive than Jsoup's basic() whitelist.
     */
-  def titleHtmlTagsWhitelist: org.jsoup.safety.Whitelist = {
+  private def titleHtmlTagsWhitelist: org.jsoup.safety.Whitelist = {
     new Whitelist().addTags(
           "b", "code", "em",
           "i", "q", "small", "span", "strike", "strong", "sub",
           "sup", "u")
   }
 
-  /** Links will have rel=nofollow. Images, pre, div allowed.
-    */
-  def sanitizeAllowLinksAndBlocks(unsafeTags: String,
-        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
-    var whitelist = org.jsoup.safety.Whitelist.basic()
-    whitelist = amendWhitelistFn(whitelist)
-    Jsoup.clean(unsafeTags, whitelist)
+  def sanitizePost(unsafeHtml: String): String = {
+    compactClean(unsafeHtml, relaxedHtmlTagWhitelist)
   }
 
-  def sanitizeRelaxed(unsafeTags: String,
+  def sanitizeInternalLinksAndQuotes(unsafeHtml: String): String = {
+    // TyT7J03SKD5
+    compactClean(unsafeHtml,  new Whitelist()
+          .addTags("a", "div", "blockquote")
+          .addAttributes("a", "href"))
+  }
+
+  def sanitizeAllowIframeOnly(unsafeHtml: String): String = {
+    // TyT603RKDL56
+    compactClean(unsafeHtml, new org.jsoup.safety.Whitelist()
+          .addTags("iframe")
+          .addAttributes("iframe", "src", "srcdoc", "sandbox"))
+  }
+
+  /** Links will have rel="nofollow noopener". Images, pre, div allowed.
+    */
+  def sanitizeAllowLinksAndBlocks(unsafeHtml: String,
         amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    var whitelist = org.jsoup.safety.Whitelist.basic()
+    whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
+    compactClean(unsafeHtml, whitelist)
+  }
+
+  /** Links will have rel="nofollow noopener". ul, ol, code, blockquote and
+    * much more is allowed.
+    */
+  def sanitizeRelaxed(unsafeHtml: String,
+        amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
+    COULD // [disallow_h1_h2]
     var whitelist = org.jsoup.safety.Whitelist.relaxed()
-    whitelist = amendWhitelistFn(whitelist)
-    Jsoup.clean(unsafeTags, whitelist)
+    whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
+    compactClean(unsafeHtml, whitelist)
   }
 
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
@@ -177,12 +212,25 @@ object TextAndHtml {
   // processes? So as not to block a thread here, running Nashorn? [external-server-js]
   def relaxedHtmlTagWhitelist: org.jsoup.safety.Whitelist = {
     // Tested here: TyT03386KTDGR
+    COULD // [disallow_h1_h2]
+    addRelNofollowNoopener(org.jsoup.safety.Whitelist.relaxed())
+  }
 
+  private def addRelNofollowNoopener(whitelist: Whitelist): Whitelist = {
     // rel=nofollow not included by default, in the relaxed() whitelist,
     // see: https://jsoup.org/apidocs/org/jsoup/safety/Whitelist.html#relaxed()
-    BUG // this removes  noopener
-    org.jsoup.safety.Whitelist.relaxed().addEnforcedAttribute("a", "rel", "nofollow")
+    // Also add rel="noopener", in case of target="_blank" links.
+    COULD_OPTIMIZE // only nofollow for external links, and noopener only if target=_blank.
+    // And don't remove target="_blank"  (Whitelist.relaxed() removes target=... ).
+    whitelist.addEnforcedAttribute("a", "rel", "nofollow noopener")
   }
+
+  private def compactClean(unsafeHtml: String, whitelist: Whitelist): String = {
+    Jsoup.clean(unsafeHtml, "", whitelist, compactJsoupOutputSettings).trim()
+  }
+
+  private def compactJsoupOutputSettings: org.jsoup.nodes.Document.OutputSettings =
+    new org.jsoup.nodes.Document.OutputSettings().indentAmount(0).prettyPrint(false)
 }
 
 
@@ -191,7 +239,7 @@ object TextAndHtmlMaker {
   val Ipv4AddressRegex: Regex = """[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+""".r
 
 
-  def findLinks(html: String): immutable.Seq[String] = {   // and add  noopener ?
+  def findLinks(html: String): immutable.Seq[String] = {
     // Tested here:  tests/app/debiki/TextAndHtmlTest.scala
 
     val result = mutable.ArrayBuffer[String]()
@@ -238,19 +286,18 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     val safeHtml: String,
     val usernameMentions: Set[String],
     override val uploadRefs: Set[UploadRef],
-    val externalLinks: immutable.Seq[String],
     override val internalLinks: Set[String],
+    val externalLinks: immutable.Seq[String],
     val linkDomains: immutable.Set[String],
     val linkIpAddresses: immutable.Seq[String],
     val embeddedOriginOrEmpty: String,
-    val isTitle: Boolean,
     val followLinks: Boolean,
     val allowClassIdDataAttrs: Boolean) extends TextAndHtml {
 
     def append(text: String): TextAndHtml = {
       append(new TextAndHtmlMaker(site = site, nashorn).apply(
         text, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        isTitle = isTitle, followLinks = followLinks,
+        followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs))
     }
 
@@ -266,12 +313,12 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
         safeHtml + "\n" + more.safeHtml,
         usernameMentions = usernameMentions ++ more.usernameMentions,
         uploadRefs = uploadRefs ++ more.uploadRefs,
+        // CLEAN_UP this  toSet  toSeq  makes no sense.
         externalLinks = (externalLinks.toSet ++ more.externalLinks.toSet).to[immutable.Seq],
         internalLinks = internalLinks ++ more.internalLinks,
-        linkDomains ++ more.linkDomains,
+        linkDomains = linkDomains ++ more.linkDomains,
         linkIpAddresses = (linkIpAddresses.toSet ++ more.linkIpAddresses.toSet).to[immutable.Seq],
         embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-        isTitle = isTitle && more.isTitle,
         followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs)
     }
@@ -286,9 +333,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           // Hmm but probably should analyze links! Well this not in use
           // now anyway, except for via UTX.
           usernameMentions = Set.empty, uploadRefs = Set.empty,
-          externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
+          internalLinks = Set.empty, externalLinks = Nil, linkDomains = Set.empty,
           linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
-          isTitle = false, followLinks = false, allowClassIdDataAttrs = false)
+          followLinks = false, allowClassIdDataAttrs = false)
     }
   }
 
@@ -298,29 +345,27 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
       new TextAndHtmlImpl(text = formInputs.toString, safeHtml = htmlString,
             usernameMentions = Set.empty, // (5LKATS0)
             uploadRefs = Set.empty,
-            externalLinks = Nil, internalLinks = Set.empty,
+            internalLinks = Set.empty, externalLinks = Nil,
             linkDomains = Set.empty,
-            linkIpAddresses = Nil, embeddedOriginOrEmpty = "", false, false, false)
+            linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
+            followLinks = false, allowClassIdDataAttrs = false)
     }
   }
 
 
   CLEAN_UP; REMOVE
   def forTitle(title: String): TitleSourceAndHtml =
-    TitleSourceAndHtml(title) /*
-    apply(title, embeddedOriginOrEmpty = "",
-      isTitle = true, followLinks = false, allowClassIdDataAttrs = false) */
+    TitleSourceAndHtml(title)
 
   def forBodyOrComment(text: String, embeddedOriginOrEmpty: String = "",
         followLinks: Boolean = false, allowClassIdDataAttrs: Boolean = false): TextAndHtml =
     apply(text, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-      isTitle = false, followLinks = followLinks,
-      allowClassIdDataAttrs = allowClassIdDataAttrs)
+          followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
 
   // COULD escape all CommonMark so becomes real plain text
   def forBodyOrCommentAsPlainTextWithLinks(text: String): TextAndHtml =
     apply(text, embeddedOriginOrEmpty = "",
-      isTitle = false, followLinks = false, allowClassIdDataAttrs = false)
+          followLinks = false, allowClassIdDataAttrs = false)
 
   def forHtmlAlready(html: String): TextAndHtml = {
     findLinksEtc(html, RenderCommonmarkResult(html, Set.empty),
@@ -330,85 +375,71 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
   private def apply(
     text: String,
-    isTitle: Boolean,
     embeddedOriginOrEmpty: String,
     followLinks: Boolean,
     allowClassIdDataAttrs: Boolean): TextAndHtml = {
 
-    dieIf(isTitle, "TyE593SKD")
-    if (isTitle) {  // REMOVE
-      val safeHtml = TextAndHtml.sanitizeTitleText(text)
-      new TextAndHtmlImpl(text = text, safeHtml = safeHtml,
-            uploadRefs = Set.empty,
-            externalLinks = Nil, internalLinks = Set.empty,
-            usernameMentions = Set.empty,
-            linkDomains = Set.empty,
-            linkIpAddresses = Nil,
-            embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-            isTitle = true, followLinks = followLinks,
-            allowClassIdDataAttrs = allowClassIdDataAttrs)
-    }
-    else {
-      // Rel links whiting same site: https://moz.com/blog/relative-vs-absolute-urls-whiteboard-friday
-      val renderResult = nashorn.renderAndSanitizeCommonMark_new(
-            text, site, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-            allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
-      findLinksEtc(text, renderResult, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-            followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
-    }
+    val renderResult = nashorn.renderAndSanitizeCommonMark(
+          text, site, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+          allowClassIdDataAttrs = allowClassIdDataAttrs, followLinks = followLinks)
+    findLinksEtc(text, renderResult, embeddedOriginOrEmpty = embeddedOriginOrEmpty,
+          followLinks = followLinks, allowClassIdDataAttrs = allowClassIdDataAttrs)
   }
 
 
   private def findLinksEtc(text: String, renderResult: RenderCommonmarkResult,
         embeddedOriginOrEmpty: String, followLinks: Boolean,
         allowClassIdDataAttrs: Boolean): TextAndHtmlImpl = {
-
     val linksFound = findLinksAndUplRefs(renderResult.safeHtml)
-
-    new TextAndHtmlImpl(text, renderResult.safeHtml, usernameMentions = renderResult.mentions,
+    new TextAndHtmlImpl(
+          text,
+          safeHtml = renderResult.safeHtml,
+          usernameMentions = renderResult.mentions,
           uploadRefs = linksFound.uploadRefs,
-          externalLinks = linksFound.externalLinks,
           internalLinks = linksFound.internalLinks,
+          externalLinks = linksFound.externalLinks,
           linkDomains = linksFound.linkDomains,
           linkIpAddresses = linksFound.linkIpAddresses,
           embeddedOriginOrEmpty = embeddedOriginOrEmpty,
-          isTitle = false,
           followLinks = followLinks,
           allowClassIdDataAttrs = allowClassIdDataAttrs)
   }
 
 
-  def findLinksAndUplRefs(safeHtml: String): LinksFound = {  // rm?
+  // Break out, make static, so more testable? Pass  site: SiteIdHostnames.
+  //
+  TESTS_MISSING //  add to:  class TextAndHtmlTest, "find links" - { ... }
+  //
+  def findLinksAndUplRefs(safeHtml: String): LinksFound = {
 
-    val allLinks = TextAndHtmlMaker.findLinks(safeHtml)
+    val allLinks: Seq[String] = TextAndHtmlMaker.findLinks(safeHtml)
 
     val uploadRefs: Set[UploadRef] =
           UploadsDao.findUploadRefsInLinks(allLinks.toSet, site.pubId)
 
-    var externalLinks = Vector[String]()
     var internalLinks = Set[String]()
+    var externalLinks = Vector[String]()
     var linkDomains = Set[String]()
     var linkAddresses = Vector[String]()
 
-    allLinks foreach { link =>
-        try {
-          val uri = new java.net.URI(link)
-          val domainOrAddress = uri.getHost
+    allLinks foreach { link: String =>
+      try {
+        val uri = new java.net.URI(link)
+        val domainOrAddress = uri.getHost  // can be null, fine
+        if (domainOrAddress eq null) {
+          internalLinks += link
+        }
+        else {
+          // Would it be good if hosts3 included any non-standard port number,
+          // and protocol? In case an old origin was, say, http://ex.com:8080,
+          // and there was a different site at  http://ex.com  (port 80) ?
+          // So we won't mistake links to origin = ex.com  for pointing
+          // to http://ex.com:8080?  [remember_port]
+          // Doesn't matter in real life, with just http = 80 and https = 443.
+          val isSameHostname = site.allHostnames.contains(  // [find_int_links]
+                domainOrAddress)
 
-          val (isUrlPath, isSameHostname) =
-                if (domainOrAddress eq null) (true, false)
-                else {
-                  // Would it be good if hosts3 included any non-standard port number,
-                  // and protocol? In case an old origin was, say, http://ex.com:8080,
-                  // and there was a different site at  http://ex.com  (port 80) ?
-                  // So we won't mistake links to origin = ex.com  for pointing
-                  // to http://ex.com:8080?  [remember_port]
-                  // Doesn't matter in real life, with just http = 80 and https = 443.
-                  val isSameHostname = site.allHostnames.contains(domainOrAddress)
-                  (false, isSameHostname)
-                }
-
-          if (isUrlPath || isSameHostname) {
+          if (isSameHostname) {
             internalLinks += link
           }
           else {
@@ -437,16 +468,17 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
             linkDomains += domainOrAddress
           }
         }
-        catch {
-          case _: Exception =>
-            // ignore, the href isn't a valid link, it seems
-        }
+      }
+      catch {
+        case _: Exception =>
+          // ignore, the href isn't a valid link, it seems
+      }
     }
 
     LinksFound(
           uploadRefs = uploadRefs,
-          externalLinks = externalLinks,
           internalLinks = internalLinks,
+          externalLinks = externalLinks,
           linkDomains = linkDomains,
           linkIpAddresses = linkAddresses)
   }
@@ -456,47 +488,46 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     * This is useful in test suites, because they'll run a lot faster when they won't
     * have to wait for the commonmark renderer to be created.
     */
-  def test(text: String, isTitle: Boolean): TextAndHtml = {
+  def test(text: String): TextAndHtml = {
     dieIf(Globals.isProd, "EsE7GPM2")
-    new TextAndHtmlImpl(text, text, uploadRefs = Set.empty,
-          externalLinks = Nil, internalLinks = Set.empty,
-          usernameMentions = Set.empty,
+    new TextAndHtmlImpl(
+          text, safeHtml = text, usernameMentions = Set.empty, uploadRefs = Set.empty,
+          internalLinks = Set.empty, externalLinks = Nil,
           linkDomains = Set.empty, linkIpAddresses = Nil,
-          embeddedOriginOrEmpty = "", isTitle = isTitle, followLinks = false,
+          embeddedOriginOrEmpty = "", followLinks = false,
           allowClassIdDataAttrs = false)
   }
 
   CLEAN_UP; REMOVE // later, just don't want the diff too large now
-  def testTitle(text: String): TitleSourceAndHtml = TitleSourceAndHtml(text)
+  def testTitle(text: String): TitleSourceAndHtml =
+    TitleSourceAndHtml.alreadySanitized(text, safeHtml = text)
 
-  def testBody(text: String): TextAndHtml = test(text, isTitle = false)
+  def testBody(text: String): TextAndHtml = test(text)
 
-  def wrapInParagraphNoMentionsOrLinks(text: String, isTitle: Boolean): TextAndHtml = {
-    // REMOVE all  isTitle
-    new TextAndHtmlImpl(text, s"<p>$text</p>", usernameMentions = Set.empty,
-          uploadRefs = Set.empty,
-          externalLinks = Nil, internalLinks = Set.empty, linkDomains = Set.empty,
-          linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
-          isTitle = isTitle, followLinks = false,
-          allowClassIdDataAttrs = false)
+
+  def wrapInParagraphNoMentionsOrLinks(safeHtml: String): TextAndHtml = {
+    new TextAndHtmlImpl(
+          safeHtml, safeHtml = s"<p>$safeHtml</p>", usernameMentions = Set.empty,
+          uploadRefs = Set.empty, internalLinks = Set.empty, externalLinks = Nil,
+          linkDomains = Set.empty, linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
+          followLinks = false, allowClassIdDataAttrs = false)
   }
 
 }
 
 
 
-case class StaticSourceAndHtml(
+case class SafeStaticSourceAndHtml(
   override val source: String,
   override val safeHtml: String) extends TextAndHtml {
 
   override def text: String = source
   override def usernameMentions: Set[String] = Set.empty
   override def uploadRefs: Set[UploadRef] = Set.empty
-  override def externalLinks: immutable.Seq[String] = Nil
   override def internalLinks: Set[String] = Set.empty
+  override def externalLinks: immutable.Seq[String] = Nil
   override def linkDomains: Set[String] = Set.empty
   override def linkIpAddresses: immutable.Seq[String] = Nil
-  override def isTitle: Boolean = false
   override def append(moreTextAndHtml: TextAndHtml): TextAndHtml = die("TyE50396SK")
   override def append(text: String): TextAndHtml = die("TyE703RSKTDH")
 }

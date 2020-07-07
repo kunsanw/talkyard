@@ -24,10 +24,8 @@ import debiki.EdHttp.throwForbidden
 import debiki.JsonUtils.readOptString
 import java.{net => jn}
 import java.net.UnknownHostException
-
 import play.api.libs.ws._
 import play.api.libs.json.{JsArray, JsObject, Json}
-
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}

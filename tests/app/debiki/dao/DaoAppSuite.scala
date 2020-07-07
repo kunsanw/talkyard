@@ -27,6 +27,7 @@ import DaoAppSuite._
 import java.io.File
 import play.api.inject.DefaultApplicationLifecycle
 import play.api._
+import talkyard.server.dao.StaleStuff
 
 
 
@@ -50,6 +51,19 @@ class DaoAppSuite(
   val startTime: When = When.fromMillis(10 * 1000 + OneAndZeros1157DaysInMillis),
   val extraConfig: Map[String, String] = Map.empty)
   extends FreeSpec with MustMatchers with BaseOneAppPerSuite with FakeApplicationFactory {
+
+
+  /** Adds new ScalaTest syntax:  "test name".inReadTx(dao) { tx => .... }
+    */
+  implicit class InTxString(val underlying: String) {
+    def inReadTx(dao: => SiteDao)(f: SiteTx => Any /* Assertion */): Unit = {
+      underlying in dao.readTx(f)
+    }
+    def inWriteTx(dao: => SiteDao)(f: (SiteTx, StaleStuff) => Any /* Assertion */): Unit = {
+      underlying in dao.writeTx(f)
+    }
+  }
+
 
   Globals.setIsProdForever(false)
 
@@ -283,30 +297,33 @@ class DaoAppSuite(
   }
 
 
-  /*
-  def createCategory(sectionPageId: PageId,
-        bodyTextAndHtml: TextAndHtml, authorId: UserId, browserIdData: BrowserIdData,
-        dao: SiteDao, anyCategoryId: Option[CategoryId] = None): (Category, Seq[PermsOnPages]) = {
+  def createCategory(slug: String, forumPageId: PageId, parentCategoryId: CategoryId,
+        authorId: UserId, browserIdData: BrowserIdData,
+        dao: SiteDao, anyCategoryId: Option[CategoryId] = None): CreateCategoryResult = {
+CR_DONE
+    val newCatId = dao.readTx(_.nextCategoryId())
 
     val categoryData: CategoryToSave = CategoryToSave(
-      anyId = None, //Some(categoryId),
-      sectionPageId = sectionPageId,
-      parentId = (categoryJson \ "parentId").as[CategoryId],
-      name = (categoryJson \ "name").as[String],
-      slug = (categoryJson \ "slug").as[String].toLowerCase,
-      description = CategoriesDao.CategoryDescriptionSource,
-      position = (categoryJson \ "position").as[Int],
-      newTopicTypes = List(defaultTopicType),
-      shallBeDefaultCategory = shallBeDefaultCategory,
-      unlistCategory = unlistCategory,
-      unlistTopics = unlistTopics,
-      includeInSummaries = includeInSummaries)
+          anyId = Some(newCatId),
+          sectionPageId = forumPageId,
+          parentId = parentCategoryId,
+          name = s"Cat $slug Name",
+          slug = slug,
+          position = 50,
+          newTopicTypes = List(PageType.Discussion),
+          shallBeDefaultCategory = false,
+          unlistCategory = false,
+          unlistTopics = false,
+          includeInSummaries = IncludeInSummaries.Default,
+          description = s"Cat $slug Description")
 
-    val permissions = ArrayBuffer[PermsOnPages]()
+    val permissions = Vector(
+          ForumDao.makeEveryonesDefaultCategoryPerms(newCatId),
+          ForumDao.makeStaffCategoryPerms(newCatId))
 
-    request.dao.createCategory(
-      categoryData, permissions.to[immutable.Seq], request.who)
-  } */
+    dao.createCategory(categoryData, permissions, Who(SystemUserId, browserIdData))
+  }
+
 
   REMOVE; CLEAN_UP // use createPage2 instead, and rename it to createPage().
   def createPage(pageRole: PageType, titleTextAndHtml: TitleSourceAndHtml,

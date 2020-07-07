@@ -379,11 +379,17 @@ object ForumController {
   //
   def topicToJson(topic: PagePathAndMeta, pageStuffById: Map[PageId, PageStuff]): JsObject = {
     val topicStuff = pageStuffById.get(topic.pageId) getOrDie "DwE1F2I7"
-    topicToJson(topic.meta, topicStuff, topic.path.value)
+    topicToJsonImpl(topic.meta, topicStuff, topic.path.value)
   }
 
 
-  def topicToJson(page: PageMeta, topicStuff: PageStuff, urlPath: String): JsObject = {
+  def topicToJson(topicStuff: PageStuff, urlPath: String): JsObject = {
+    topicToJsonImpl(topicStuff.pageMeta, topicStuff, urlPath)
+  }
+
+
+  private def topicToJsonImpl(page: PageMeta, topicStuff: PageStuff, urlPath: String)
+        : JsObject = {
     // Try to remove 'page' or topicStuff.pageMeta? Don't need both.
     dieIf(Globals.isDevOrTest && page != topicStuff.pageMeta, "TyE305DRJ24")
 

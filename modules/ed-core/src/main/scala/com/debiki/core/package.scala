@@ -457,9 +457,9 @@ package object core {
   case class SiteUserId(siteId: SiteId, userId: UserId)
   case class SitePageVersion(siteVersion: SiteVersion, pageVersion: PageVersion)
 
-  trait PageTitleRole {
+  trait PageTitleRole {  RENAME // to PageTitleType
     def title: String
-    def role: PageType
+    def role: PageType  ; RENAME // to pageType
   }
 
 
@@ -1192,9 +1192,16 @@ package object core {
   def SEC_TESTS_MISSING = ()
   def ADD_TO_DOCS = ()
   def SHOULD_CODE_REVIEW = ()
+  def CR_DONE = ()
   def FASTER_E2E_TESTS = () // An opportunity to speed up the e2e tests (maybe just marginally)
   def FLAKY = ()          // If an e2e test has races, can fail (ought to fix ... well ... later)
+
+  // Maybe split into [defense] and [weakness]?
+  // [defense] code tags are good — means security issues that have been dealt with.
+  // [weakness] means an issues not yet handled, might lead to a 'vulnerability'
+  // that an attacker / 'threat actor' can 'exploit'.
   def SECURITY = ()       // Some security issue, not necessarily so very important
+
   def SELF_DOS = ()
   def ASTROTURFING = ()   // Someone creates many accounts and pretends to be many people
   def PRIVACY = ()        // Could make things a bit more private

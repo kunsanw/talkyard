@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015 Kaj Magnus Lindberg
+ * Copyright (c) 2015, 2020 Kaj Magnus Lindberg
  * Parts Copyright (c) 2013 jzeta (Joanna Zeta)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@ import scala.util.matching.Regex
 
 
 class VideoPrevwRendrEng(globals: Globals)
-  extends InstantLinkPreviewEngine(globals) {
+  extends InstantLinkPrevwRendrEng(globals) {
 
   override val regex: Regex =
     """^(https?:)?\/\/.*\.(mov|mp4|m4v|webm|ogv)(\?.*)?$""".r

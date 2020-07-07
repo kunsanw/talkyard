@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2016 Kaj Magnus Lindberg
+ * Copyright (c) 2012-2020 Kaj Magnus Lindberg
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,11 +24,10 @@ import debiki.EdHttp._
 import ed.server.search.SearchEngine
 import org.{elasticsearch => es}
 import redis.RedisClient
-import talkyard.server.TyLogger
-
+import talkyard.server.dao._
+import talkyard.server.{PostRendererSettings, TyLogging}
 import scala.collection.immutable
 import scala.collection.mutable
-import SiteDao._
 import ed.server.EdContext
 import ed.server.auth.MayMaybe
 import ed.server.notf.NotificationGenerator
@@ -38,7 +37,6 @@ import ed.server.summaryemails.SummaryEmailsDao
 import org.scalactic.{ErrorMessage, Or}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
-import talkyard.server.PostRendererSettings
 
 
 
@@ -100,6 +98,7 @@ class SiteDao(
   private val elasticSearchClient: es.client.Client,
   val config: Config)
   extends AnyRef
+  with TyLogging
   with ReadOnlySiteDao
   with AssetBundleDao
   with SettingsDao
@@ -126,7 +125,7 @@ class SiteDao(
   with FeedsDao
   with AuditDao {
 
-  protected lazy val logger: play.api.Logger = TyLogger("SiteDao")
+  import SiteDao._
 
   // Could be protected instead? Then need to move parts of ApiV0Controller to inside the Dao.
   lazy val memCache = new MemCache(siteId, cache, globals.mostMetrics)
@@ -141,6 +140,8 @@ class SiteDao(
   def now(): When = globals.now()
   def nashorn: Nashorn = context.nashorn
 
+  REFACTOR // rename to anyPageDao and return a Some(PageDao) with PageMeta pre-loaded
+  // if the page exist, otherwise None? — If callers "always" want a PageMeta.
   def newPageDao(pageId: PageId, tx: SiteTransaction): PageDao =
     PageDao(pageId, loadWholeSiteSettings(tx), tx)
 
@@ -203,17 +204,17 @@ class SiteDao(
           fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
     val staleStuff = new StaleStuff()
-    val r = readWriteTransaction(tx => {
+    val r: R = readWriteTransaction(tx => {
       val r = fn(tx, staleStuff)
       tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
       r
     }, allowOverQuota)
-    staleStuff.stalePageIdsInDb foreach refreshPageInMemCache
+    (staleStuff.stalePageIdsInDb
+          ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
     r
   }
 
 
-  RENAME // to writeTx
   @deprecated("now", "use writeTx { (tx, staleStuff) => ... } instead")
   def readWriteTransaction[R](fn: SiteTransaction => R, allowOverQuota: Boolean = false): R = {
     // Serialize writes per site. This avoids all? transaction rollbacks because of
@@ -553,7 +554,7 @@ class SiteDao(
 
 
 
-object SiteDao {
+object SiteDao extends TyLogging {
 
   private val SoftMaxOldHostnames = 5
   private val WaitUntilAnotherHostnameInterval = 60

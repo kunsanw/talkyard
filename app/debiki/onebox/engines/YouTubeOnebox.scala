@@ -1,6 +1,5 @@
 /**
  * Copyright (c) 2015 Kaj Magnus Lindberg
- * Parts Copyright (c) 2013 jzeta (Joanna Zeta)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +31,7 @@ import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 
 
-class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(globals) {
+class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
 
   import YouTubePrevwRendrEng._
 
@@ -53,17 +52,15 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
   def renderInstantly(safeUrl: String): String Or LinkPreviewProblem = {
     javaUri = new jn.URI(safeUrl)
     findVideoId(javaUri) match {
-      case Some(videoId) =>
-        // We must sanitize here because alreadySanitized above is true, so that
-        // the iframe below won't be removed.
-        // (Better sanitize, also if seems to be no werird chars in the id.)
-        if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
+      case Some(unsafeVideoId) =>
+        // Double check id.
+        if (unsafeVideoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
           return Bad(LinkPreviewProblem(
                 "Bad YouTube video ID, cannot create preview",
                 unsafeUrl = safeUrl, errorCode = "TyEYOUTBID_"))
         }
 
-        val safeId = safeEncodeForHtml(videoId)
+        val safeId = safeEncodeForHtml(unsafeVideoId)
         val unsafeParams = findParams(javaUri) getOrElse {
           return Bad(LinkPreviewProblem(
                 "Bad YouTube video URL, cannot create preview",
@@ -78,7 +75,7 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
         // https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player
         //
         // So, needs site origin too.
-        // Re-render if origin changes :-(  ?  (new Talkyard hostname)
+        // Re-render if origin changes :-(  ?  (new Talkyard hostname)  [html_json]
 
         val safeParams = safeEncodeForHtml(unsafeParams)
         // wmode=opaque makes it possible to cover the iframe with a transparent div,
@@ -93,8 +90,9 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
       case None =>
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
+        // No, instead use oEmbed.
         Bad(LinkPreviewProblem(
-              "Cannot currently onebox this YouTube URL [TyE45kFE2]",
+              "Cannot currently onebox this YouTube URL",
               unsafeUrl = safeUrl, errorCode = "TyEYOUTB0ID"))
     }
   }
@@ -102,6 +100,9 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
 }
 
 
+/** Parts Copyright (c) 2013 jzeta (Joanna Zeta)
+  * MIT: https://github.com/discourse/onebox/blob/master/LICENSE.txt
+  */
 object YouTubePrevwRendrEng {
 
   private val SlashVideoIdRegex = """/([^/]+)""".r
@@ -115,7 +116,7 @@ object YouTubePrevwRendrEng {
     * - https://www.youtube.com/embed/112233abc
     */
   def findVideoId(javaUri: jn.URI): Option[String] = {
-    val path = javaUri.getPath  // null?!
+    val path = javaUri.getPathEmptyNotNull
     if (javaUri.getHost endsWith "youtu.be") {
       // The url is like: http://youtu.be/112233abc
       SlashVideoIdRegex findGroupIn path
@@ -150,4 +151,5 @@ object YouTubePrevwRendrEng {
     Some(result)
   }
 }
+
 

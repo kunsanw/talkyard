@@ -15,7 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.onebox   // RENAME to talkyard.server.links
+// SHOULD_CODE_REVIEW later and the tests too.
+
+package debiki.onebox   // RENAME to talkyard.server.linkpreviews
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
@@ -55,27 +57,32 @@ object RenderPreviewResult {
 }
 
 
+
 class RenderPreviewParams(
   val siteId: SiteId,
   val unsafeUrl: String,
+  val inline: Boolean,
   val requesterId: UserId,
   val mayHttpFetch: Boolean,
   val loadPreviewFromDb: String => Option[LinkPreview],
   val savePreviewInDb: LinkPreview => Unit)
 
 
+
 case class LinkPreviewProblem(
   unsafeProblem: String, unsafeUrl: String, errorCode: String)
 
 
-/**
-  * - globals — that's s a bit much — COULD instead, incl only what's needed:
+
+/** Renders link previews for one type of links — e.g. YouTube,
+  * or Reddit, or maybe generic oEmed links.
+  *
+  * COULD remove param globals, and incl only precisely what's needed?
   */
-abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
-  import LinkPreviewRenderEngine._
+abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CLEAN_UP // move to its own file?
 
   def regex: Regex =
-    die("TyE603RKDJ35", "Please override 'handles(url): Boolean' or 'regex: Regex'")
+    die("TyE603RKDJ35", "Please implement 'handles(url): Boolean' or 'regex: Regex'")
 
   def providerName: Option[String]
 
@@ -83,13 +90,19 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
   def handles(url: String): Boolean = regex matches url
 
-  /** If an engine needs to include an iframe, then it'll have to sanitize everything itself,
-    * because Google Caja's JsHtmlSanitizer (which we use) removes iframes.
+  /** If an engine needs to include an iframe or any "uexpected thing",
+    * then it'll have to sanitize everything itself, because
+    * TextAndHtml.sanitizeRelaxed() removes iframes and other uexpected things.
     */
   protected def alreadySanitized = false
 
+  /** An engine can set this to true, to get iframe-sandboxed instead of
+    * html-sanitized.
+    */
   protected def sandboxInIframe = false
 
+  /** By default, we add a "View at (provider name)" link below the link preview.
+    */
   protected def addViewAtLink = true
 
   // (?:...) is a non-capturing group.  (for local dev search: /-/u/ below.)
@@ -105,17 +118,28 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
   }
 
 
-  final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
-    val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
+  final def fetchRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
 
-    COULD_OPTIMIZE // hash the url, so shorter?
+    // ----- Any cached preview?
+
+    // This prevents pg strorage DoS.  [ln_pv_netw_err]
+    COULD_OPTIMIZE // hash the url = Redis key, so shorter?
+    val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
     redisCache.getLinkPreviewSafeHtml(urlAndFns.unsafeUrl) foreach { safeHtml =>
       SHOULD // if preview broken *and* if (urlAndFns.mayHttpFetch):
       // retry, although cache entry still here.
       // E.g. was netw err,
-      // but at most X times per minute? Otherwise return the cached failed html.
+      // but at most X times per minute? Otherwise return the cached broken html.
       return Future.successful(safeHtml)
     }
+
+    // ----- Http fetch preview
+
+    // Or generate instantly.
+
+    val futureHtml = loadAndRender(urlAndFns)
+
+    // ----- Sanitize
 
     def sanitizeAndWrap(htmlOrError: String Or LinkPreviewProblem): String = {
       // <aside> class:    s_LnPv (-Err)    means Link Preview (Error)
@@ -123,21 +147,17 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
       var safeHtml = htmlOrError match {
         case Bad(problem) =>
-          safeProblemHtml(problem.unsafeProblem, unsafeUrl = urlAndFns.unsafeUrl,
-                extraLnPvCssClasses = extraLnPvCssClasses, errorCode = problem.errorCode)
+          LinkPreviewHtml.safeProblem(unsafeProblem = problem.unsafeProblem,
+                unsafeUrl = urlAndFns.unsafeUrl, errorCode = problem.errorCode)
         case Good(maybeUnsafeHtml) =>
           if (alreadySanitized) {
             maybeUnsafeHtml
           }
           else if (sandboxInIframe) {
-            SandboxedAutoSizeIframe.makeSafePreviewHtml(
-                  unsafeUrl = urlAndFns.unsafeUrl, unsafeHtml = maybeUnsafeHtml,
-                  unsafeProviderName = providerName,
-                  extraLnPvCssClasses = extraLnPvCssClasses)
+            LinkPreviewHtml.sandboxedIframe(maybeUnsafeHtml)
           }
           else {
             // COULD pass info to here so can follow links sometimes? [WHENFOLLOW]
-            //Jsoup.clean(html, TextAndHtml.relaxedHtmlTagWhitelist)
             TextAndHtml.sanitizeRelaxed(maybeUnsafeHtml)
           }
       }
@@ -150,12 +170,14 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
       // https://web.dev/external-anchors-use-rel-noopener/
       //  when you use target="_blank", always add rel="noopener" or rel="noopener"
       //
-      // Extra security check. For now, remove later.
+      // Extra security check:
+      DO_AFTER // 2020-10-01 remove this extra check.
       // This might break previews with '_blank' in any text / description loaded
       // via OpenGraph or html tags — but Talkyard doesn't support that yet,
       // so, for now, this is fine:
-      if (!sandboxInIframe && safeHtml.contains("_blank") &&
-            !safeHtml.contains("noopener")) {
+      if (!sandboxInIframe && safeHtml.contains("_blank")
+            && !safeHtml.contains("noopener")
+            && !this.isInstanceOf[InternalLinkPrevwRendrEng]) {
         logger.warn(s"Forgot to add noopener to _blank link: ${urlAndFns.unsafeUrl
               } [TyEFORGTNORFR]")
         return <pre>{"Talkyard bug: _blank but no 'noopener' [TyE402RKDHF46]:\n" +
@@ -171,19 +193,16 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
       }
       safeHtml = pointUrlsToCdn(safeHtml)
 
-      dieIf(safeEncodeForHtml(extraLnPvCssClasses)
-            != extraLnPvCssClasses, "TyE06RKTDH2")
+      val lnPvErr = if (htmlOrError.isBad) "s_LnPv-Err " else ""
 
-      safeHtml = wrapSafeHtmlInAside(
-            safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
+      safeHtml = LinkPreviewHtml.safeAside(
+            safeHtml = safeHtml, extraLnPvCssClasses = lnPvErr + extraLnPvCssClasses,
             unsafeUrl = urlAndFns.unsafeUrl, unsafeProviderName = providerName,
             addViewAtLink = addViewAtLink)
 
       redisCache.putLinkPreviewSafeHtml(urlAndFns.unsafeUrl, safeHtml)
       safeHtml
     }
-
-    val futureHtml = loadAndRender(urlAndFns)
 
     // Use if-isCompleted to get an instant result, if possible — Future.map()
     // apparently isn't executed directly, even if the future is completed.
@@ -203,57 +222,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
 
 
-object LinkPreviewRenderEngine {
-
-  private def safeBoringLinkTag(unsafeUrl: String, isOk: Boolean): String = {
-    val spaceErrClass = if (!isOk) " s_LnPv_L-Err" else ""
-    val safeUrl = safeEncodeForHtml(unsafeUrl)
-    s"""<a href="$safeUrl" class="s_LnPv_L$spaceErrClass" """ +
-      s"""target="_blank" rel="nofollow noopener">$safeUrl</a>"""
-  }
-
-
-  private def safeProblemHtml(problem: String, unsafeUrl: String,
-      extraLnPvCssClasses: String, errorCode: String = ""): String = {
-
-    val safeProblem = TextAndHtml.safeEncodeForHtmlContentOnly(problem)
-    val safeLinkTag = safeBoringLinkTag(unsafeUrl, isOk = false)
-    val errInBrackets = if (errorCode.isEmpty) "" else s" <code>[$errorCode]</code>"
-    val safeHtml =
-      s"""<aside class="onebox s_LnPv s_LnPv-Err $extraLnPvCssClasses clearfix">${
-        safeProblem} $safeLinkTag$errInBrackets</aside>"""
-
-    // safeHtml is safe already — let's double-sanitize just in case:
-    TextAndHtml.sanitizeAllowLinksAndBlocks(
-      safeHtml, _.addAttributes("aside", "class").addAttributes("a", "class", "rel"))
-  }
-
-
-  def wrapSafeHtmlInAside(safeHtml: String, extraLnPvCssClasses: String,
-        unsafeUrl: String, unsafeProviderName: Option[String],
-        addViewAtLink: Boolean): String = {
-    <aside class={s"onebox s_LnPv $extraLnPvCssClasses clearfix"}>{
-        // The html should have been sanitized already (that's why the param
-        // name is *safe*Html).
-        scala.xml.Unparsed(safeHtml)
-      }{ if (!addViewAtLink) xml.Null else {
-        <div class="s_LnPv_ViewAt"
-          ><a href={unsafeUrl} target="_blank" rel={
-                // 'noopener' prevents the new browser tab from redireting the current
-                // browser tab to, say, a pishing site.
-                // 'ugc' means User-generated-content. There's also  "sponsored",
-                // which must be used for paid links (or "nofollow" is also ok,
-                // but not "ugc" — search engines can penalize that).
-                "nofollow noopener ugc"}>{
-            "View at " + unsafeProviderName.getOrElse(unsafeUrl) /* I18N */
-            } <span class="icon-link-ext"></span></a
-        ></div>
-    }}</aside>.toString
-  }
-}
-
-
-abstract class ExternalRequestLinkPreviewEngine(globals: Globals, siteId: SiteId,
+abstract class ExternalFetchLinkPrevwRendrEng(globals: Globals, siteId: SiteId,
         mayHttpFetch: Boolean)
   extends LinkPreviewRenderEngine(globals) {
 }
@@ -265,16 +234,16 @@ abstract class ExternalRequestLinkPreviewEngine(globals: Globals, siteId: SiteId
   * And can optionally scan the content, find out if it's not allowed  [content_filter]
   * as per the community rules & guidelines.
   */
-abstract class InstantLinkPreviewEngine(globals: Globals)
+abstract class InstantLinkPrevwRendrEng(globals: Globals)
   extends LinkPreviewRenderEngine(globals) {
 
-  val extraLnPvCssClasses: String = "s_LnPv-Instant " + providerLnPvCssClassName
+  val extraLnPvCssClasses: String = providerLnPvCssClassName
 
   def providerName: Option[String] = None
 
   def providerLnPvCssClassName: String
 
-  protected def loadAndRender(urlAndFns: RenderPreviewParams)
+  protected final def loadAndRender(urlAndFns: RenderPreviewParams)
         : Future[String Or LinkPreviewProblem] = {
     Future.successful(renderInstantly(urlAndFns.unsafeUrl))
   }
@@ -304,16 +273,12 @@ class LinkPreviewRenderer(
 
   import LinkPreviewRenderer._
 
-  private val pendingRequestsByUrl = mutable.HashMap[String, Future[String]]()
-  private val oneboxHtmlByUrl = mutable.HashMap[String, String]()
-  private val failedUrls = mutable.HashSet[String]()
   private val PlaceholderPrefix = "onebox-"
   private val NoEngineException = new DebikiException("DwE3KEF7", "No matching preview engine")
 
-  private val executionContext: ExecutionContext = globals.executionContext
-
   private val engines = Seq[LinkPreviewRenderEngine](
     // COULD_OPTIMIZE These are, or can be made thread safe — no need to recreate all the time.
+    new InternalLinkPrevwRendrEng(globals, siteId),
     new ImagePrevwRendrEng(globals),
     new VideoPrevwRendrEng(globals),
     new GiphyPrevwRendrEng(globals),
@@ -327,14 +292,15 @@ class LinkPreviewRenderer(
     new RedditPrevwRendrEng(globals, siteId, mayHttpFetch),
     )
 
-  def loadRenderSanitize(url: String): Future[String] = {
+  def fetchRenderSanitize(url: String, inline: Boolean): Future[String] = {
     require(url.length <= MaxUrlLength, s"Too long url: $url TyE53RKTKDJ5")
+    unimplementedIf(inline, "TyE50KSRDH7")
 
-    def loadPreiewInfoFromDatabase(downloadUrl: String): Option[LinkPreview] = {
+    def loadPreviewFromDatabase(downloadUrl: String): Option[LinkPreview] = {
       // Don't create a write tx — could cause deadlocks, because unfortunately
       // we might be inside a tx already: [nashorn_in_tx] (will fix later)
       val siteDao = globals.siteDao(siteId)
-      siteDao.readOnlyTransaction { tx =>
+      siteDao.readTx { tx =>
         tx.loadLinkPreviewByUrl(linkUrl = url, downloadUrl = downloadUrl)
       }
     }
@@ -344,11 +310,12 @@ class LinkPreviewRenderer(
         val args = new RenderPreviewParams(
               siteId = siteId,
               unsafeUrl = url,
+              inline = inline,
               requesterId = requesterId,
               mayHttpFetch = mayHttpFetch,
-              loadPreviewFromDb = loadPreiewInfoFromDatabase,
-              savePreviewInDb = savePreiewInDatabase)
-        return engine.loadRenderSanitize(args)
+              loadPreviewFromDb = loadPreviewFromDatabase,
+              savePreviewInDb = savePreviewInDatabase)
+        return engine.fetchRenderSanitize(args)
       }
     }
 
@@ -356,34 +323,31 @@ class LinkPreviewRenderer(
   }
 
 
-  private def savePreiewInDatabase(linkPreview: LinkPreview): Unit = {
+  private def savePreviewInDatabase(linkPreview: LinkPreview): Unit = {
     dieIf(!mayHttpFetch, "TyE305KSHW2",
           s"Trying to save link preview, when may not fetch: ${linkPreview.link_url_c}")
     val siteDao = globals.siteDao(siteId)
-    siteDao.readWriteTransaction { tx =>
+    siteDao.writeTx { (tx, _) =>
+      COULD // refresh pages that link to this preview, add to StaleStuff.
       tx.upsertLinkPreview(linkPreview)
     }
   }
 
 
-  def loadRenderSanitizeInstantly(url: String): RenderPreviewResult = {
+  def fetchRenderSanitizeInstantly(url: String, inline: Boolean): RenderPreviewResult = {
     // Don't throw, this might be in a background thread.
+
     if (url.length > MaxUrlLength)
       return RenderPreviewResult.NoPreview
 
     def placeholder = PlaceholderPrefix + nextRandomString()
 
-    val futureSafeHtml = loadRenderSanitize(url)
+    val futureSafeHtml = fetchRenderSanitize(url, inline)
     if (futureSafeHtml.isCompleted)
       return futureSafeHtml.value.get match {
         case Success(safeHtml) => RenderPreviewResult.Done(safeHtml, placeholder)
         case Failure(throwable) => RenderPreviewResult.NoPreview
       }
-
-    futureSafeHtml.onComplete({
-      case Success(safeHtml) =>
-      case Failure(throwable) =>
-    })(executionContext)
 
     RenderPreviewResult.Loading(futureSafeHtml, placeholder)
   }
@@ -413,6 +377,7 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
     */
   def renderAndSanitizeOnebox(unsafeUrl: String): String = {
     lazy val safeUrl = org.owasp.encoder.Encode.forHtml(unsafeUrl)
+    val inline = false // for now
 
     if (!globals.isInitialized) {
       // Also see the comment for Nashorn.startCreatingRenderEngines()
@@ -425,7 +390,7 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
            soft-restarts the server in development mode. [DwE4KEPF72]</p>"""
     }
 
-    linkPreviewRenderer.loadRenderSanitizeInstantly(unsafeUrl) match {
+    linkPreviewRenderer.fetchRenderSanitizeInstantly(unsafeUrl, inline = inline) match {
       case RenderPreviewResult.NoPreview =>
         UX; COULD // target="_blank" — maybe site conf val? [site_conf_vals]
         s"""<a href="$safeUrl" rel="nofollow">$safeUrl</a>"""

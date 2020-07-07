@@ -538,9 +538,9 @@ object RateLimits {
   }
 
 
-  object LoadOnebox extends RateLimits {
-    val key = "LdPv"
-    val what = "loaded too many link previews"
+  object FetchLinkPreview extends RateLimits {
+    val key = "LnPv"
+    val what = "fetched too many link previews"
     def maxPerFifteenSeconds = 10
     def maxPerFifteenMinutes: Int = 75  // 5 per minute is a lot?
     def maxPerDay: Int = Unlimited

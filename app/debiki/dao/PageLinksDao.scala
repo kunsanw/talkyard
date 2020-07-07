@@ -25,43 +25,15 @@ import scala.collection.mutable
 
 
 
-/** Cached things that got out-of-date, should be re-rendered.
-  * Since we 1) pass a mutable StaleStuff to "everywhere" (well, not yet,
-  * just getting started with this)  — then, forgetting to pass it along,
-  * causes a compile time error. And since 2) [[SiteDao.writeTx]] automatically
-  * just before the transaction ends, uncaches all stale stuff,
-  * it's not so easy to forget to uncache the right things?
-  *
-  * Mutable. Not thread safe.
-  */
-class StaleStuff {
-  private var _stalePageIdsMemCacheOnly: Set[PageId] = Set.empty
-  private var _stalePageIds: Set[PageId] = Set.empty
-
-  def stalePageIdsInDb: Set[PageId] = _stalePageIds
-  def stalePageIdsInMemCache: Set[PageId] = _stalePageIds ++ _stalePageIdsMemCacheOnly
-
-  def addPageId(pageId: PageId, memCacheOnly: Boolean): Unit = {
-    if (memCacheOnly) _stalePageIdsMemCacheOnly += pageId
-    else _stalePageIds += pageId
-  }
-
-  def addPageIds(pageIds: Set[PageId]): Unit = {
-    _stalePageIds ++= pageIds
-  }
-}
-
-
-
 trait PageLinksDao {
   self: SiteDao =>
 
-  memCache.onPageCreated { case (_, pagePath: PagePathWithId) =>
-    uncacheLinkedPages(pagePath.pageId)
+  memCache.onPageCreated { (_, pagePath: PagePathWithId) =>
+    uncacheLinksToPagesLinkedFrom(pagePath.pageId)
   }
 
   memCache.onPageSaved { sitePageId =>
-    uncacheLinkedPages(sitePageId.pageId)
+    uncacheLinksToPagesLinkedFrom(sitePageId.pageId)
   }
 
 
@@ -78,7 +50,7 @@ trait PageLinksDao {
 
   def getPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
     memCache.lookup(
-          linksKey(pageId),
+          linksToKey(pageId),
           orCacheAndReturn = Some {
             loadPageIdsLinkingTo(pageId, inclDeletedHidden = inclDeletedHidden)
           }).get
@@ -86,19 +58,19 @@ trait PageLinksDao {
 
 
   def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
-    readTx(_.loadPageIdsLinkingTo(pageId, inclDeletedHidden))
+    readTx(_.loadPageIdsLinkingToPage(pageId, inclDeletedHidden))
   }
 
 
-  private def uncacheLinkedPages(pageId: PageId): Unit = {
+  private def uncacheLinksToPagesLinkedFrom(pageId: PageId): Unit = {
     val linkedPageIds: Set[PageId] = getPageIdsLinkedFrom(pageId)
     linkedPageIds.foreach { id =>
-      memCache.remove(linksKey(id))
+      memCache.remove(linksToKey(id))
     }
   }
 
 
-  private def linksKey(pageId: PageId) =
+  private def linksToKey(pageId: PageId) =
     MemCacheKey(siteId, s"$pageId|PgLns")
 
 
