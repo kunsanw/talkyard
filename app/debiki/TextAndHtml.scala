@@ -53,10 +53,14 @@ sealed trait TitleSourceAndHtml extends SourceAndHtml {
 
 object TitleSourceAndHtml {
   def alreadySanitized(source: String, safeHtml: String): TitleSourceAndHtml = {
+    // (These xParam avoid `def x = x`, which the compiler apparently tail optimizes
+    // into a forever eternal loop.)
+    val sourceParam = source
+    val safeHtmlParam = safeHtml
     new TitleSourceAndHtml {
-      def source: String = source
-      def text: String = source
-      def safeHtml: String = safeHtml
+      def source: String = sourceParam
+      def text: String = sourceParam
+      def safeHtml: String = safeHtmlParam
     }
   }
 
