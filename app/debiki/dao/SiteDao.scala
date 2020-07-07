@@ -24,11 +24,9 @@ import debiki.EdHttp._
 import ed.server.search.SearchEngine
 import org.{elasticsearch => es}
 import redis.RedisClient
-import talkyard.server.TyLogger
-
+import talkyard.server.{PostRendererSettings, TyLogging}
 import scala.collection.immutable
 import scala.collection.mutable
-import SiteDao._
 import ed.server.EdContext
 import ed.server.auth.MayMaybe
 import ed.server.notf.NotificationGenerator
@@ -38,7 +36,6 @@ import ed.server.summaryemails.SummaryEmailsDao
 import org.scalactic.{ErrorMessage, Or}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
-import talkyard.server.PostRendererSettings
 
 
 
@@ -100,6 +97,7 @@ class SiteDao(
   private val elasticSearchClient: es.client.Client,
   val config: Config)
   extends AnyRef
+  with TyLogging
   with ReadOnlySiteDao
   with AssetBundleDao
   with SettingsDao
@@ -126,7 +124,7 @@ class SiteDao(
   with FeedsDao
   with AuditDao {
 
-  protected lazy val logger: play.api.Logger = TyLogger("SiteDao")
+  import SiteDao._
 
   // Could be protected instead? Then need to move parts of ApiV0Controller to inside the Dao.
   lazy val memCache = new MemCache(siteId, cache, globals.mostMetrics)
@@ -203,17 +201,23 @@ class SiteDao(
           fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
     val staleStuff = new StaleStuff()
-    val r = readWriteTransaction(tx => {
+    logger.trace(s"s$siteId writeTx ...")
+
+    val r: R = readWriteTransaction(tx => {
+      logger.trace(s"s$siteId in tx ...")
       val r = fn(tx, staleStuff)
       tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
+      logger.trace(s"s$siteId in tx END")
       r
     }, allowOverQuota)
-    staleStuff.stalePageIdsInDb foreach refreshPageInMemCache
+    (staleStuff.stalePageIdsInDb
+          ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
+
+    logger.trace(s"s$siteId writeTx END")
     r
   }
 
 
-  RENAME // to writeTx
   @deprecated("now", "use writeTx { (tx, staleStuff) => ... } instead")
   def readWriteTransaction[R](fn: SiteTransaction => R, allowOverQuota: Boolean = false): R = {
     // Serialize writes per site. This avoids all? transaction rollbacks because of
@@ -553,7 +557,7 @@ class SiteDao(
 
 
 
-object SiteDao {
+object SiteDao extends TyLogging {
 
   private val SoftMaxOldHostnames = 5
   private val WaitUntilAnotherHostnameInterval = 60
@@ -565,6 +569,7 @@ object SiteDao {
 
   def synchronizeOnManySiteIds[R](siteIds: Set[SiteId])(block: => R): R = {
     // Lock in same order, to avoid deadlocks.
+    logger.trace(s"synchronizeOnManySiteIds: Locking site ids: $siteIds ... [TyMLOCKMANY]")
     val idsSorted = siteIds.toSeq.sorted
     syncManyImpl(idsSorted) {
       block
@@ -573,7 +578,8 @@ object SiteDao {
 
 
   private def syncManyImpl[R](siteIds: Seq[SiteId])(block: => R): R = {
-    if (siteIds.isEmpty) {
+    logger.trace(s"syncManyImpl: Locking site ids: $siteIds ... [TyMLOCKMANY]")
+    val r = if (siteIds.isEmpty) {
       block
     }
     else {
@@ -585,6 +591,8 @@ object SiteDao {
         }
       }
     }
+    logger.trace(s"syncManyImpl: Locking site ids: $siteIds END [TyMLOCKMANY]")
+    r
   }
 
 
@@ -592,16 +600,28 @@ object SiteDao {
     val lock = locksBySiteId.getOrElseUpdate(siteId, new ReentrantLock)
     // Wait for fairly long (some seconds) in case a garbage collection takes long.
     // (Previously we waited forever here — so a few seconds should be fine.)
+    logger.trace(s"Locking s$siteId ... [TyMLOCKSITE]")
+
+    try throw new RuntimeException() catch {
+      case e: RuntimeException =>
+        e.printStackTrace()
+    }
+
+    logger.trace(s"Locking s$siteId ... Now: [TyMLOCKSITE]")
     if (lock.tryLock(3L, TimeUnit.SECONDS)) {
+      logger.trace(s"LockED s$siteId. [TyMLOCKSITEOK]")
       try {
         block
       }
       finally {
         lock.unlock()
+        logger.trace(s"Unlocked s$siteId [TyMUNLSITE]")
       }
     }
     else {
-      throw new RuntimeException(s"Couldn't lock site $siteId for updates [TyE0SITELOCK]")
+      val message = s"Couldn't lock site $siteId for updates [TyE0SITELOCK]"
+      logger.error(message)
+      throw new RuntimeException(message)
     }
   }
 
