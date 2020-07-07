@@ -48,8 +48,8 @@ Indented _statements_: 2 spaces as typical in Scala code.
 Talkyard: Only one "interesting" thing should happen per line.
 
 Talkyard: Max 95 chars per line. Then you can have two editor tabs open side by side
-on a 14'' 1920 px wide laptop
-(1920 is a typical laptop resolution, at least now year 2020).
+on a 14'' 1920 px wide laptop, at least with font Droid Sans Mono size 12.
+(1920 is a typical laptop resolution, at least now year 2020.)
 
 > _"Do not unnecessarily use braces where a single statement will do."_
 

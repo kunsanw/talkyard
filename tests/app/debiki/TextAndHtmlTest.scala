@@ -41,7 +41,7 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
     }
 
     def checkRemovesScriptAttributes(fn: String => String, keepTag: Boolean): Unit = {
-      val (start, end) = if (keepTag) ("<a>", "</a>") else ("", "")
+      val (start, end) = if (keepTag) ("""<a rel="nofollow noopener">""", "</a>") else ("", "")
       fn("""<a href="javascript:alert(123)">Title</a>""") mustBe s"${start}Title$end"
       fn("""Hi <a onclick="alert(123)">Title</a>""") mustBe s"Hi ${start}Title$end"
     }
@@ -123,7 +123,7 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
     "sanitize posts  TyT03386KTDGR" - {
       import TextAndHtml.relaxedHtmlTagWhitelist
 
-      def sanPost(text: String) = Jsoup.clean(text, relaxedHtmlTagWhitelist)
+      def sanPost(text: String): String = Jsoup.clean(text, relaxedHtmlTagWhitelist)
 
       "remove <script> and anything inside" in {
         checkRemovesScriptTags(sanPost)
@@ -133,24 +133,24 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
         checkRemovesScriptAttributes(sanPost, keepTag = true)
       }
 
-      "add rel=nofollow" in {   // ?? broken ??
+      "add rel=nofollow" in {
         sanPost("""<a href="https://x.co">x.co</a>"""
-              ) mustBe """<a href="https://x.co" rel="nofollow">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
 
-      "add rel='nofollow noopener'  if _blank" in {   // ?? broken ??
+      "add rel='nofollow noopener'  if _blank  —  oh, actually removes _blank" in {
         sanPost("""<a href="https://x.co" target="_blank">x.co</a>""") mustBe (
-              """<a href="https://x.co" target="_blank" rel="nofollow noopener">x.co</a>""")
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
       }
 
-      "change rel=follow to nofollow" in {   // ?? broken ??
+      "change rel=follow to nofollow" in {
         sanPost("""<a href="https://x.co" rel="follow">x.co</a>"""
-              ) mustBe """<a href="https://x.co" rel="nofollow">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
 
-      "change rel=follow to 'nofollow noopener'  if _blank" in {   // ?? broken ??
+      "change rel=follow to 'nofollow noopener'  if _blank  —  oh, removes _blank" in {
         sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe (
-              """<a href="https://x.co" target="_blank" rel="nofollow noopener">x.co</a>""")
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
       }
     }
   }

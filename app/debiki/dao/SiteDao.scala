@@ -201,19 +201,13 @@ class SiteDao(
           fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
     val staleStuff = new StaleStuff()
-    logger.trace(s"s$siteId writeTx ...")
-
     val r: R = readWriteTransaction(tx => {
-      logger.trace(s"s$siteId in tx ...")
       val r = fn(tx, staleStuff)
       tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
-      logger.trace(s"s$siteId in tx END")
       r
     }, allowOverQuota)
     (staleStuff.stalePageIdsInDb
           ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
-
-    logger.trace(s"s$siteId writeTx END")
     r
   }
 
@@ -569,7 +563,6 @@ object SiteDao extends TyLogging {
 
   def synchronizeOnManySiteIds[R](siteIds: Set[SiteId])(block: => R): R = {
     // Lock in same order, to avoid deadlocks.
-    logger.trace(s"synchronizeOnManySiteIds: Locking site ids: $siteIds ... [TyMLOCKMANY]")
     val idsSorted = siteIds.toSeq.sorted
     syncManyImpl(idsSorted) {
       block
@@ -578,8 +571,7 @@ object SiteDao extends TyLogging {
 
 
   private def syncManyImpl[R](siteIds: Seq[SiteId])(block: => R): R = {
-    logger.trace(s"syncManyImpl: Locking site ids: $siteIds ... [TyMLOCKMANY]")
-    val r = if (siteIds.isEmpty) {
+    if (siteIds.isEmpty) {
       block
     }
     else {
@@ -591,8 +583,6 @@ object SiteDao extends TyLogging {
         }
       }
     }
-    logger.trace(s"syncManyImpl: Locking site ids: $siteIds END [TyMLOCKMANY]")
-    r
   }
 
 
@@ -600,28 +590,16 @@ object SiteDao extends TyLogging {
     val lock = locksBySiteId.getOrElseUpdate(siteId, new ReentrantLock)
     // Wait for fairly long (some seconds) in case a garbage collection takes long.
     // (Previously we waited forever here — so a few seconds should be fine.)
-    logger.trace(s"Locking s$siteId ... [TyMLOCKSITE]")
-
-    try throw new RuntimeException() catch {
-      case e: RuntimeException =>
-        e.printStackTrace()
-    }
-
-    logger.trace(s"Locking s$siteId ... Now: [TyMLOCKSITE]")
     if (lock.tryLock(3L, TimeUnit.SECONDS)) {
-      logger.trace(s"LockED s$siteId. [TyMLOCKSITEOK]")
       try {
         block
       }
       finally {
         lock.unlock()
-        logger.trace(s"Unlocked s$siteId [TyMUNLSITE]")
       }
     }
     else {
-      val message = s"Couldn't lock site $siteId for updates [TyE0SITELOCK]"
-      logger.error(message)
-      throw new RuntimeException(message)
+      throw new RuntimeException(s"Couldn't lock site $siteId for updates [TyE0SITELOCK]")
     }
   }
 

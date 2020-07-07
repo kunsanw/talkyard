@@ -201,6 +201,8 @@ object TextAndHtml {
   }
 
   private def addRelNofollowNoopener(whitelist: Whitelist): Whitelist = {
+    COULD_OPTIMIZE // only nofollow for external links, and noopener only if _blank.
+    // And don't remove target="_blank"   (currently, does remove target=... ).
     whitelist.addEnforcedAttribute("a", "rel", "nofollow noopener")
   }
 }
