@@ -260,6 +260,9 @@ function runAllE2eTests {
     echo
   fi
 
+  # Start and exit the manual testing tests, just to verify this works.
+  $r s/wdio --only manual.2browsers $args
+
   $r s/wdio --only all-links $args
   $r s/wdio --only create-site-password-run-admin-intro-tours $args
   $r s/wdio --only create-site-gmail-and-email-notf $args
@@ -282,9 +285,9 @@ function runAllE2eTests {
 
   $r s/wdio --only embed-images-mp4-youtube $args
   $r s/wdio --only embed-twitter-tweets-etc $args
-  ## $r s/wdio --only link-previews-all-others $args  broken!
+  ## $r s/wdio --only link-previews-all-others $args  broken! zz
 
-  #$r s/wdio --only links-internal.2browsers $args
+  #$r s/wdio --only links-internal.2browsers $args zz
 
   $r s/wdio --only view-edit-history.2browsers $args
   $r s/wdio --only upload-images-and-files $args

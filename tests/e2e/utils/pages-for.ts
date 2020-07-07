@@ -852,9 +852,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    switchToFrame(selector: string) {
+    switchToFrame(selector: string, ps: { timeoutMs?: number } = {}) {
       printBoringToStdout(`Switching to frame ${selector}...`);
-      this.waitForExist(selector);
+      this.waitForExist(selector, ps);
       const iframe = this.$(selector);
       this.#br.switchToFrame(iframe);
       printBoringToStdout(` done, now in frame  ${selector}.\n`);
@@ -4245,12 +4245,12 @@ export class TyE2eTestBrowser {
 
     linkPreview = {
       waitUntilLinkPreviewMatches: (ps: { postNr: PostNr, timeoutMs?: number,
-            regex: string | RegExp, whicLinkPreviewSelector?: string,
+            regex: string | RegExp, whichLinkPreviewSelector?: string,
             inSandboxedIframe: boolean }) => {
-        const linkPrevwSel = ' .s_LnPv' + (ps.whicLinkPreviewSelector || '');
+        const linkPrevwSel = ' .s_LnPv' + (ps.whichLinkPreviewSelector || '');
         if (ps.inSandboxedIframe) {
           this.topic.waitForExistsInIframeInPost({ postNr: ps.postNr,
-                iframeSelector: linkPrevwSel + ' iframe', //'.s_LnPv' + (ps.whicLinkPreviewSelector || '')
+                iframeSelector: linkPrevwSel + ' iframe',
                 textToMatch: ps.regex,
                 timeoutMs: ps.timeoutMs });
         }
@@ -4282,16 +4282,15 @@ export class TyE2eTestBrowser {
       },
 
       waitUntilPreviewHtmlMatches: (text: string,
-            opts: { where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string }) => {
+            opts: { where: 'InEditor' | 'InPage', whichLinkPreviewSelector?: string }) => {
         this.preview.__checkPrevw(opts, (prevwSelector: string) => {
           this.waitUntilHtmlMatches(prevwSelector, text);
         });
       },
 
       // ^--REMOVE, use --v  instead
-      waitUntilPreviewTextMatches: (
-            regex: string | RegExp, opts: {
-                  where: 'InEditor' | 'InPage', whicLinkPreviewSelector?: string,
+      waitUntilPreviewTextMatches: (regex: string | RegExp,
+            opts: { where: 'InEditor' | 'InPage', whichLinkPreviewSelector?: string,
                   inSandboxedIframe: boolean }) => {
         this.preview.__checkPrevw(opts, (prevwSelector: string) => {
           if (opts.inSandboxedIframe) {
@@ -4300,14 +4299,14 @@ export class TyE2eTestBrowser {
             this.switchToTheParentFrame();
           }
           else {
-            this.waitUntilTextMatches(prevwSelector, regex);
+            this.waitUntilTextMatches(`${prevwSelector}.s_LnPv`, regex);  // or just prevwSelector ?
           }
         });
       },
 
       __checkPrevw: <R>(opts: { where: 'InEditor' | 'InPage',
-              whicLinkPreviewSelector?: string }, fn: (string) => R): R => {
-        const lnPvSelector = opts.whicLinkPreviewSelector || '';
+              whichLinkPreviewSelector?: string }, fn: (string) => R): R => {
+        const lnPvSelector = opts.whichLinkPreviewSelector || '';
         if (opts.where === 'InEditor') {
           this.switchToEmbEditorIframeIfNeeded();
           return fn(`${this.preview.__inEditorPreviewSelector} ${lnPvSelector}`);
@@ -4548,7 +4547,7 @@ export class TyE2eTestBrowser {
             thingInIframeSelector?: string, textToMatch?: string | RegExp,
             timeoutMs?: number, howMany?: number }) => {
         const complIfrSel = this.topic.postBodySelector(ps.postNr) + ' ' + ps.iframeSelector;
-        this.switchToFrame(complIfrSel);
+        this.switchToFrame(complIfrSel, { timeoutMs: ps.timeoutMs });
         const thingInIframeSelector = ps.thingInIframeSelector || 'body';
         this.waitForExist(thingInIframeSelector, { timeoutMs: ps.timeoutMs });
         if (ps.textToMatch) {

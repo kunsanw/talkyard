@@ -97,34 +97,34 @@ class UploadsDaoSpec extends FreeSpec with MustMatchers {
             .replaceAllLiterally(s"/-/u/$pubSiteIdTwo/", "")
             .replaceAllLiterally("/-/u/", ""))
 
-      UploadsDao.findUploadRefsInText("", "pubsiteid") mustBe Set.empty
-      UploadsDao.findUploadRefsInText("nothing\nhere\nbye", "pubsiteid") mustBe Set.empty
+      UploadsDao.findUploadRefsInHtml("", "pubsiteid") mustBe Set.empty
+      UploadsDao.findUploadRefsInHtml("nothing\nhere\nbye", "pubsiteid") mustBe Set.empty
 
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"not a link: $uploadUrlPath", pubSiteIdOne) mustBe Set.empty
 
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"<img src='$uploadUrlPath'>", pubSiteIdOne) mustBe Set(mkRef(uploadUrlPath))
 
       // Text before and after.
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"hi\nthere<img src='$uploadUrlPath'>good\nbye", pubSiteIdOne) mustBe Set(mkRef(uploadUrlPath))
 
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"""double quotes: <img src="$uploadUrlPath">""", pubSiteIdOne) mustBe Set(mkRef(uploadUrlPath))
 
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"""link: <a href="$uploadUrlPath">text</a>""", pubSiteIdOne) mustBe Set(mkRef(uploadUrlPath))
 
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"""area: <area href="$uploadUrlPath"></area>""", pubSiteIdOne) mustBe Set(mkRef(uploadUrlPath))
 
       // Bad attr:
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"""weird: <a x-href="$uploadUrlPath"></a>""", pubSiteIdOne) mustBe Set.empty
 
       // Many refs, different tags
-      UploadsDao.findUploadRefsInText(i"""
+      UploadsDao.findUploadRefsInHtml(i"""
          |<a href="$uploadUrlPath2">text</a>
          |<img src="$uploadUrlPath3">
          |<video src="$uploadUrlPath4">
@@ -133,23 +133,23 @@ class UploadsDaoSpec extends FreeSpec with MustMatchers {
             mkRef(uploadUrlPath2), mkRef(uploadUrlPath3), mkRef(uploadUrlPath4))
 
       // Wrong site id
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"<img src='$uploadUrlPath'>", "wrongid") mustBe Set.empty
 
       // Wrong site id, and correct id too
-      UploadsDao.findUploadRefsInText(i"""
+      UploadsDao.findUploadRefsInHtml(i"""
         |<a href="$uploadUrlPath">text</a>
         |<a href="$uploadUrlPathSiteTwo">text</a>
         |""", pubSiteIdTwo) mustBe Set(mkRef(uploadUrlPathSiteTwo))
 
       // No site id
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"<img src='$pathNoSite'>", "whateverid") mustBe Set(mkRef(pathNoSite))
 
       // Bad paths:
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"<a href='$badPathTooFewChars'>text</a>", pubSiteIdOne) mustBe Set.empty
-      UploadsDao.findUploadRefsInText(
+      UploadsDao.findUploadRefsInHtml(
         s"<a href='$badPathSlashMissing'>text</a>", pubSiteIdOne) mustBe Set.empty
     }
   }

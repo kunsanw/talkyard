@@ -40,6 +40,7 @@ object IfCached {
 class PostRenderer(private val nashorn: Nashorn) {
 
 
+  @deprecated("now", "to do: save approved sanitized html in posts3 table [nashorn_in_tx]")
   def renderAndSanitize(post: Post, settings: PostRendererSettings, ifCached: IfCached,
         site: SiteIdHostnames): String = {
     if (ifCached == IfCached.Ignore) {
@@ -65,7 +66,7 @@ class PostRenderer(private val nashorn: Nashorn) {
     }
     else {
       // Reuse @mentions? [4WKAB02]
-      val renderResult = nashorn.renderAndSanitizeCommonMark_new(
+      val renderResult = nashorn.renderAndSanitizeCommonMark(
           post.currentSource,
           site,
           embeddedOriginOrEmpty = settings.embeddedOriginOrEmpty,

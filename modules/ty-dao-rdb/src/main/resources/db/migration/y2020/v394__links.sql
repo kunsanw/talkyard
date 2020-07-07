@@ -1,4 +1,4 @@
-
+-- SHOULD_CODE_REVIEW  all this later.
 
 create table link_previews_t(
   site_id_c int not null,

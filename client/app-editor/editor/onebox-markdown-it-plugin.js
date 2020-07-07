@@ -43,7 +43,7 @@ function parseOnebox(state, startLineIndex, endLineIndex, whatIsThis) {
   if (nextLine)
     return false;
 
-  // SHOULD require only its own line, not its own paragraph! (Otherwise,
+  // SHOULD require only its own line, not its own paragraph! (Otherwise,  UNTESTED how make this work?
   // people don't "discover" the link preview functionality).
   // Maybe just remove this?
   /*
@@ -88,8 +88,13 @@ function renderOnebox(tokens, index, options, env, renderer) {
           return debiki2.$h.parseHtml(safeHtml)[0];
         }
         // The link couldn't be oneboxed. Show a plain <a href=...> link instead.
-        // (rel=nofollow gets added here: [7WBK2A04] for other not-a-onebox-attempt links.)
-        return Bliss.create('a', { href: token.link, rel: 'nofollow', text: token.link });
+        // (rel=nofollow gets added here: [rel_nofollow] for other not-a-onebox-attempt links.)
+        return Bliss.create('a', {
+          href: token.link,
+          // target: _blank — don't add! without also adding noopener on the next line:
+          rel: 'nofollow',   // + ' noopener' — for [reverse_tabnabbing].
+          text: token.link,
+         });
       }
       var placeholders = debiki2.$all('.' + randomClass);
       // The placeholders might have disappeared, if the editor was closed or the

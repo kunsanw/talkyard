@@ -174,7 +174,7 @@ export const TopBar = createComponent({
     // A new category permission: SeeUnlistedTopics? For now:
     const showAlthoughUnlisted = isStaff(me);
 
-    if ((isUnlisted && !showAlthoughUnlisted || isSection(pageRole)) && !isEmbComments) {
+    if (((isUnlisted && !showAlthoughUnlisted) || isSection(pageRole)) && !isEmbComments) {
       // Show no ancestors.
     }
     else if (thereAreAncestors && shallShowAncestors) {

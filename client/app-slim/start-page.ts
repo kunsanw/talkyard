@@ -343,7 +343,7 @@ function renderPageInBrowser() {
   });
 
   function lastStep() {
-    startListeningForOneboxIframeSizeMessages();
+    listenForLinkPreviewIframeSizeMessages();
     debiki2.startMagicTime(eds.testNowMs);
     pageStarted = true;
     _.each(scriptLoadDoneCallbacks, function(c) { c(); });
@@ -468,14 +468,15 @@ d.i.renderPageInBrowser = function() {
 };
 
 
-// Move to where, instead?  CLEAN_UP
-function startListeningForOneboxIframeSizeMessages() {
-  console.debug('ZZQQ startListeningForOneboxIframeSizeMessages()');
+// Move to where, instead?  CLEAN_UP  — Move to  link-previews.ts.
+function listenForLinkPreviewIframeSizeMessages() {
   addEventListener('message', onMessageFromChildIframe, false);
 }
 
 
 function onMessageFromChildIframe(event: WindowEventMap['message']) {
+  // TESTS_MISSING  TyT037MKAH24
+
   console.debug('onMessageFromChildIframe: ' + JSON.stringify(event.data));
   if (!_.isArray(event.data))
     return;

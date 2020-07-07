@@ -673,13 +673,13 @@ const RootPostAndComments = createComponent({
           debiki2.renderer.drawHorizontalArrowFromRootPost(rootPost);
     }
 
-    let linkedFrom;
-    if (nonEmpty(page.intLinkedFrom)) {
-      linkedFrom =
+    let internalBacklinks;
+    if (nonEmpty(page.internalBacklinks)) {
+      internalBacklinks =
             r.div({ className: 's_InLns' },
               r.p({ className: 's_InLns_Ttl' }, "Linked from:"), // I18N
               r.ol({},
-                page.intLinkedFrom.map((topic: Topic) =>
+                page.internalBacklinks.map((topic: Topic) =>
                   r.li({ key: topic.pageId },
                     Link({ to: topic.url, className: 's_InLns_Ln icon-link' },
                       topic.title))
@@ -976,7 +976,7 @@ const RootPostAndComments = createComponent({
         socialButtons,
         deletedText,
         postActions,
-        linkedFrom,
+        internalBacklinks,
         debiki2.page.Metabar(),
         anyHorizontalArrowToChildren,
         // try to remove the dw-single-and-multireplies div + the dw-singlereplies class,

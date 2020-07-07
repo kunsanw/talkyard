@@ -18,7 +18,7 @@ the code simpler to read — and a bit longer. Or adding line breaks,
 so the "important" method invokations are visible at _the start of the line_,
 or in their own paragraphs, so you find them easily, when glancing at the code.
 
-Talkyard maybe never will use something like Cats (a Sala funcional programming library).
+Talkyard maybe never will use something like Cats (a Sala functional programming library).
 Cats makes the code shorter, but _harder to read_?
 Example: `EitherT.liftF("a".some)` — what's that — everyone would need to learn
 Cats too, not just Scala.

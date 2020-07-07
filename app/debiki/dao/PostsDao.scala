@@ -29,12 +29,10 @@ import play.api.libs.json.{JsObject, JsValue}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import PostsDao._
-import com.debiki.core
 import ed.server.auth.Authz
 import ed.server.spam.SpamChecker
 import org.scalactic.{Bad, Good, One, Or}
 import math.max
-import talkyard.server.{IfCached, PostRendererSettings}
 
 
 case class InsertPostResult(storePatchJson: JsObject, post: Post, reviewTask: Option[ReviewTask])
@@ -202,8 +200,8 @@ trait PostsDao {
     // Since the post didn't exist before, it's enough to remember the refs
     // from the new textAndHtml only. [new_upl_refs]
     val uploadRefs = textAndHtml.uploadRefs
-    if (!Globals.isProd) {
-      val uplRefs2 = findUploadRefsInPost_gaah(newPost)
+    if (Globals.isDevOrTest) {
+      val uplRefs2 = findUploadRefsInPost(newPost)
       dieIf(uploadRefs != uplRefs2, "TyE503SKH5", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
     }
 
@@ -569,8 +567,8 @@ trait PostsDao {
 
     // New post, all refs in textAndHtml regardless of if approved or not. [new_upl_refs]
     val uploadRefs: Set[UploadRef] = textAndHtml.uploadRefs
-    if (!Globals.isProd) {
-      val uplRefs2: Set[UploadRef] = findUploadRefsInPost_gaah(newPost)
+    if (Globals.isDevOrTest) {
+      val uplRefs2: Set[UploadRef] = findUploadRefsInPost(newPost)
       dieIf(uploadRefs != uplRefs2, "TyE38RDHD4", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
     }
 
@@ -719,7 +717,7 @@ trait PostsDao {
     tx.indexPostsSoon(editedPost)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
     saveDeleteUploadRefs(lastPost, editedPost = editedPost, textAndHtml,
-          isAppending = true, authorId, tx)
+          isAppending = true, isEditing = false, authorId, tx)
 
     saveDeleteLinks(editedPost, combinedTextAndHtml, authorId, tx, staleStuff)
 
@@ -1019,7 +1017,7 @@ trait PostsDao {
       anySpamCheckTask.foreach(tx.insertSpamCheckTask)
       newRevision.foreach(tx.insertPostRevision)
       saveDeleteUploadRefs(postToEdit, editedPost = editedPost, newTextAndHtml,
-            isAppending = false, editorId, tx)
+            isAppending = false, isEditing = true, editorId, tx)
 
       insertAuditLogEntry(auditLogEntry, tx)
 
@@ -1039,6 +1037,10 @@ trait PostsDao {
         val notfs = notfGenerator(tx).generateForEdits(
               postToEdit, editedPost, Some(newTextAndHtml))
         tx.saveDeleteNotifications(notfs)
+      }
+      else {
+        SHOULD // generate review task notf?  [revw_task_notfs]
+        // val notfs = notfGenerator(tx).generateForReviewTask( ...)
       }
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(editorId, nr))
@@ -1067,58 +1069,75 @@ trait PostsDao {
   }
 
 
-  /** If there're many links from page A to B, then ...
-    * For now, remember all of them, per unique url.
-    * Look:
-    *   /some-topic
-    *   /-123-some-topic
-    * Those are two linsk — and if that topic gets moved to:
+  /** Links are saved only for the approved version (if any) of a post.
+    * So, if someone submits a new post, or edits an old post, we don't
+    * save any links, until the new post, or the edits, have been approved
+    * by staff or System.
+    *
+    * If there're many links from page A to B, then, remember all of them,
+    * per unique url, e.g. both:  /some-topic  and /-123-some-topic.
+    *
+    * Reasoning: If that linked page with id 123 gets moved to:
     *   /another-url-path
     * then the  /some-topic  link breaks,
-    * but /-123-some-topic will still work, becaues it includes the page id
+    * but /-123-some-topic will still work, because it includes the page id
     * in the url.
     * So links can be different, although they're to the same page. Maybe
     * therefore makes sense to remember all links, per unique url?
-    *    But no need to remember two different /-123-some-topic  links from the
+    *
+    * But no need to remember two different /-123-some-topic  links from the
     * same post. — That's why [[SourceAndHtml.internalLinks]] is a Set.
     */
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
           tx: SiteTx, staleStuff: StaleStuff): Unit = {
+    TESTS_MISSING
+
+    dieIf(!post.isCurrentVersionApproved && Globals.isDevOrTest, "TyE406RMTK2")
     if (!post.isCurrentVersionApproved)
       return
 
     val approvedAt: When = post.lastApprovedAt getOrElse {
-      logger.warn(s"s$siteId: Post approved but no date: $post [TyE603RKDJM44]")
+      bugWarn("TyE42RKTJ56", s"s$siteId: Post approved but no date: $post")
       return
     }
 
-    dieIf(post.currentSource != sourceAndHtml.source
-          && Globals.isDevOrTest, "TyE305RKT5")
+    if (post.currentSource != sourceAndHtml.source) {
+      bugWarn("TyE305RKT5", s"s$siteId: post.currentSource != sourceAndHtml.source: $post")
+      return
+    }
 
     val pageIdsLinkedBefore = tx.loadPageIdsLinkedFromPage(post.pageId)
     val linksBefore: Seq[Link] = tx.loadLinksFromPost(post.id)
 
     val linkStrsAfter = sourceAndHtml.internalLinks
-    val linksAfter = linkStrsAfter flatMap { linkStr: String =>
+    val newLinkStrs = linkStrsAfter.filterNot(linkStr =>
+          linksBefore.exists(_.link_url_c == linkStr))
+
+    val pathsSeen = mutable.HashSet[String]()
+
+    val newLinks = newLinkStrs flatMap { linkStr: String =>
       val uri = new java.net.URI(linkStr)
-      val urlPath = uri.getPath
+      val urlPath = uri.getPath // or getPathNotNull
       val pagePath: Option[PagePathWithId] = PagePath.fromUrlPath(siteId, urlPath) match {
         case PagePath.Parsed.Good(maybeOkPath) =>
           // There's a db constraint, pgpths_page_r_pages, so if the page path
           // exists, the page does too.
-          checkPagePath2(maybeOkPath)
-          /* Hmm, no, remember all links for now instead?
-          checkPagePath2(maybeOkPath) filter { path =>
-            // We remember just one link even if there're many same-post ——> same-page
-            // links (many <a href=...> to the same page, from the same post).
-            linksBefore.exists(_.to_page_id_c == path.pageId)
-          } */
+          checkPagePath2(maybeOkPath) flatMap { path =>
+            // Don't save more than one link, per url path.
+            val duplLinkPath = pathsSeen contains path.value
+            if (duplLinkPath) None
+            else {
+              pathsSeen.add(path.value)
+              Some(path)
+            }
+          }
         case PagePath.Parsed.Bad(error) =>
           None
         case PagePath.Parsed.Corrected(newPath) =>
           None // or checkPagePath2(newPath) ?
       }
-      pagePath map { path =>
+
+      pagePath map { path: PagePathWithId =>
         Link(from_post_id_c = post.id,
               link_url_c = linkStr,
               added_at_c = approvedAt,
@@ -1129,9 +1148,6 @@ trait PostsDao {
     }
 
     // [On2], fine.
-    val newLinks = linksAfter.filterNot(link =>
-          linksBefore.exists(_.link_url_c == link.link_url_c))
-
     val deletedLinks = linksBefore.filterNot(link =>
           linkStrsAfter.contains(link.link_url_c))
 
@@ -1147,23 +1163,49 @@ trait PostsDao {
 
 
   private def saveDeleteUploadRefs(postToEdit: Post, editedPost: Post,
-        sourceAndHtml: SourceAndHtml, isAppending: Boolean,
+        sourceAndHtml: SourceAndHtml, isAppending: Boolean, isEditing: Boolean,
         editorId: UserId, tx: SiteTransaction): Unit = {
     // Use findUploadRefsInPost (not ...InText) so we'll find refs both in the hereafter
     // 1) approved version of the post, and 2) the current possibly unapproved version.
     // Because if any of the approved or the current version links to an uploaded file,
     // we should keep the file.
 
+    if (isEditing && editedPost.currentSource != sourceAndHtml.source) {
+      bugWarn("TyE5WKG20J", s"s$siteId: editedPost.currentSource != sourceAndHtml.source: ${
+            editedPost}")
+      return
+    }
+
     val oldUploadRefs = tx.loadUploadedFileReferences(postToEdit.id)
 
     val currentUploadRefs: Set[UploadRef] = {
       if (isAppending) {
+        require(!isEditing)
         oldUploadRefs ++ sourceAndHtml.uploadRefs  // [52TKTSJ5]
       }
       else {
+        TESTS_MISSING // or?
+
+        require(isEditing)
         // Tricky! We don't know which of oldUploadRefs are approved,
         // and which one's aren't, and should be removed because they aren't
         // in the new edited unapproved source.
+        //
+        // Example:
+        //
+        // Old approved text includes:  https://old-appr-ref
+        // Old next *unapproved* revision includes: (old Post.currentSource)
+        //   https://old-appr-ref   and https://old-unappr-ref
+        //
+        // The edited new unapproved revision (new Post.currentSource) includes
+        // no ref at all. We cannot remove  https://old-appr-ref,
+        // until the new edited version has been approved.
+        // But we do want to remove  https://old-unappr-ref.
+        // So, there's a difference between *un*approved and approved old upl ref,
+        // and we want to know which ones of the old refs, have been approved
+        // (need to keep those).
+        // Maybe remember in the db? [is_upl_ref_aprvd]
+        //
         // This won't work:
         //
         // var newRefs = sourceAndHtml.uploadRefs
@@ -1176,7 +1218,21 @@ trait PostsDao {
         //   // But we don't know which of oldUploadRefs those are.
         // }
         // So, we need to:
-        findUploadRefsInPost_gaah(editedPost) // [nashorn_in_tx] [save_post_lns_mentions]
+        val pubId = thePubSiteId()
+        val approvedRefs = editedPost.approvedHtmlSanitized.map(
+              html => UploadsDao.findUploadRefsInHtml(html, pubId)) getOrElse Set.empty
+        val unapprRefs = sourceAndHtml.uploadRefs
+
+        // (In the comment example above, approvedRefs would include  https://old-appr-ref,
+        // but unapprRefs might, and might not.)
+        val refs = approvedRefs ++ unapprRefs
+
+        if (Globals.isDevOrTest) {
+          val r2 = findUploadRefsInPost(editedPost) // [nashorn_in_tx]
+          dieIf(refs != r2, "TyE306KSM233", s"refs: $refs, r2: $r2")
+        }
+
+        refs
 
         // Two solution, to avoid slow things (like Nashorn) inside
         // a tx, are 1) to add  editedPost  to a background queue,
@@ -1542,6 +1598,8 @@ trait PostsDao {
 
     // ----- Update related things
 
+    BUG; SHOULD // delete upload refs, if any posts deleted?  [rm_upl_refs]
+
     if (uncacheBacklinksFromPostIds.nonEmpty) {
       // Uncache backlinked pages. [uncache_blns]
       // (We don't delete links, when soft-deleting a post or page. Instead, such
@@ -1571,6 +1629,7 @@ trait PostsDao {
     // instead, notfs about deleted posts, or on deleted pages, are filtered
     // out here: [SKIPDDNTFS].
 
+    // We don't both delete and undelete at the same time.
     dieIf(postsDeleted.nonEmpty && postsUndeleted.nonEmpty, "TyE2WKBG5")
 
     // Invalidate, or re-activate, review tasks whose posts get deleted / undeleted.
@@ -1843,7 +1902,7 @@ trait PostsDao {
       deletePostImpl(pageId, postNr = postNr, deletedById = deletedById,
             doingReviewTask = None, browserIdData, tx, staleStuff)
     }
-    refreshPageInMemCache(pageId)   // + refreshLinkedPagesToo: Boolean
+    refreshPageInMemCache(pageId)
   }
 
 
@@ -1854,7 +1913,10 @@ trait PostsDao {
       action = PostStatusAction.DeletePost(clearFlags = false), userId = deletedById,
       doingReviewTask = doingReviewTask,
       tx = tx, staleStuff = staleStuff)
+
     // The caller needs to: refreshPageInMemCache(pageId) — and should be done just after tx ended.
+    // EDIT: That's soon not needed, use staleStuff instead and [rm_cache_listeners].
+
     result
   }
 
@@ -2068,18 +2130,19 @@ trait PostsDao {
           tx.indexPostsSoon(postsAfter: _*)
 
           // Uncache backlinked pages. [uncache_blns]
+          // (Need not update links_t or upload_refs3, because links and upload refs
+          // are from *posts* not from *pages*.)
           val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsAfter.map(_.id).toSet)
           staleStuff.addPageIds(linkedPageIds)
+
+          COULD // if target page is deleted, or in a deleted category,
+          // then remove upl refs, or mark as deleted?  [rm_upl_refs]
 
           auditEntries foreach tx.insertAuditLogEntry
           tx.movePostsReadStats(fromPage.id, toPage.id, Map(newNrsMap.toSeq: _*))
           // Mark both fromPage and toPage sections as stale, in case they're different forums.
           refreshPageMetaBumpVersion(fromPage.id, markSectionPageStale = true, tx)
           refreshPageMetaBumpVersion(toPage.id, markSectionPageStale = true, tx)
-
-          // staleStuff? — No, need not update links_t or upload_refs3,
-          // because links and upload refs are from a *post* not from a *page*.
-          // But! Do need to clear the linked-pages cache.
 
           postAfter
         }

@@ -283,7 +283,11 @@ trait PagesDao {
         bodyHiddenById = ifThenSome(hidePageBody, authorId),
         bodyHiddenReason = None) // add `hiddenReason` function parameter?
 
-    val uploadPaths = body.uploadRefs // findUploadRefsInPost(bodyPost)
+    val uploadRefs = body.uploadRefs
+    if (Globals.isDevOrTest) {
+      val uplRefs2 = findUploadRefsInPost(bodyPost)
+      dieIf(uploadRefs != uplRefs2, "TyE7RTEGP04", s"uploadRefs: $uploadRefs, 2: $uplRefs2")
+    }
 
     val pageMeta = PageMeta.forNewPage(pageId, pageRole, authorId,
       extId = extId,
@@ -382,7 +386,7 @@ trait PagesDao {
       saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff)
     }
 
-    uploadPaths foreach { hashPathSuffix =>
+    uploadRefs foreach { hashPathSuffix =>
       tx.insertUploadedFileReference(bodyPost.id, hashPathSuffix, authorId)
     }
 

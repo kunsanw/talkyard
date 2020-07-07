@@ -31,7 +31,7 @@ import scala.util.matching.Regex
 
 
 class ImagePrevwRendrEng(globals: Globals)
-  extends InstantLinkPreviewEngine(globals) {
+  extends InstantLinkPrevwRendrEng(globals) {
 
   override val regex: Regex =
     """^(https?:)?\/\/.+\.(png|jpg|jpeg|gif|bmp|tif|tiff)(\?.*)?$""".r
@@ -41,17 +41,19 @@ class ImagePrevwRendrEng(globals: Globals)
   override val alreadySanitized = true
   override val addViewAtLink = false
 
-  def renderInstantly(url: String): Good[String] = {
-    var betterUrl = url
+  def renderInstantly(unsafeUrl: String): Good[String] = {
     // Fix Dropbox image links.
-    if (url startsWith "https://www.dropbox.com/") {
-      betterUrl = url.replaceAllLiterally(
-        "https://www.dropbox.com", "https://dl.dropboxusercontent.com")
-    }
+    val betterUrl =
+          if (unsafeUrl startsWith "https://www.dropbox.com/")
+            unsafeUrl.replaceAllLiterally(
+                  "https://www.dropbox.com", "https://dl.dropboxusercontent.com")
+          else
+            unsafeUrl
 
-    val safeUrl = safeEncodeForHtml(url)
+    val safeUrl = safeEncodeForHtml(betterUrl)
 
-    Good(s"<a href='$safeUrl' rel='nofollow noopener' target='_blank'><img src='$safeUrl'></a>")
+    Good(s"<a href='$safeUrl' rel='nofollow noopener' target='_blank'><img src='${
+          safeUrl}'></a>")
   }
 
 }

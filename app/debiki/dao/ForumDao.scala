@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
-import debiki.{StaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
+import debiki.{SafeStaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
 
 
 case class CreateForumOptions(
@@ -97,7 +97,7 @@ trait ForumDao {
       // If is the first forum for this site, we're also creating the first category, id = 1. [8UWKQXN45]
       val isFirstForumForThisSite = rootCategoryId == 1
 
-      // Create forum page.  ZZZ
+      // Create forum page.
       val introText: TextAndHtml = isForEmbCmts ? EmbeddedCommentsIntroText | ForumIntroText
       val forumPagePath = createPageImpl(
             PageType.Forum, PageStatus.Published, anyCategoryId = Some(rootCategoryId),
@@ -367,7 +367,7 @@ trait ForumDao {
     } */
 
     def makeTitle(safeText: String) =
-      TitleSourceAndHtml(safeText, safeHtml = safeText)
+      TitleSourceAndHtml.alreadySanitized(safeText, safeHtml = safeText)
 
     // Create forum welcome topic.
     createPageImpl(
@@ -383,7 +383,7 @@ trait ForumDao {
       tx, staleStuff)
 
     if (options.createSampleTopics) {
-      def wrap(text: String) = textAndHtmlMaker.wrapInParagraphNoMentionsOrLinks(text, isTitle = false)
+      def wrap(text: String) = textAndHtmlMaker.wrapInParagraphNoMentionsOrLinks(text)
 
       // Create a sample open-ended discussion.
       val discussionPagePath = createPageImpl(
@@ -391,7 +391,7 @@ trait ForumDao {
         anyCategoryId = Some(generalCategoryId), //anySampleTopicsCategoryId,
         anyFolder = None, anySlug = Some("sample-discussion"), showId = true,
         title = makeTitle(SampleThreadedDiscussionTitle),
-        body = StaticSourceAndHtml(SampleThreadedDiscussionText,
+        body = SafeStaticSourceAndHtml(SampleThreadedDiscussionText,
                 s"<p>$SampleThreadedDiscussionText</p>"),
         pinOrder = None,
         pinWhere = None,
@@ -495,7 +495,7 @@ trait ForumDao {
       anyCategoryId = Some(staffCategoryId),
       anyFolder = None, anySlug = Some("staff-chat"), showId = true,
       title = makeTitle(StaffChatTopicTitle),
-      body = StaticSourceAndHtml(StaffChatTopicText, s"<p>$StaffChatTopicText</p>"),
+      body = SafeStaticSourceAndHtml(StaffChatTopicText, s"<p>$StaffChatTopicText</p>"),
       pinOrder = None,
       pinWhere = None,
       bySystem,
@@ -526,22 +526,22 @@ object ForumDao {
   private val DefaultCategoryPosition = 1000
 
 
-  private val ForumIntroText: StaticSourceAndHtml = {
+  private val ForumIntroText: SafeStaticSourceAndHtml = {
     val source = o"""[ Edit this to tell people what they can do here. ]"""
-    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
+    SafeStaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
-  private val EmbeddedCommentsIntroText: StaticSourceAndHtml = {
+  private val EmbeddedCommentsIntroText: SafeStaticSourceAndHtml = {
     val source = o"""Here are comments posted at your website. One topic here,
          for each blog post that got any comments, over at your website."""
-    StaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
+    SafeStaticSourceAndHtml(source, safeHtml = s"<p>$source</p>")
   }
 
 
   private val WelcomeTopicTitle = "Welcome to this community"
 
-  private val welcomeTopic: StaticSourceAndHtml = {
+  private val welcomeTopic: SafeStaticSourceAndHtml = {
     val para1Line1 = "[ Edit this to clarify what this community is about. This first paragraph"
     val para1Line2 = "is shown to everyone, on the forum homepage. ]"
     val para2Line1 = "Here, below the first paragraph, add details like:"
@@ -549,7 +549,7 @@ object ForumDao {
     val listItem2 = "What can they do or find here?"
     val listItem3 = "Link to additional info, for example, any FAQ, or main website of yours."
     val toEditText = """To edit this, click the <b class="icon-edit"></b> icon below."""
-    StaticSourceAndHtml(
+    SafeStaticSourceAndHtml(
       source = i"""
         |$para1Line1
         |$para1Line2
@@ -601,7 +601,7 @@ object ForumDao {
     val para3 = o"""In the topic list, people see if a problem is new, or if it's been solved:
       the <span class="icon-attention-circled"></span> and
       <span class="icon-check"></span> icons."""
-    StaticSourceAndHtml(
+    SafeStaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -628,7 +628,7 @@ object ForumDao {
     val para2 = o"""In the topic list, everyone sees the status of the idea at a glance
       — the status icon is shown to the left (e.g.
       <span class="icon-idea"></span> or <span class="icon-check"></span>).</div>"""
-    StaticSourceAndHtml(
+    SafeStaticSourceAndHtml(
       source = i"""
         |$para1
         |
@@ -672,7 +672,7 @@ object ForumDao {
       and then choose "Only waiting", look:"""
     // (You'll find /-/media/ in the Nginx config [NGXMEDIA] and submodule ty-media.)
     val para3 = """<img class="no-lightbox" src="/-/media/tips/how-click-show-waiting-680px.jpg">"""
-    StaticSourceAndHtml(
+    SafeStaticSourceAndHtml(
       source = i"""
         |$para1
         |

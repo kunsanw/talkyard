@@ -32,7 +32,7 @@ settings.newSiteDomain = settings.newSiteDomain || settings.host;
 settings.debugEachStep = args.debugEachStep || args.des;
 settings.debugBefore = args.debugBefore || args.db;
 // dant = debug afterwards, no timeout
-settings.debugAfterwards = args.debugAfterwards || args.da || args.dant;
+settings.debugAfterwards = args.debugAfter || args.debugAfterwards || args.da || args.dant;
 settings.debug = args.debug || args.d || settings.debugBefore || settings.debugAfterwards;
 
 // Quick way to disable all browser.debug():

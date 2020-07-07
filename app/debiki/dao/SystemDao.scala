@@ -83,7 +83,7 @@ class SystemDao(
   def getSiteById(siteId: SiteId): Option[Site] = {
     // We use SiteDao.getSite() because it caches.
     COULD_OPTIMIZE // move getSite() to SystemDao instead so won't need to create
-    // temp SiteDao obj.
+    // temp SiteDao obj.  Or, not needed, after:  [rm_cache_listeners]  ?
     globals.siteDao(siteId).getSite()
   }
 

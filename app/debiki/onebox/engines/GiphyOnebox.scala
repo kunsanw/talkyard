@@ -28,7 +28,7 @@ import scala.util.{Failure, Success, Try}
 
 
 class GiphyPrevwRendrEng(globals: Globals)
-  extends InstantLinkPreviewEngine(globals) {
+  extends InstantLinkPrevwRendrEng(globals) {
 
   override val regex: Regex =
     """^(https?:)?\/\/giphy\.com\/(gifs|embed)/[a-zA-Z0-9-]*-?[a-zA-Z0-9]+(/html5)?$""".r
@@ -53,9 +53,7 @@ class GiphyPrevwRendrEng(globals: Globals)
     // The id is [a-zA-Z0-9] so need not be sanitized, but do anyway.
     val safeId = safeEncodeForHtml(unsafeId)
 
-    COULD // find out if this still works? Or use oEmbed?
-
-    // SANDBOX!
+    // Optonally disable / sandbox this iframe [trust_ext_content]
 
     // The hardcoded width & height below are probably incorrect. They can be retrieved
     // via Giphys API: https://github.com/Giphy/GiphyAPI#get-gif-by-id-endpoint

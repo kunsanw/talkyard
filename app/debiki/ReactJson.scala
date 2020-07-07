@@ -48,8 +48,8 @@ private case class RendererWithSettings(
 private case class RestrTopicsCatsLinks(
   categoriesJson: JsArray,
   topicsJson: Seq[JsValue],
-  usersJson: Seq[JsObject],
-  linkedFromJson: Seq[JsValue])
+  topicParticipantsJson: Seq[JsObject],
+  internalBacklinksJson: Seq[JsValue])
 
 class HowRenderPostInPage(
   val summarize: Boolean,
@@ -267,7 +267,7 @@ class JsonMaker(dao: SiteDao) {
       makeCategoriesJson(_, authzCtx, exclPublCats = false)) getOrElse JsArray()
     val siteSettings = dao.getWholeSiteSettings()
 
-    val linkingPagesJson = makeLinkingPagesJson(page.id, authzCtx, dao)
+    val internalBacklinksJson = makeInternalBacklinksJson(page.id, authzCtx, dao)
 
     val anyLatestTopics: JsValue =
       if (page.pageType == PageType.Forum) {
@@ -310,8 +310,8 @@ class JsonMaker(dao: SiteDao) {
       "forumId" -> JsStringOrNull(anyForumId),
       "ancestorsRootFirst" -> ancestorsJsonRootFirst,
       "categoryId" -> JsNumberOrNull(page.meta.categoryId),
-      "intLinkedFrom" -> linkingPagesJson,
-      "extLinkedFrom" -> JsArray(Nil),
+      "internalBacklinks" -> internalBacklinksJson,
+      "externalBacklinks" -> JsArray(Nil),
       "pageRole" -> JsNumber(page.pageType.toInt),
       "pagePath" -> JsPagePathWithId(pagePath),
       // --- These and some more, could be in separate objs instead [DBLINHERIT]
@@ -707,7 +707,7 @@ class JsonMaker(dao: SiteDao) {
 
     val restrictedCategories: JsArray = restrTopicsCatsLinks.categoriesJson
     val restrictedTopics: Seq[JsValue] = restrTopicsCatsLinks.topicsJson
-    val restrictedTopicsUsers: Seq[JsObject] = restrTopicsCatsLinks.usersJson
+    val restrictedTopicsUsers: Seq[JsObject] = restrTopicsCatsLinks.topicParticipantsJson
 
     val draftsOnThisPage: immutable.Seq[Draft] =
       anyPageId.map(tx.loadDraftsByUserOnPage(requester.id, _)).getOrElse(Nil)
@@ -784,7 +784,7 @@ class JsonMaker(dao: SiteDao) {
             "groupsPageNotfPrefs" -> pageNotfPrefs.filter(_.peopleId != requester.id).map(JsPageNotfPref),
             "readingProgress" -> anyReadingProgressJson,
             "votes" -> votes,
-            "linkedFrom" -> restrTopicsCatsLinks.linkedFromJson,
+            "internalBacklinks" -> restrTopicsCatsLinks.internalBacklinksJson,
             // later: "flags" -> JsArray(...) [7KW20WY1]
             "unapprovedPosts" -> unapprovedPosts,
             "unapprovedPostAuthors" -> unapprovedAuthors,  // should remove [5WKW219] + search for elsewhere
@@ -862,22 +862,23 @@ class JsonMaker(dao: SiteDao) {
 
     val categoryId = request.thePageMeta.categoryId getOrElse {
       // Not a forum topic. Could instead show an option to add the page to the / a forum?
-      val linkedFromJson = Nil // later
-      return RestrTopicsCatsLinks(JsArray(), Nil, Nil, linkedFromJson)
+      val internalBacklinksJson = Nil // later
+      return RestrTopicsCatsLinks(JsArray(), Nil, Nil, internalBacklinksJson)
     }
 
     // SHOULD avoid starting a new transaction, so can remove workaround [7YKG25P].
     // (request.dao might start a new transaction)
     val categoriesJson = makeCategoriesJson(categoryId, authzCtx, exclPublCats = true)
 
-    val (topics: Seq[PagePathAndMeta], pageStuffById, linkedFromJson: Seq[JsObject]) =
+    val (topics: Seq[PagePathAndMeta], pageStuffById, internalBacklinksJson) =
       if (request.thePageRole != PageType.Forum) {
-        // Then won't list forum topics; instead, load backlinks.
-        val linkedFromJson = request.pageId.map(id =>
-              makeLinkingPagesJson(id, authzCtx, dao)) getOrElse Nil
-        (Nil, Map[PageId, PageStuff](), linkedFromJson)
+        // Don't list topics; instead, show backlinks.
+        val internalBacklinksJson: Seq[JsObject] = request.pageId.map(id =>
+              makeInternalBacklinksJson(id, authzCtx, dao)) getOrElse Nil
+        (Nil, Map[PageId, PageStuff](), internalBacklinksJson)
       }
       else {
+        // List forum topics.
         // BUG (minor): To include restricted categories & topics, sorted in the correct order, need
         // to know topic sort order & topic filter — but that's not incl in the url params. [2KBLJ80]
         val pageQuery = request.parsePageQuery() getOrElse defaultPageQuery(siteSettings)
@@ -899,8 +900,8 @@ class JsonMaker(dao: SiteDao) {
     RestrTopicsCatsLinks(
           categoriesJson = categoriesJson,
           topicsJson = topics.map(ForumController.topicToJson(_, pageStuffById)),
-          usersJson = users.map(JsUser),
-          linkedFromJson = linkedFromJson)
+          topicParticipantsJson = users.map(JsUser),
+          internalBacklinksJson = internalBacklinksJson)
   }
 
 
@@ -982,7 +983,7 @@ class JsonMaker(dao: SiteDao) {
   }
 
 
-  def makeLinkingPagesJson(toPageId: PageId, authzCtx: ForumAuthzContext,
+  def makeInternalBacklinksJson(toPageId: PageId, authzCtx: ForumAuthzContext,
           daoOrTx: SiteDao): Seq[JsObject] = {
     daoOrTx match {
       case dao: SiteDao =>
@@ -996,9 +997,8 @@ class JsonMaker(dao: SiteDao) {
                       page.pageMeta, authzCtx, maySeeUnlisted = false)
                 maySee
               }
-        val linksJson = linkersOkSee map { pageStuff =>
-          val pageId = pageStuff.pageId
-          ForumController.topicToJson(pageStuff.pageMeta, pageStuff, s"/-$pageId")
+        val linksJson = linkersOkSee map { page =>
+          ForumController.topicToJson(page, s"/-${page.pageId}")
         }
         linksJson.toSeq
     }
@@ -1017,7 +1017,7 @@ class JsonMaker(dao: SiteDao) {
         val linkingPageTitles = tx.loadPostsByNrs(
           linkedFromMaySee.map(pm => PagePostNr(pm.pageId, PageParts.TitleNr)))
 
-    val linkingPagesJson = linkingPageTitles flatMap { titlePost =>
+    val internalBacklinksJson = linkingPageTitles flatMap { titlePost =>
       if (!titlePost.isSomeVersionApproved) None
       else {
         linkedFromMaySee.find(_.pageId == titlePost.pageId) flatMap { pageMeta =>  // [On2]
@@ -1029,7 +1029,7 @@ class JsonMaker(dao: SiteDao) {
         }
       }
     }
-    JsArray(linkingPagesJson)
+    JsArray(internalBacklinksJson)
           */
   }
 
@@ -1676,7 +1676,7 @@ object JsonMaker {
         (None, post.approvedSource, post.approvedAt.isDefined)
       }
       else if (includeUnapproved) {
-        // Later: Save sanitized html in the post always.  [nashorn_in_tx]
+        // Later: Save sanitized html in the post always. [html_json] [nashorn_in_tx]
         val htmlString = renderer.renderAndSanitize(post, IfCached.Use)
         (Some(htmlString), Some(post.currentSource), post.isCurrentVersionApproved)
       }

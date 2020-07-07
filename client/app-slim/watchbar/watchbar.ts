@@ -151,7 +151,7 @@ const SubCommunities = createComponent({
 const RecentTopicsAndNotfs = createComponent({
   displayName: 'RecentTopicsAndNotfs',
 
-  // ADD REMOVE BUTTON
+  // ADD REMOVE BUTTON todo zz
 
   render: function() {
     const store: Store = this.props.store;

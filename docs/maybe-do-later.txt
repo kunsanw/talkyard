@@ -50,6 +50,14 @@ Rename User to Participant and User to Member.  Participant = Guest or Member, M
 Rename variables named like "member" to "user", "memberOrGroup" to "member", "user" to "participant"
 Rename "indie" to user" and "people" to "members"
 
+[security]
+prevent usernames from being displayed in Unicode, if mixed charsets used,
+e.g. Latin + Cryllic = facebooĸ.com  (homograph attacks).
+
+[authn]
+What about adding U2F login?
+https://github.com/Yubico/java-webauthn-server/ — a Java U2F / WebAuthn lib.
+
 [no-email]:
 Let people create accounts without specifying any email address. Like at Reddit.
 
@@ -281,6 +289,12 @@ https://news.ycombinator.com/item?id=19862002
 SECURITY: https://news.ycombinator.com/item?id=19856419 "HTTP headers for the responsible developer"
 https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity
 
+[emb_login_req]
+Make  login-required work also for embeded comments.
+
+[emb_forum]
+Make it possible to embedd a forum, or fourm cateory (no just blog comments).
+
 [like-notfs]
 Send notifications about getting a Like.
 
@@ -300,6 +314,18 @@ process, that'd almost be a self-DoS. Better delegate to other server.
 Later, support not only CommonMark but also rich text wysiwyg.
 Then first need to fix: [DRAFTPRVW] ?
 
+[html_json] [nashorn_in_tx] [save_post_lns_mentions]
+Keep sanitized html in a json array with placeholders for site origin,
+page titles (internal links), usernames, so the html can be reconstructed
+"instantly" if the site origin changes, pages renamed, username changed.
+And for different display resolutions — without having to re-render
+CommonMark to html (which can be a bit slow).
+
+[nashorn_in_tx]  COULD_OPTIMIZE
+Do outside tx.
+
+[double_tx]  COULD_OPTIMIZE
+Read-only tx in tx is ok but unnecessary, a tiny bit slower & more mem.
 
 [macro-bug]
 Find a better macro lib that won't "destroy" the file if @endif is on the line just above '}'.
@@ -319,14 +345,7 @@ Nice API for writing bots, e.g. chat bots or a Usability Testing Exchange extern
 server / bot.
 
 [site_conf_vals]
-Generate target=_blank links?
-Generate https://host/page/path links, or /page/path links,  for in site rel links?
-
-[nashorn_in_tx]  COULD_OPTIMIZE
-Do outside tx.
-
-[double_tx]  COULD_OPTIMIZE
-Read-only tx in tx is ok but unnecessary, a tiny bit slower & more mem.
+Generate target=_blank noopener links?
 
 [Scala_213]
 Try —> Using
@@ -379,11 +398,3 @@ Without! any long running db transactions. 1) loads the data it needs, in a read
 Then, compiles Commonmark to html, finds all links etc.
 Then, a read-write-tx: If the post wasn't changed since the r/o tx, then
 save the rebuilt post.
-
-[security]
-prevent usernames from being displayed in Unicode, if mixed charsets used,
-e.g. Latin + Cryllic = facebooĸ.com.
-
-[authn]
-What about adding U2F login?
-https://github.com/Yubico/java-webauthn-server/ — a Java U2F / WebAuthn lib.

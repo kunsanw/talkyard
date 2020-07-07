@@ -19,21 +19,26 @@ package debiki.onebox.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
-import debiki.Globals
+import debiki.{Globals, TextAndHtml}
+import debiki.onebox.{InstantLinkPrevwRendrEng, LinkPreviewProblem}
+import org.scalactic.{Bad, Good, Or}
 import scala.util.matching.Regex
 
+// SHOULD_CODE_REVIEW later and the tests too.
 
 // These oEmbed engines are sorted alphabetically, index:   (Soon)
 // Facebook posts
 // Facebook videos
 // Instagram
 // Reddit
+// Telegram
 // TikTok
 // Twitter
 // YouTube
 
 
-// ===== Facebook posts
+
+// ====== Facebook posts
 
 
 object FacebookPostPrevwRendrEng {
@@ -97,14 +102,13 @@ class FacebookPostPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: 
   def widgetName = "Facebook post"
   def providerLnPvCssClassName = "s_LnPv-FbPost"
   def providerEndpoint = "https://www.facebook.com/plugins/post/oembed.json"
-  //override def sanitizeInsteadOfSandbox = true
   override def sandboxInIframe = false
   override def handles(url: String): Boolean = FacebookPostPrevwRendrEng.handles(url)
 }
 
 
 
-// ===== Facebook videos
+// ====== Facebook videos
 
 
 object FacebookVideoPrevwRendrEng {
@@ -172,7 +176,7 @@ class FacebookVideoPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch:
 
 
 
-// ===== Instagram
+// ====== Instagram
 
 
 object InstagramPrevwRendrEng {
@@ -219,7 +223,8 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 
 
 
-// ===== Reddit
+// ====== Reddit
+
 
 // Reddit's embedding script is buggy: it breaks in Talkyard's sandboxed iframe,
 // when it cannot access document.cookie. It won't render any link preview
@@ -267,7 +272,94 @@ class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 
 
 
-// ===== TikTok
+// ====== Telegram
+
+
+class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
+
+  override def regex: Regex =
+    """^https://t\.me/([a-zA-Z0-9]+/[0-9]+)$""".r
+
+  def providerLnPvCssClassName = "s_LnPv-Telegram"
+
+  override def alreadySanitized = true
+
+
+  def renderInstantly(unsafeUrl: String): String Or LinkPreviewProblem = {
+    val messageId = (regex findGroupIn unsafeUrl) getOrElse {
+      return Bad(LinkPreviewProblem(
+            "Couldn't find message id in Telegram link",
+            unsafeUrl = unsafeUrl, "TyE0TLGRMID"))
+    }
+
+    //"durov/68" "telegram/83"
+
+    val safeMessageId = TextAndHtml.safeEncodeForHtmlAttrOnly(messageId)
+
+    // Look at the regex — messageId should be safe already.
+    dieIf(safeMessageId != messageId, "TyE50SKDGJ5")
+
+    // This is what Telegram's docs says we should embed: ...
+    /*
+    val unsafeScriptWithMessageId =
+          """<script async src="https://telegram.org/js/telegram-widget.js?9" """ +
+            s"""data-telegram-post="$safeMessageId" data-width="100%"></script>"""
+
+    val safeHtml = sandboxedLinkPreviewIframeHtml(
+          unsafeUrl = unsafeUrl, unsafeHtml = unsafeScriptWithMessageId,
+          unsafeProviderName = Some("Telegram"),
+          extraLnPvCssClasses = extraLnPvCssClasses)
+
+    return Good(safeHtml)   */
+
+    // ... HOWEVER then Telegram refuses to show that contents — because
+    // Telegram creates an iframe that refuses to appear when nested in
+    // Talkyard's sandboxed iframe.
+    // There's this error:
+    //   68:1 Access to XMLHttpRequest at 'https://t.me/durov/68?embed=1' from
+    //   origin 'null' has been blocked by CORS policy: No 'Access-Control-Allow-Origin'
+    //   header is present on the requested resource.
+    // Happens in Telegram's  'initWidget',
+    //   https://telegram.org/js/telegram-widget.js?9   line 199:
+    //       widgetEl.parentNode.insertBefore(iframe, widgetEl);
+    // apparently Telegram loads its own iframe, but that won't work, because
+    // Talkyard's sandboxed iframe is at cross-origin domain "null",
+    // and becasue (?) Telegram's iframe request has:
+    //    Sec-Fetch-Site: cross-site
+    // but Telegram's response lacks any Access-Control-Allow-Origin header.
+
+    // Instead, let's load the Telegram iframe ourselves instead;
+    // this seems to work:
+
+    // Iframe sandbox permissions. [IFRMSNDBX]
+    val permissions =
+          "allow-popups " +
+          "allow-popups-to-escape-sandbox " +
+          "allow-top-navigation-by-user-activation"
+
+    // So let's copy-paste Telegram's iframe code to here, and sandbox it.
+    // This'll be slightly fragile, in that it'll break if Telegram makes "major"
+    // change to their iframe and its url & params.
+    val safeTelegramIframeUrl =
+          TextAndHtml.safeEncodeForHtmlAttrOnly(s"$unsafeUrl?embed=1")
+
+    val safeSandboxedIframe =
+          s"""<iframe sandbox="$permissions" src="$safeTelegramIframeUrl"></iframe>"""
+    // Telegarm's script would add: (I suppose the height is via API?)
+    //  width="100%" height="" frameborder="0" scrolling="no"
+    //  style="border: none; overflow: hidden; min-width: 320px; height: 96px;">
+
+    // Unfortunately, now Telegram's iframe tends to become a bit too tall. [TELEGRIFR]
+
+    Good(safeSandboxedIframe)
+  }
+
+}
+
+
+
+// ====== TikTok
+
 
 // TikTok's embed script (they include in the oEmbed html field) is buggy —
 // it breaks when it cannot access localStorage in Talkyard's sandboxed iframe:
@@ -305,7 +397,8 @@ class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 
 
 
-// ===== Twitter
+// ====== Twitter
+
 
 // What about Twitter Moments?
 // https://developer.twitter.com/en/docs/twitter-for-websites/moments/guides/oembed-api
@@ -362,6 +455,10 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
 }
 
 
+
+// ====== YouTube
+
+
 // From oembed.com:
 // URL scheme: https://*.youtube.com/watch*
 // URL scheme: https://*.youtube.com/v/*
@@ -379,7 +476,7 @@ object YouTubePrevwRendrEngOEmbed {
 }
 
 /* Doesn't work, just gets 404 Not Found oEmbed responses. Use instead:
-    YouTubePrevwRendrEng extends InstantLinkPreviewEngine
+    YouTubePrevwRendrEng extends InstantLinkPrevwRendrEng
 
 class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
   extends OEmbedPrevwRendrEng(

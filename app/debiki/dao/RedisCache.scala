@@ -225,8 +225,8 @@ class RedisCache(val siteId: SiteId, private val redis: RedisClient, private val
   // Link Previews
   //-------------
 
-  // Failed link previews aren't saved to the database (then could DoS-make it
-  // run out of space?). Just cached for a while here in Redis.
+  // [defense] Failed link previews aren't saved to the database (then could DoS-attack
+  // make it run out of space?). Just cached for a while in Redis.  [ln_pv_downl_errs]
 
   val LinkPreviewExpirationSecs: Int = 30 * 60
 

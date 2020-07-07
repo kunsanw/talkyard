@@ -83,6 +83,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def loadThePost(pageId: PageId, postNr: PostNr): Post =
     loadPost(pageId, postNr).getOrElse(throw PostNotFoundException(pageId, postNr))
 
+  /** Also see: [[loadTitlesPreferApproved()]]  */
   def loadTitleAndOrigPost(pageId: PageId): Seq[Post] =
     loadPostsByNrs(Seq(PagePostNr(pageId, PageParts.TitleNr), PagePostNr(pageId, PageParts.BodyNr)))
 
@@ -148,7 +149,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def insertPost(newPost: Post): Unit
   def updatePost(newPost: Post): Unit
 
-  /** We index any approed text, and also any unapproved source, see:
+  /** We index any approed text, or the unapproved source, see:
     * [[ed.server.search.makeElasticSearchJsonDocFor]]. [ix_unappr]
     */
   def indexPostsSoon(posts: Post*): Unit
@@ -338,7 +339,7 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   /** Remembers that an uploaded file is referenced from this post.
     * This needs to be done also for not-yet-approved posts — otherwise,
-    * the uploaded things might look unused, and get deleted and would
+    * the uploaded things will seem unused, and get deleted and would
     * then be missing, if the post gets approved, later.  */
   def insertUploadedFileReference(postId: PostId, uploadRef: UploadRef, addedById: UserId): Unit
   def deleteUploadedFileReference(postId: PostId, uploadRef: UploadRef): Boolean
@@ -362,16 +363,16 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
   def upsertLinkPreview(linkPreview: LinkPreview): Unit
   def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String): Option[LinkPreview]
   /** Deletes for all download urls (e.g. downloaded for different screen sizes) */
-  def deleteLinkPreviews(linkUrl: String): Boolean
+  def deleteLinkPreviews(linkUrl: String): Boolean   // Not needed ??
 
   def upsertLink(link: Link): Boolean
   def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int
-  def deleteAllLinksFromPost(postId: PostId): Boolean
+  def deleteAllLinksFromPost(postId: PostId): Boolean  // ?? not needed ??  or if hard delete ?
   def loadLinksFromPost(postId: PostId): Seq[Link]
-  def loadLinksToPage(pageId: PageId): Seq[Link]
+  def loadLinksToPage(pageId: PageId): Seq[Link]  // ?? not needed
   def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId]
-  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]
-  def loadPageIdsLinkedFromPost(postId: PostId): Set[PageId] =
+  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]  // needed! yes.
+  def loadPageIdsLinkedFromPost(postId: PostId): Set[PageId] =  // Not needed?
         loadPageIdsLinkedFromPosts(Set(postId))
   def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId]
 

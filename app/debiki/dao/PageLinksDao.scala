@@ -36,18 +36,21 @@ import scala.collection.mutable
   */
 class StaleStuff {
   private var _stalePageIdsMemCacheOnly: Set[PageId] = Set.empty
-  private var _stalePageIds: Set[PageId] = Set.empty
+  private var _stalePageIdsInDb: Set[PageId] = Set.empty
 
-  def stalePageIdsInDb: Set[PageId] = _stalePageIds
-  def stalePageIdsInMemCache: Set[PageId] = _stalePageIds ++ _stalePageIdsMemCacheOnly
+  def stalePageIdsInDb: Set[PageId] =
+    _stalePageIdsInDb
+
+  def stalePageIdsMemCacheOnly: Set[PageId] =
+    _stalePageIdsMemCacheOnly
 
   def addPageId(pageId: PageId, memCacheOnly: Boolean): Unit = {
     if (memCacheOnly) _stalePageIdsMemCacheOnly += pageId
-    else _stalePageIds += pageId
+    else _stalePageIdsInDb += pageId
   }
 
   def addPageIds(pageIds: Set[PageId]): Unit = {
-    _stalePageIds ++= pageIds
+    _stalePageIdsInDb ++= pageIds
   }
 }
 

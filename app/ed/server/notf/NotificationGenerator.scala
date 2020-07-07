@@ -40,7 +40,7 @@ case class NotificationGenerator(
   nashorn: Nashorn,
   config: debiki.Config) {
 
-  dieIf(tx.siteId != dao.siteId && Globals.isDevOrTest, "TyE603RSKHAN3")
+  dieIf(Globals.isDevOrTest && tx.siteId != dao.siteId, "TyE603RSKHAN3")
 
   private var notfsToCreate = mutable.ArrayBuffer[Notification]()
   private var notfsToDelete = mutable.ArrayBuffer[NotificationToDelete]()
@@ -71,7 +71,12 @@ case class NotificationGenerator(
     if (newPost.isTitle)
       return generatedNotifications  // [no_title_notfs]
 
-    val anyNewTextAndHtml = sourceAndHtml.map(_.asInstanceOf[TextAndHtml])
+    val anyNewTextAndHtml: Option[TextAndHtml] = sourceAndHtml.map({
+      case tah: TextAndHtml => tah
+      case _ =>
+        dieIf(Globals.isDevOrTest, "TyE305KTUDP3")
+        return generatedNotifications
+    })
 
     // A new embedded discussions page shouldn't generate a notification, [new_emb_pg_notf]
     // because those pages are lazy auto created – and uninteresting event.
@@ -82,6 +87,8 @@ case class NotificationGenerator(
       return generatedNotifications
 
     if (anyReviewTask.isDefined) {
+      COULD // Move this to a new fn  generateForReviewTask()  instead? [revw_task_notfs]
+
       // Generate notifications to staff members, so they can review this post. Don't
       // notify others until later, when the post has been approved and is visible.
 
@@ -730,7 +737,7 @@ object NotificationGenerator {
     if (!MaybeMentionsRegex.matches(text))
       return Set.empty
 
-    val result = nashorn.renderAndSanitizeCommonMark_new(
+    val result = nashorn.renderAndSanitizeCommonMark(
       // BUG? COULD incl origin here, so links won't be interpreted relative any
       // web browser client's address? — Right now, no images incl in reply notf emails
       // anyway, so need not fix now.

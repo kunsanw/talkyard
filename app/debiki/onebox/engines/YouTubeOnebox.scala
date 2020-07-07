@@ -32,7 +32,7 @@ import org.scalactic.{Bad, ErrorMessage, Good, Or}
 import scala.util.matching.Regex
 
 
-class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(globals) {
+class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
 
   import YouTubePrevwRendrEng._
 
@@ -78,7 +78,7 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
         // https://developers.google.com/youtube/iframe_api_reference#Loading_a_Video_Player
         //
         // So, needs site origin too.
-        // Re-render if origin changes :-(  ?  (new Talkyard hostname)
+        // Re-render if origin changes :-(  ?  (new Talkyard hostname)  [html_json]
 
         val safeParams = safeEncodeForHtml(unsafeParams)
         // wmode=opaque makes it possible to cover the iframe with a transparent div,
@@ -94,7 +94,7 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPreviewEngine(gl
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
         Bad(LinkPreviewProblem(
-              "Cannot currently onebox this YouTube URL [TyE45kFE2]",
+              "Cannot currently onebox this YouTube URL",
               unsafeUrl = safeUrl, errorCode = "TyEYOUTB0ID"))
     }
   }
@@ -115,7 +115,7 @@ object YouTubePrevwRendrEng {
     * - https://www.youtube.com/embed/112233abc
     */
   def findVideoId(javaUri: jn.URI): Option[String] = {
-    val path = javaUri.getPath  // null?!
+    val path = javaUri.getPathNotNull
     if (javaUri.getHost endsWith "youtu.be") {
       // The url is like: http://youtu.be/112233abc
       SlashVideoIdRegex findGroupIn path
@@ -150,4 +150,5 @@ object YouTubePrevwRendrEng {
     Some(result)
   }
 }
+
 

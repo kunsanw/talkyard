@@ -20,6 +20,7 @@ package com.debiki.core
 import com.debiki.core.Prelude._
 import play.api.libs.json.JsValue
 
+// SHOULD_CODE_REVIEW  and rename all column names to camelCase.
 
 object LinkPreviewTypes {
   // Later:
