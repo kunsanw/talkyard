@@ -4981,12 +4981,12 @@ function googleCajaSanitizeHtml(htmlTextUnsafe, allowClassAndIdAttr,
             // and also don't start with '///', but instead starts with '/something'.
           }
           else {
-            // rel=nofollow added here: [rel_nofollow] too.  TESTS_MISSING
-            newAttribs.rel = 'nofollow';
+            // rel=nofollow added here: [rel_nofollow] too.
+            newAttribs.rel = 'nofollow';  // TyTRELNOFLW01
           }
       }
 
-      // Stop [reverse_tabnabbing],  TESTS_MISSING
+      // Stop [reverse_tabnabbing],  TyTREVTABNAB01
       // https://owasp.org/www-community/attacks/Reverse_Tabnabbing
       if (newAttribs.target && newAttribs.target.indexOf('_blank') >= 0) {
         newAttribs.rel = (newAttribs.rel || '') + ' noopener';

@@ -281,6 +281,8 @@ function runAllE2eTests {
   # Also:  embedded-comments-navigation-as-guest  further below.
 
 
+  $r s/wdio --only sanitize-posts.2browsers $args
+
   $r s/wdio --only votes-and-best-first $args
 
   $r s/wdio --only embed-images-mp4-youtube $args
