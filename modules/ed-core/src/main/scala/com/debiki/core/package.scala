@@ -1192,6 +1192,7 @@ package object core {
   def SEC_TESTS_MISSING = ()
   def ADD_TO_DOCS = ()
   def SHOULD_CODE_REVIEW = ()
+  def CR_DONE = ()
   def FASTER_E2E_TESTS = () // An opportunity to speed up the e2e tests (maybe just marginally)
   def FLAKY = ()          // If an e2e test has races, can fail (ought to fix ... well ... later)
 

@@ -25,6 +25,7 @@ import java.{util => ju}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{mutable, immutable}
 import play.{api => p}
+import talkyard.server.dao._
 
 
 /** Review stuff: a ReviewTask and the users and posts it refers to.

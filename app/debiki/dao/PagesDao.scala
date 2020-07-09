@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014 Kaj Magnus Lindberg (born 1979)
+ * Copyright (c) 2014-2020 Kaj Magnus Lindberg
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,6 +28,7 @@ import ed.server.auth.Authz
 import ed.server.spam.SpamChecker
 import java.{util => ju}
 import scala.collection.immutable
+import talkyard.server.dao._
 import math.max
 import org.owasp.encoder.Encode
 

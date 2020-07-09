@@ -1,6 +1,5 @@
 /**
  * Copyright (c) 2015 Kaj Magnus Lindberg
- * Parts Copyright (c) 2013 jzeta (Joanna Zeta)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,17 +52,15 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(gl
   def renderInstantly(safeUrl: String): String Or LinkPreviewProblem = {
     javaUri = new jn.URI(safeUrl)
     findVideoId(javaUri) match {
-      case Some(videoId) =>
-        // We must sanitize here because alreadySanitized above is true, so that
-        // the iframe below won't be removed.
-        // (Better sanitize, also if seems to be no werird chars in the id.)
-        if (videoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
+      case Some(unsafeVideoId) =>
+        // Double check id.
+        if (unsafeVideoId.exists(""":/?&=;,.()[]{}"'\""" contains _)) {
           return Bad(LinkPreviewProblem(
                 "Bad YouTube video ID, cannot create preview",
                 unsafeUrl = safeUrl, errorCode = "TyEYOUTBID_"))
         }
 
-        val safeId = safeEncodeForHtml(videoId)
+        val safeId = safeEncodeForHtml(unsafeVideoId)
         val unsafeParams = findParams(javaUri) getOrElse {
           return Bad(LinkPreviewProblem(
                 "Bad YouTube video URL, cannot create preview",
@@ -93,6 +90,7 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(gl
       case None =>
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb
+        // No, instead use oEmbed.
         Bad(LinkPreviewProblem(
               "Cannot currently onebox this YouTube URL",
               unsafeUrl = safeUrl, errorCode = "TyEYOUTB0ID"))
@@ -102,6 +100,9 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(gl
 }
 
 
+/** Parts Copyright (c) 2013 jzeta (Joanna Zeta)
+  * MIT: https://github.com/discourse/onebox/blob/master/LICENSE.txt
+  */
 object YouTubePrevwRendrEng {
 
   private val SlashVideoIdRegex = """/([^/]+)""".r

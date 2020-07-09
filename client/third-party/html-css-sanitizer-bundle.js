@@ -4650,7 +4650,7 @@ var html = (function(html4) {
       }
       if (attribName === 'target' && value === '_blank') { // KajMagnus hack
         // Allow (don't clear value).
-        // But add  rel=noopener!
+        // We've added rel=noopener already: [reverse_tabnabbing].
       }
       else if (attribName.substr(0, 5) === 'data-') { // KajMagnus hack
         // Allow data- attrs (don't clear). SECURITY SHOULD allow for custom html pages only? [5JMUKWA1]
@@ -4959,6 +4959,7 @@ function googleCajaSanitizeHtml(htmlTextUnsafe, allowClassAndIdAttr,
     }
   };
 
+    // CR_DONE
     //var siteId = debiki2.ReactStore.allData().siteId;
     //if (siteId === 98) {  // doesn't work, site id not updated when just rendering markdown.
                             // instead, always rel=follow StackExchange links, for now.
@@ -4988,13 +4989,19 @@ function googleCajaSanitizeHtml(htmlTextUnsafe, allowClassAndIdAttr,
 
       // Stop [reverse_tabnabbing],  TyTREVTABNAB01
       // https://owasp.org/www-community/attacks/Reverse_Tabnabbing
-      if (newAttribs.target && newAttribs.target.indexOf('_blank') >= 0) {
-        newAttribs.rel = (newAttribs.rel || '') + ' noopener';
+      // Could do only if:  newAttribs.target.indexOf('_blank') >= 0
+      // but this is simpler:
+      if (newAttribs.target) {
+        var space = newAttribs.rel ? ' ' : '';
+        newAttribs.rel = (newAttribs.rel || '') + space + 'noopener';
       }
 
       return { tagName: 'a', attribs: newAttribs };
     }
   };
+
+  // UX COULD [disallow_h1_h2], annoying if ppl can insert such large titles
+  // in their posts?
 
   // SECURITY SHOULD remove classes & ids like 's_...' and 't_...' — that's internal stuff, and
   // could be used to make the post look weird. (Fairly harmless though.)

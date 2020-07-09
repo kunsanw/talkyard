@@ -5,6 +5,7 @@ create table link_previews_t(
   link_url_c varchar not null,
   downloaded_from_url_c varchar not null,
   downloaded_at_c timestamp not null,
+  cache_max_secs_c int,
   status_code_c int not null,
   preview_type_c int not null,
   first_linked_by_id_c int not null,
@@ -22,6 +23,9 @@ create table link_previews_t(
 
   constraint linkpreviews_c_downloadedfromurl_len check (
       length(downloaded_from_url_c) between 5 and 500),
+
+  constraint linkpreviews_c_cachemaxsecs check (
+      cache_max_secs_c >= 0),
 
   constraint linkpreviews_c_statuscode check (
       status_code_c >= 0),

@@ -289,6 +289,10 @@ https://news.ycombinator.com/item?id=19862002
 SECURITY: https://news.ycombinator.com/item?id=19856419 "HTTP headers for the responsible developer"
 https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity
 
+SECURITY tests: https://github.com/beefproject/beef  ?
+Also see:   [sec_tst_rscs] in sanitize-posts.2browsers.test.ts.
+
+
 [emb_login_req]
 Make  login-required work also for embeded comments.
 

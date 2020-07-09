@@ -45,7 +45,7 @@ function parseOnebox(state, startLineIndex, endLineIndex, whatIsThis) {
 
   // SHOULD require only its own line, not its own paragraph! (Otherwise,  UNTESTED how make this work?
   // people don't "discover" the link preview functionality).
-  // Maybe just remove this?
+  // Maybe just remove this?  zz
   /*
   if (state.parentType !== 'root' &&     // works with markdown-it 7
       state.parentType !== 'paragraph')  // works with markdown-it 8

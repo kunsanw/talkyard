@@ -22,6 +22,7 @@ import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
 import debiki.{SafeStaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
+import talkyard.server.dao._
 
 
 case class CreateForumOptions(

@@ -55,7 +55,7 @@
 
   var numSent = 0;
 
-  function sendHeight() {
+  function sendHeightToParent() {
     var height = 0;
     // There's no body if an embedded-thing-<script> broke, no content appeared.
     if (doc.body) {
@@ -68,9 +68,10 @@
     window.parent.postMessage(['oEmbHeight', height], '*');
     numSent += 1;
     if (numSent < 4) {
-      setTimeout(sendHeight, numSent * 500);
+      setTimeout(sendHeightToParent, numSent * 500);
     }
   }
 
-  setTimeout(sendHeight, 500);
+  // This sends a message after 500, 1000, 2000, 3500 ms, right.
+  setTimeout(sendHeightToParent, 500);
 })(document);

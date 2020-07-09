@@ -819,6 +819,12 @@ object Prelude {
 
 
   implicit class RichJavaUri(val underlying: java.net.URI) extends AnyVal {
+    def getHostOrNone: Option[String] = {
+      val h = underlying.getHost
+      if (h eq null) None
+      else Some(h)
+    }
+
     def getPathNotNull: String = {
       // Java's getPath returns null if the path is undefined.
       val path = underlying.getPath

@@ -28,6 +28,7 @@ import ed.server.pubsub.StorePatchMessage
 import play.api.libs.json.{JsObject, JsValue}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
+import talkyard.server.dao._
 import PostsDao._
 import ed.server.auth.Authz
 import ed.server.spam.SpamChecker

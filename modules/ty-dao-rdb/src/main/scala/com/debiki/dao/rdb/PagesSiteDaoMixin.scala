@@ -68,7 +68,7 @@ trait PagesSiteDaoMixin extends SiteTransaction {
     if (pageIds.isEmpty) return
     UNTESTED
     val statement = s"""
-          update pages3
+          update page_html3
           set page_version = -1, updated_at = ?
           where site_id = ?
             and page_version <> -1

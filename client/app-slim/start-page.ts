@@ -17,6 +17,8 @@
 
 /// <reference path="prelude.ts" />
 /// <reference path="init-all-react-roots.ts" />
+/// <reference path="link-previews.ts" />
+
 
 const d = { i: debiki.internal };
 
@@ -343,7 +345,7 @@ function renderPageInBrowser() {
   });
 
   function lastStep() {
-    listenForLinkPreviewIframeSizeMessages();
+    debiki2.listenForLinkPreviewIframeSizeMessages();
     debiki2.startMagicTime(eds.testNowMs);
     pageStarted = true;
     _.each(scriptLoadDoneCallbacks, function(c) { c(); });
@@ -466,62 +468,6 @@ function registerServiceWorkerWaitForSameVersion() {  // [REGSW]
 d.i.renderPageInBrowser = function() {
   Bliss.ready().then(renderPageInBrowser);
 };
-
-
-// Move to where, instead?  CLEAN_UP  — Move to  link-previews.ts.
-function listenForLinkPreviewIframeSizeMessages() {
-  addEventListener('message', onMessageFromChildIframe, false);
-}
-
-
-function onMessageFromChildIframe(event: WindowEventMap['message']) {
-  // TESTS_MISSING  TyT037MKAH24
-
-  console.debug('onMessageFromChildIframe: ' + JSON.stringify(event.data));
-  if (!_.isArray(event.data))
-    return;
-
-  const typeAndData = event.data;
-  if (typeAndData[0] !== 'oEmbHeight')
-    return;
-
-  const maybeHeight: any = typeAndData[1];
-  if (!_.isNumber(maybeHeight))
-    return;
-
-  const height: number = maybeHeight;
-  console.debug(`oEmbed ifame height: ${height}  says frame: ${event.origin}`);
-
-  // Not too small or too big.
-  if (height < 1 || 700 < height)
-    return;
-
-  const iframe = findIframeThatSent(event);
-  if (iframe) {
-    // Add 10 px to really avoid scrollbars. This Talkyard script: [OEMBHGHT] included
-    // in the oEmbed <iframe srcdoc=...> sets any margins and paddings in the iframe
-    // to 0, so maybe this + 10 isn't needed — but anyway:
-    iframe.style.height = (height + 10) + 'px';   // [oemb_extr_height]
-  }
-  else {
-    // The iframe just disappeared? Maybe an editor preview refreshed & changed,
-    // or some React component got unmounted.
-    console.trace(`No iframe found for message from: ` + event.origin);
-  }
-}
-
-
-function findIframeThatSent(event): HTMLElement | U {  // Move to where instead?  CLEAN_UP
-  // (`iframes` is not an array.)
-  const iframes: HTMLCollectionOf<HTMLElementTagNameMap['iframe']>  =
-      document.getElementsByTagName('iframe');
-  for (let i = 0; i < iframes.length; ++i) {
-    const iframe = iframes[i];
-    if (iframe.contentWindow === event.source)
-    return iframe;
-  }
-}
-
 
 
 // vim: fdm=marker et ts=2 sw=2 fo=tcqwn list

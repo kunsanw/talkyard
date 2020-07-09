@@ -202,7 +202,7 @@ class SystemDao(
       "TyE5S20PUJ6", (site: Site) => s"Trying to delete *real* site: $site")
 
     val siteIdsToDelete = sitesToDeleteMaybeDupls.map(_.id).toSet
-    logger.info(s"ZZZ Deleting sites: $siteIdsToDelete")
+    logger.info(s"Deleting sites: $siteIdsToDelete")  ; AUDIT_LOG
 
     SiteDao.synchronizeOnManySiteIds(siteIdsToDelete) {
       // Not dangerous — we locked these site ids (the line above).
@@ -251,7 +251,7 @@ class SystemDao(
       redisCache.clearThisSite()
     }
 
-    logger.info(s"ZZZ Done deleting sites: $siteIdsToDelete")
+    logger.info(s"Done deleting sites: $siteIdsToDelete")  ; AUDIT_LOG
 
     // ----- Cancel any background jobs
 
@@ -432,7 +432,6 @@ class SystemDao(
   def refreshPageInMemCache(sitePageId: SitePageId): Unit = {
     // No:  memCache.firePageSaved(sitePageId)   [rm_cache_listeners]
     // — then, no event listeners registered, would have no effect. Instead:
-    logger.trace(s"ZZZ refreshPageInMemCache($sitePageId)")
     globals.siteDao(sitePageId.siteId).memCache.firePageSaved(sitePageId)
   }
 

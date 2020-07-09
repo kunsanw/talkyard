@@ -23,9 +23,10 @@ import debiki.EdHttp._
 import debiki.{TextAndHtml, TextAndHtmlMaker, TitleSourceAndHtml}
 import ed.server.auth.{Authz, ForumAuthzContext, MayMaybe}
 import java.{util => ju}
-import org.scalactic.{ErrorMessage, Good, Or}
+import org.scalactic.{ErrorMessage, Or}
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
+import talkyard.server.dao._
 
 
 case class SectionCategories(

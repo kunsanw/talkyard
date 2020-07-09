@@ -172,9 +172,6 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
       }
       safeHtml = pointUrlsToCdn(safeHtml)
 
-      dieIf(safeEncodeForHtml(extraLnPvCssClasses)
-            != extraLnPvCssClasses, "TyE06RKTDH2")
-
       safeHtml = LinkPreviewHtml.safeAside(
             safeHtml = safeHtml, extraLnPvCssClasses = extraLnPvCssClasses,
             unsafeUrl = urlAndFns.unsafeUrl, unsafeProviderName = providerName,
