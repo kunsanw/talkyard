@@ -708,20 +708,33 @@ trait CategoriesDao {
 
   def deleteUndeleteCategory(categoryId: CategoryId, delete: Boolean, who: Who): Unit = {
     readWriteTransaction { tx =>
-      throwForbiddenIf(!tx.isAdmin(who.id), "EdEGEF239S", "Not admin")
-      val categoryBefore = tx.loadCategory(categoryId) getOrElse {
-        throwNotFound("EdE5FK8E2", s"No category with id $categoryId")
-      }
-      val categoryAfter = categoryBefore.copy(
-        deletedAt = if (delete) Some(tx.now.toJavaDate) else None)
-      tx.updateCategoryMarkSectionPageStale(categoryAfter)
+      deleteUndelCategoryImpl(categoryId, delete = delete, who)(tx)
     }
+    COULD_OPTIMIZE // clear less — see comment in deleteUndelCategoryImpl
+    memCache.clearThisSite()
+  }
+
+
+  CLEAN_UP // change  delete: Boolean to case objects Delete and Undelete.
+  def deleteUndelCategoryImpl(categoryId: CategoryId, delete: Boolean, who: Who)(
+        tx: SiteTx): Unit = {
+
+    throwForbiddenIf(!tx.isAdmin(who.id), "EdEGEF239S", "Not admin")
+
+    val categoryBefore = tx.loadCategory(categoryId) getOrElse throwNotFound(
+          "EdE5FK8E2", s"No category with id $categoryId")
+    val categoryAfter = categoryBefore.copy(
+          deletedAt = if (delete) Some(tx.now.toJavaDate) else None)
+
+    tx.updateCategoryMarkSectionPageStale(categoryAfter)
+
     // All pages in the category now needs to be rerendered.
     // And pages *linked from* pages in the categories — for the correct
     // backlinks to appear.
     COULD_OPTIMIZE // only remove-from-cache / mark-as-dirty pages inside the category,
     // plus linked pages — but that's not so easy? Wait with that.
-    emptyCache()
+    //emptyCache()
+    tx.bumpSiteVersion()
   }
 
 

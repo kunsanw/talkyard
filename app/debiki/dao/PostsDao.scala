@@ -1477,6 +1477,8 @@ trait PostsDao {
 
     val page = newPageDao(pageId, tx)
     val user = tx.loadParticipant(userId) getOrElse throwForbidden("DwE3KFW2", "Bad user id")
+
+    SECURITY; COULD // Should check if may see post, not just the page?
     throwIfMayNotSeePage(page, Some(user))(tx)
 
     val postBefore = page.parts.thePostByNr(postNr)
@@ -2357,7 +2359,7 @@ trait PostsDao {
   }
 
 
-  private def hidePostsOnPage(posts: Iterable[Post], pageId: PageId, reason: String)(
+  def hidePostsOnPage(posts: Iterable[Post], pageId: PageId, reason: String)(
         tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
     dieIf(posts.exists(_.pageId != pageId), "EdE7GKU23Y4")
     dieIf(posts.exists(_.isTitle), "EdE5KP0WY2") ; SECURITY ; ANNOYING // end users can trigger internal error
