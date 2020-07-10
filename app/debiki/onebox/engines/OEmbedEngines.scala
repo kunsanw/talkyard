@@ -114,9 +114,6 @@ class FacebookPostPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: 
 
 object FacebookVideoPrevwRendrEng {
 
-  // maxwidth=...
-  // omitscript=...
-
   // Facebook videos URL scheme, from https://oembed.com:
   //
   // API endpoint: https://www.facebook.com/plugins/video/oembed.json
@@ -130,7 +127,7 @@ object FacebookVideoPrevwRendrEng {
   //   https://www.facebook.com/video.php?id={video-id}
   //   https://www.facebook.com/video.php?v={video-id}
   //
-  // Response looks like:
+  // FB's response looks like:
   //   {
   //     "author_name": "Facebook",
   //     "author_url": "https://www.facebook.com/facebook/",
@@ -138,7 +135,9 @@ object FacebookVideoPrevwRendrEng {
   //     "provider_name": "Facebook",
   //     "success": true,
   //     "height": null,
-  //     "html": "<div id=\"fb-root\"></div>\n<script>(function(d, s, id) {\n  var js, fjs = d.getElementsByTagName(s)[0];\n  if (d.getElementById(id)) return;\n  js = d.createElement(s); js.id = id;\n  js.src = \"https://connect.facebook.net/en_US/sdk.js#xfbml=1&amp;version=v2.9\";\n  fjs.parentNode.insertBefore(js, fjs);\n}(document, 'script', 'facebook-jssdk'));</script><div class=\"fb-video\" data-href=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><div class=\"fb-xfbml-parse-ignore\"><blockquote cite=\"https://www.facebook.com/facebook/videos/10153231379946729/\"><a href=\"https://www.facebook.com/facebook/videos/10153231379946729/\">How to Share With Just Friends</a><p>How to share with just friends.</p>Posted by <a href=\"https://www.facebook.com/facebook/\">Facebook</a> on Friday, December 5, 2014</blockquote></div></div>",
+  //     "html": "<div id=\"fb-root\"></div>\n<script>...</script>
+  //               <div class=\"fb-video\" data-href=\"https://www.facebook.com/...">...
+  //               <blockquote ...",
   //     "type": "video",
   //     "version": "1.0",
   //     "url": "https://www.facebook.com/facebook/videos/10153231379946729/",
@@ -369,8 +368,8 @@ class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(g
 // ====== TikTok
 
 
-// TikTok's embed script (they include in the oEmbed html field) is buggy —
-// it breaks when it cannot access localStorage in Talkyard's sandboxed iframe:
+// TikTok's embed script (they include in the oEmbed html field) is buggy  [buggy_oembed]
+// — it breaks when it cannot access localStorage in Talkyard's sandboxed iframe:
 //
 //   > VM170 embed_v0.0.6.js:1 Uncaught DOMException: Failed to read the 'localStorage'
 //   >      property from 'Window': The document is sandboxed and lacks the
@@ -418,17 +417,6 @@ class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 // Links look like:
 //   https://twitter.com/TwitterDev
 
-// omit_script=1  ?
-// theme  = {light, dark}
-// link_color  = #zzz   [ty_themes]
-// lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
-// see:
-// https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview
-// dnt  ?
-
-// Wants:  theme: light / dark.  Primary color / link color.
-// And device:  mobile / tablet / laptop ?  for maxwidth.
-
 object TwitterPrevwRendrEng {
   // URL scheme, from https://oembed.com:
   // >  https://twitter.com/*/status/*
@@ -451,7 +439,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   // Twitter wants 'maxwidth' not 'max_width'.
   // omit_script=1  ?
   // theme  = {light, dark}
-  // link_color  = #zzz   [ty_themes]
+  // link_color  =   [ty_themes]
   // lang="en" ... 1st 2 letters in Ty's lang code — except for Chinese:  zh-cn  zh-tw
   // see:
   // https://developer.twitter.com/en/docs/twitter-for-websites/twitter-for-websites-supported-languages/overview

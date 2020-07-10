@@ -309,6 +309,7 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
 
   // ====== Telegram
 
+  TESTS_MISSING  // Telegram links
 
 
   // ====== TikTok
