@@ -256,7 +256,7 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 
 object RedditPrevwRendrEng {
   val regex: Regex =
-    """^https://(www\.)?(reddit\.com|instagr\.am)/r/[^/]+/comments/[^/]+/.*$""".r
+    """^https://(www\.)?reddit\.com/r/[^/]+/comments/[^/]+/.*$""".r
 }
 
 class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
