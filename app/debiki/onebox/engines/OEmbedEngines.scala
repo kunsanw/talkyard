@@ -15,7 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package debiki.onebox.engines
+// CR_DONE
+
+package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview.engines
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
@@ -24,17 +26,16 @@ import debiki.onebox.{InstantLinkPrevwRendrEng, LinkPreviewProblem}
 import org.scalactic.{Bad, Good, Or}
 import scala.util.matching.Regex
 
-// SHOULD_CODE_REVIEW later and the tests too.
 
-// These oEmbed engines are sorted alphabetically, index:   (Soon)
-// Facebook posts
-// Facebook videos
-// Instagram
-// Reddit
-// Telegram
-// TikTok
-// Twitter
-// YouTube
+// These oEmbed engines are sorted alphabetically, index:
+//   - Facebook posts
+//   - Facebook videos
+//   - Instagram
+//   - Reddit
+//   - Telegram
+//   - TikTok
+//   - Twitter
+//   - YouTube
 
 
 
@@ -226,8 +227,8 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 // ====== Reddit
 
 
-// Reddit's embedding script is buggy: it breaks in Talkyard's sandboxed iframe,
-// when it cannot access document.cookie. It won't render any link preview
+// Reddit's embedding script is buggy [buggy_oembed]: it breaks in Talkyard's sandboxed
+// iframe, when it cannot access document.cookie. It won't render any link preview
 // — *however*, reddit comment replies use another Reddit script,
 // which works (not buggy).
 //
@@ -255,8 +256,9 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 //  - https://www.reddit.com/r/*/comments/*/*
 
 object RedditPrevwRendrEng {
-  val regex: Regex =
-    """^https://(www\.)?reddit\.com/r/[^/]+/comments/[^/]+/.*$""".r
+
+  val regex: Regex = """^https://(www\.)?reddit\.com/r/[^/]+/comments/[^/]+/.*$""".r
+
 }
 
 class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
@@ -275,10 +277,16 @@ class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 // ====== Telegram
 
 
+object TelegramPrevwRendrEng {
+
+  val regex: Regex = """^https://t\.me/([a-zA-Z0-9]+/[0-9]+)$""".r
+
+}
+
 class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
 
   override def regex: Regex =
-    """^https://t\.me/([a-zA-Z0-9]+/[0-9]+)$""".r
+    TelegramPrevwRendrEng.regex
 
   def providerLnPvCssClassName = "s_LnPv-Telegram"
 
@@ -314,7 +322,7 @@ class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(g
 
     // ... HOWEVER then Telegram refuses to show that contents — because
     // Telegram creates an iframe that refuses to appear when nested in
-    // Talkyard's sandboxed iframe.
+    // Talkyard's sandboxed iframe.  [buggy_oembed]
     // There's this error:
     //   68:1 Access to XMLHttpRequest at 'https://t.me/durov/68?embed=1' from
     //   origin 'null' has been blocked by CORS policy: No 'Access-Control-Allow-Origin'

@@ -47,19 +47,6 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
     var wrongLinks = Set[String]()
     var rightLinks = Set[String]()
 
-    if (any == TwitterLinks) {
-      SECURITY; TESTS_MISSING // verify the wrong domains won't match. Done already, can do even more.
-      // change the domains in various ways, verify won't match.
-      // Already tested — see below, e.g.:
-      // (provider).regex.matches(url1.replaceAllLiterally(".com", ".bad.com")) mustBe false
-      // and would be good to double test all provider,
-      // via this sampleLinks() fn too, somehow.
-    }
-    else {
-      wrongLinks += TwitterLinks.sampleTweetLink
-      wrongLinks += TwitterLinks.sampleMomentLink
-    }
-
     if (any != FacebookLinks) {
       wrongLinks += FacebookLinks.facebookPostUrl
       wrongLinks += FacebookLinks.facebookVideoUrl
@@ -76,9 +63,24 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
       wrongLinks += RedditLinks.url3
     }
 
+    TESTS_MISSING // Telegram
+
     if (any != TikTokLinks) {
       wrongLinks += TikTokLinks.url1
       wrongLinks += TikTokLinks.url2
+    }
+
+    if (any == TwitterLinks) {
+      SECURITY; TESTS_MISSING // verify the wrong domains won't match. Done already, can do even more.
+      // change the domains in various ways, verify won't match.
+      // Already tested — see below, e.g.:
+      // (provider).regex.matches(url1.replaceAllLiterally(".com", ".bad.com")) mustBe false
+      // and would be good to double test all provider,
+      // via this sampleLinks() fn too, somehow.
+    }
+    else {
+      wrongLinks += TwitterLinks.sampleTweetLink
+      wrongLinks += TwitterLinks.sampleMomentLink
     }
 
     if (any != YouTubeLinks) {
@@ -90,70 +92,6 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
     (rightLinks, wrongLinks)
   }
 
-
-
-  // ====== Twitter
-
-  object TwitterLinks {
-    // Sample tweet link from:
-    // https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-oembed
-    val sampleTweetLink = "https://twitter.com/Interior/status/507185938620219395"
-
-    // Sample Moment link from:
-    // https://developer.twitter.com/en/docs/twitter-for-websites/moments/guides/oembed-api
-    val sampleMomentLink = "https://twitter.com/i/moments/650667182356082688"
-  }
-
-  "TwitterPrevwRendrEng can" - {
-    import TwitterPrevwRendrEng.{regex => rgx}
-    import TwitterLinks._
-
-    "regex match tweet urls" in {
-      val status = "status"
-      val twittercom = "twitter.com"
-      rgx.matches(s"$https://$twittercom/abc123/$status/def456*") mustBe true
-      rgx.matches(s"$https://$twittercom/abc/123/$status/def/456*") mustBe true
-      rgx.matches(s"$https://sth.$twittercom/ab12/$status/de45*") mustBe true
-      rgx.matches(sampleTweetLink) mustBe true
-    }
-
-    "but not the wrong tweet urls" in {
-      // Not https:
-      rgx.matches(sampleTweetLink.replaceAllLiterally("https:", "http:")) mustBe false
-      // Not 'status':
-      rgx.matches(sampleTweetLink.replaceAllLiterally("status", "sta_tus")) mustBe false
-      // Not 'twitter.com':
-      rgx.matches(sampleTweetLink.replaceAllLiterally("twitter.com", "twi_ter.com")
-            ) mustBe false
-      rgx.matches(sampleTweetLink.replaceAllLiterally(".com", ".bad.com")) mustBe false
-      rgx.matches(sampleTweetLink.replaceAllLiterally(".com", ".com.bad.com")) mustBe false
-      rgx.matches(sampleTweetLink.replaceAllLiterally("r.com", "r.co")) mustBe false
-      // 'https://not_twitter.com':
-      rgx.matches(sampleTweetLink.replaceAllLiterally("://t", "://not_t")
-            ) mustBe false
-    }
-
-    "?? Later ?? regex match Twitter Moment urls" in {
-      // rgx.matches(sampleMomentLink) mustBe true
-    }
-
-    "not the wrong domain" in {
-      TESTS_MISSING
-      sampleLinksOnly(TwitterLinks) foreach { link =>
-        rgx.matches(link) mustBe true
-        // ??
-        // rgx.matches(link.replaceFirst("([^/])/", "&1.bad.com/")) mustBe false
-        rgx.matches(link.replaceAllLiterally(".com", ".com.bad.com")) mustBe false
-      }
-    }
-
-    "not the wrong providers" in {
-      sampleLinksExecpt(TwitterLinks) foreach { link =>
-        rgx.matches(link) mustBe false
-      }
-    }
-
-  }
 
 
   // ====== Facebook
@@ -252,6 +190,7 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
       }
     }
   }
+
 
 
   // ====== Instagram
@@ -368,6 +307,10 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
 
 
 
+  // ====== Telegram
+
+
+
   // ====== TikTok
 
   object TikTokLinks {
@@ -411,6 +354,71 @@ class LinkPreviewMatchersSpec extends FreeSpec with must.Matchers {
         tiktok.regex.matches(link) mustBe false
       }
     }
+  }
+
+
+
+  // ====== Twitter
+
+  object TwitterLinks {
+    // Sample tweet link from:
+    // https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-oembed
+    val sampleTweetLink = "https://twitter.com/Interior/status/507185938620219395"
+
+    // Sample Moment link from:
+    // https://developer.twitter.com/en/docs/twitter-for-websites/moments/guides/oembed-api
+    val sampleMomentLink = "https://twitter.com/i/moments/650667182356082688"
+  }
+
+  "TwitterPrevwRendrEng can" - {
+    import TwitterPrevwRendrEng.{regex => rgx}
+    import TwitterLinks._
+
+    "regex match tweet urls" in {
+      val status = "status"
+      val twittercom = "twitter.com"
+      rgx.matches(s"$https://$twittercom/abc123/$status/def456*") mustBe true
+      rgx.matches(s"$https://$twittercom/abc/123/$status/def/456*") mustBe true
+      rgx.matches(s"$https://sth.$twittercom/ab12/$status/de45*") mustBe true
+      rgx.matches(sampleTweetLink) mustBe true
+    }
+
+    "but not the wrong tweet urls" in {
+      // Not https:
+      rgx.matches(sampleTweetLink.replaceAllLiterally("https:", "http:")) mustBe false
+      // Not 'status':
+      rgx.matches(sampleTweetLink.replaceAllLiterally("status", "sta_tus")) mustBe false
+      // Not 'twitter.com':
+      rgx.matches(sampleTweetLink.replaceAllLiterally("twitter.com", "twi_ter.com")
+      ) mustBe false
+      rgx.matches(sampleTweetLink.replaceAllLiterally(".com", ".bad.com")) mustBe false
+      rgx.matches(sampleTweetLink.replaceAllLiterally(".com", ".com.bad.com")) mustBe false
+      rgx.matches(sampleTweetLink.replaceAllLiterally("r.com", "r.co")) mustBe false
+      // 'https://not_twitter.com':
+      rgx.matches(sampleTweetLink.replaceAllLiterally("://t", "://not_t")
+      ) mustBe false
+    }
+
+    "?? Later ?? regex match Twitter Moment urls" in {
+      // rgx.matches(sampleMomentLink) mustBe true
+    }
+
+    "not the wrong domain" in {
+      TESTS_MISSING
+      sampleLinksOnly(TwitterLinks) foreach { link =>
+        rgx.matches(link) mustBe true
+        // ??
+        // rgx.matches(link.replaceFirst("([^/])/", "&1.bad.com/")) mustBe false
+        rgx.matches(link.replaceAllLiterally(".com", ".com.bad.com")) mustBe false
+      }
+    }
+
+    "not the wrong providers" in {
+      sampleLinksExecpt(TwitterLinks) foreach { link =>
+        rgx.matches(link) mustBe false
+      }
+    }
+
   }
 
 

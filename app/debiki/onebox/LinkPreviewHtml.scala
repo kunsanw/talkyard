@@ -105,6 +105,9 @@ object LinkPreviewHtml {   CR_DONE  // 07-09
         // own domain*, e.g. to know if one is logged in, so they can show one's avatar
         // or other things relevant to oneself in the iframe.
         //
+        // Unfortunately, many / most? oEmbed:s break (e.g. fail to render properly),
+        // if they cannot access document.cookie or localStorage etc.  [buggy_oembed]
+        //
         // See:
         //   - https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/
         //   - https://stackoverflow.com/questions/31184505/sandboxing-iframe-and-allow-same-origin
