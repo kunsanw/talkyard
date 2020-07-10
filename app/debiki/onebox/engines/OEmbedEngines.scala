@@ -96,14 +96,14 @@ object FacebookPostPrevwRendrEng {
 
 
 class FacebookPostPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Facebook")
-  def widgetName = "Facebook post"
+  def widgetName = "post"
   def providerLnPvCssClassName = "s_LnPv-FbPost"
   def providerEndpoint = "https://www.facebook.com/plugins/post/oembed.json"
-  override def sandboxInIframe = false
+  // override def sandboxInIframe = false
   override def handles(url: String): Boolean = FacebookPostPrevwRendrEng.handles(url)
 }
 
@@ -164,11 +164,11 @@ object FacebookVideoPrevwRendrEng {
 
 
 class FacebookVideoPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Facebook")
-  def widgetName = "Facebook post"
+  def widgetName = "video"
   def providerLnPvCssClassName = "s_LnPv-FbVideo"
   def providerEndpoint = "https://www.facebook.com/plugins/video/oembed.json"
   override def handles(url: String): Boolean = FacebookVideoPrevwRendrEng.handles(url)
@@ -211,11 +211,11 @@ object InstagramPrevwRendrEng {
 }
 
 class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Instagram")
-  def widgetName = "Instagram post"
+  def widgetName = "post"
   def providerLnPvCssClassName = "s_LnPv-Instagram"
   def providerEndpoint = "https://api.instagram.com/oembed"
   override def regex: Regex = InstagramPrevwRendrEng.regex
@@ -261,7 +261,7 @@ object RedditPrevwRendrEng {
 }
 
 class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Reddit")
@@ -386,7 +386,7 @@ object TikTokPrevwRendrEng {
 }
 
 class TikTokPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
     globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("TikTok")
@@ -425,7 +425,7 @@ object TwitterPrevwRendrEng {
 }
 
 class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolean)
-  extends OEmbedPrevwRendrEng(
+  extends OEmbedLinkPrevwRendrEng(
         globals, siteId = siteId, mayHttpFetch = mayHttpFetch) {
 
   def providerName = Some("Twitter")
@@ -436,7 +436,6 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   override def regex: Regex = TwitterPrevwRendrEng.regex
 
   // Twitter tweets are 598 px over at Twitter.com
-  // Twitter wants 'maxwidth' not 'max_width'.
   // omit_script=1  ?
   // theme  = {light, dark}
   // link_color  =   [ty_themes]
@@ -446,7 +445,7 @@ class TwitterPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   // dnt  ?
   // Wants:  theme: light / dark.  Primary color / link color.
   // And device:  mobile / tablet / laptop ?  for maxwidth.
-  override def queryParamsEndAmp = "maxwidth=600&align=center&"
+  override def moreQueryParamsEndAmp = "align=center&"
 
 }
 
@@ -481,7 +480,7 @@ class YouTubePrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boole
   def providerName = Some("YouTube")
   def widgetName = "video"
   def providerLnPvCssClassName = "s_LnPv-YouTube"
-  def providerEndpoint = "https://www.reddit.com/oembed"
+  def providerEndpoint = "https://www.youtube.com/oembed"
   override def handles(url: String): Boolean = {
     YouTubePrevwRendrEng.handles(url)
   }

@@ -53,6 +53,7 @@ object LinkPreviewTypes {
   *  but for oEmbed, it's different.
   *
   * @param downloaded_at_c
+  * @param cache_max_secs_c — thereafter, try to re-fetch the preview
   * @param status_code_c: 0 if the request failed, no response. E.g. the network.
   * @param preview_type_c
   * @param first_linked_by_id_c
@@ -65,6 +66,7 @@ case class LinkPreview(
   link_url_c: String,
   downloaded_from_url_c: String,
   downloaded_at_c: When,
+  // cache_max_secs_c: Option[Int] — later
   status_code_c: Int,
   preview_type_c: Int, // always oEmbed, for now
   first_linked_by_id_c: UserId,

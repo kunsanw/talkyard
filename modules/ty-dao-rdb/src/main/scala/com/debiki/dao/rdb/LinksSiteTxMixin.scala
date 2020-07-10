@@ -39,14 +39,16 @@ trait LinksSiteTxMixin extends SiteTransaction {
               link_url_c,
               downloaded_from_url_c,
               downloaded_at_c,
+              cache_max_secs_c,
               status_code_c,
               preview_type_c,
               first_linked_by_id_c,
               content_json_c)
-          values (?, ?, ?, ?, ?, ?, ?, ?)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
           on conflict (site_id_c, link_url_c, downloaded_from_url_c)
           do update set
               downloaded_at_c = excluded.downloaded_at_c,
+              cache_max_secs_c = excluded.cache_max_secs_c,
               status_code_c = excluded.status_code_c,
               preview_type_c = excluded.preview_type_c,
               content_json_c = excluded.content_json_c """
@@ -56,6 +58,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           linkPreview.link_url_c,
           linkPreview.downloaded_from_url_c,
           linkPreview.downloaded_at_c.asTimestamp,
+          NullInt, // linkPreview.cache_max_secs_c, — later
           linkPreview.status_code_c.asAnyRef,
           linkPreview.preview_type_c.asAnyRef,
           linkPreview.first_linked_by_id_c.asAnyRef,
@@ -256,6 +259,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
           link_url_c = getString(rs, "link_url_c"),
           downloaded_from_url_c = getString(rs, "downloaded_from_url_c"),
           downloaded_at_c = getWhen(rs, "downloaded_at_c"),
+          // cache_max_secs_c = ... — later
           status_code_c = getInt(rs, "status_code_c"),
           preview_type_c = getInt(rs, "preview_type_c"),
           first_linked_by_id_c = getInt(rs, "first_linked_by_id_c"),

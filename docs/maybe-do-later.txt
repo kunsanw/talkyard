@@ -299,6 +299,18 @@ Make  login-required work also for embeded comments.
 [emb_forum]
 Make it possible to embedd a forum, or fourm cateory (no just blog comments).
 
+[ty_oemb_og]
+Add oEmbed & OpenGraph support to Ty.
+See e.g.:
+  https://wordpress.org/plugins/wpsso/
+  https://blog.ycombinator.com/how-to-build-an-oembed-integration-for-your-startup-and-why-its-necessary/
+And OpenGraph:
+  https://wordpress.org/support/topic/social-sharing-on-linkedin-description-not-appearing/
+LinkedIn likes oEmbed better than OpenGraph:
+  https://surniaulula.com/2019/standards/og/linkedin-prefers-oembed-data-instead-of-open-graph/
+(Commercial:  https://embed.ly  +  https://iframely.com,
+iframely = OSS too:  https://github.com/itteco/iframely/tree/master/plugins/domains )
+
 [like-notfs]
 Send notifications about getting a Like.
 

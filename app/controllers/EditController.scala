@@ -228,6 +228,8 @@ class EditController @Inject()(cc: ControllerComponents, edContext: EdContext)
     *   https://publish.twitter.com/oembed?url=the_url
     * and gets back Twitter tweet json that shows how to embed the tweet,
     * then creates and returns sanitized onebox html.
+    *
+    * RENAME to fetchLinkPreview, & client side too
     */
   def onebox(url: String): Action[Unit] = AsyncGetActionRateLimited(
         RateLimits.FetchLinkPreview) { request =>

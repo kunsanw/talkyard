@@ -81,6 +81,7 @@ class LinksAppSpec extends DaoAppSuite {
         link_url_c = extWidgetUrl,
         downloaded_from_url_c = oembedRequestUrl,
         downloaded_at_c = when,
+        // cache_max_secs_c = ... — later
         status_code_c = 200,
         preview_type_c = LinkPreviewTypes.OEmbed,
         first_linked_by_id_c = userMmm.id,

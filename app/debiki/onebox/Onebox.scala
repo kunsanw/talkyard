@@ -57,6 +57,7 @@ object RenderPreviewResult {
 }
 
 
+
 class RenderPreviewParams(
   val siteId: SiteId,
   val unsafeUrl: String,
@@ -66,17 +67,21 @@ class RenderPreviewParams(
   val savePreviewInDb: LinkPreview => Unit)
 
 
+
 case class LinkPreviewProblem(
   unsafeProblem: String, unsafeUrl: String, errorCode: String)
 
 
-/**
-  * - globals — that's s a bit much — COULD instead, incl only what's needed:
+
+/** Renders link previews for one type of links — e.g. YouTube,
+  * or Reddit, or maybe generic oEmed links.
+  *
+  * COULD remove param globals, and incl only precisely what's needed?
   */
 abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
   def regex: Regex =
-    die("TyE603RKDJ35", "Please override 'handles(url): Boolean' or 'regex: Regex'")
+    die("TyE603RKDJ35", "Please implement 'handles(url): Boolean' or 'regex: Regex'")
 
   def providerName: Option[String]
 
@@ -84,13 +89,19 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
   def handles(url: String): Boolean = regex matches url
 
-  /** If an engine needs to include an iframe, then it'll have to sanitize everything itself,
-    * because Google Caja's JsHtmlSanitizer (which we use) removes iframes.
+  /** If an engine needs to include an iframe or any "uexpected thing",
+    * then it'll have to sanitize everything itself, because
+    * TextAndHtml.sanitizeRelaxed() removes iframes and other uexpected things.
     */
   protected def alreadySanitized = false
 
+  /** An engine can set this to true, to get iframe-sandboxed instead of
+    * html-sanitized.
+    */
   protected def sandboxInIframe = false
 
+  /** By default, we add a "View at (provider name)" link below the link preview.
+    */
   protected def addViewAtLink = true
 
   // (?:...) is a non-capturing group.  (for local dev search: /-/u/ below.)
@@ -107,16 +118,27 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
 
 
   final def loadRenderSanitize(urlAndFns: RenderPreviewParams): Future[String] = {
-    val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
 
-    COULD_OPTIMIZE // hash the url, so shorter?
+    // ----- Any cached preview?
+
+    // This prevents pg strorage DoS.  [ln_pv_netw_err]
+    COULD_OPTIMIZE // hash the url = Redis key, so shorter?
+    val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
     redisCache.getLinkPreviewSafeHtml(urlAndFns.unsafeUrl) foreach { safeHtml =>
       SHOULD // if preview broken *and* if (urlAndFns.mayHttpFetch):
       // retry, although cache entry still here.
       // E.g. was netw err,
-      // but at most X times per minute? Otherwise return the cached failed html.
+      // but at most X times per minute? Otherwise return the cached broken html.
       return Future.successful(safeHtml)
     }
+
+    // ----- Http fetch preview
+
+    // Or generate instantly.
+
+    val futureHtml = loadAndRender(urlAndFns)
+
+    // ----- Sanitize
 
     def sanitizeAndWrap(htmlOrError: String Or LinkPreviewProblem): String = {
       // <aside> class:    s_LnPv (-Err)    means Link Preview (Error)
@@ -180,8 +202,6 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {
       redisCache.putLinkPreviewSafeHtml(urlAndFns.unsafeUrl, safeHtml)
       safeHtml
     }
-
-    val futureHtml = loadAndRender(urlAndFns)
 
     // Use if-isCompleted to get an instant result, if possible — Future.map()
     // apparently isn't executed directly, even if the future is completed.
@@ -252,13 +272,8 @@ class LinkPreviewRenderer(
 
   import LinkPreviewRenderer._
 
-  private val pendingRequestsByUrl = mutable.HashMap[String, Future[String]]()
-  private val oneboxHtmlByUrl = mutable.HashMap[String, String]()
-  private val failedUrls = mutable.HashSet[String]()
   private val PlaceholderPrefix = "onebox-"
   private val NoEngineException = new DebikiException("DwE3KEF7", "No matching preview engine")
-
-  private val executionContext: ExecutionContext = globals.executionContext
 
   private val engines = Seq[LinkPreviewRenderEngine](
     // COULD_OPTIMIZE These are, or can be made thread safe — no need to recreate all the time.
@@ -278,11 +293,11 @@ class LinkPreviewRenderer(
   def fetchRenderSanitize(url: String): Future[String] = {
     require(url.length <= MaxUrlLength, s"Too long url: $url TyE53RKTKDJ5")
 
-    def loadPreiewInfoFromDatabase(downloadUrl: String): Option[LinkPreview] = {
+    def loadPreviewFromDatabase(downloadUrl: String): Option[LinkPreview] = {
       // Don't create a write tx — could cause deadlocks, because unfortunately
       // we might be inside a tx already: [nashorn_in_tx] (will fix later)
       val siteDao = globals.siteDao(siteId)
-      siteDao.readOnlyTransaction { tx =>
+      siteDao.readTx { tx =>
         tx.loadLinkPreviewByUrl(linkUrl = url, downloadUrl = downloadUrl)
       }
     }
@@ -294,8 +309,8 @@ class LinkPreviewRenderer(
               unsafeUrl = url,
               requesterId = requesterId,
               mayHttpFetch = mayHttpFetch,
-              loadPreviewFromDb = loadPreiewInfoFromDatabase,
-              savePreviewInDb = savePreiewInDatabase)
+              loadPreviewFromDb = loadPreviewFromDatabase,
+              savePreviewInDb = savePreviewInDatabase)
         return engine.loadRenderSanitize(args)
       }
     }
@@ -304,11 +319,12 @@ class LinkPreviewRenderer(
   }
 
 
-  private def savePreiewInDatabase(linkPreview: LinkPreview): Unit = {
+  private def savePreviewInDatabase(linkPreview: LinkPreview): Unit = {
     dieIf(!mayHttpFetch, "TyE305KSHW2",
           s"Trying to save link preview, when may not fetch: ${linkPreview.link_url_c}")
     val siteDao = globals.siteDao(siteId)
-    siteDao.readWriteTransaction { tx =>
+    siteDao.writeTx { (tx, _) =>
+      COULD // refresh pages that link to this preview, add to StaleStuff.
       tx.upsertLinkPreview(linkPreview)
     }
   }
@@ -316,6 +332,7 @@ class LinkPreviewRenderer(
 
   def fetchRenderSanitizeInstantly(url: String): RenderPreviewResult = {
     // Don't throw, this might be in a background thread.
+
     if (url.length > MaxUrlLength)
       return RenderPreviewResult.NoPreview
 
@@ -327,11 +344,6 @@ class LinkPreviewRenderer(
         case Success(safeHtml) => RenderPreviewResult.Done(safeHtml, placeholder)
         case Failure(throwable) => RenderPreviewResult.NoPreview
       }
-
-    futureSafeHtml.onComplete({
-      case Success(safeHtml) =>
-      case Failure(throwable) =>
-    })(executionContext)
 
     RenderPreviewResult.Loading(futureSafeHtml, placeholder)
   }
