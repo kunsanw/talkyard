@@ -27,6 +27,7 @@ import DaoAppSuite._
 import java.io.File
 import play.api.inject.DefaultApplicationLifecycle
 import play.api._
+import talkyard.server.dao.StaleStuff
 
 
 
@@ -50,6 +51,19 @@ class DaoAppSuite(
   val startTime: When = When.fromMillis(10 * 1000 + OneAndZeros1157DaysInMillis),
   val extraConfig: Map[String, String] = Map.empty)
   extends FreeSpec with MustMatchers with BaseOneAppPerSuite with FakeApplicationFactory {
+
+
+  /** Adds new ScalaTest syntax:  "test name".inReadTx(dao) { tx => .... }
+    */
+  implicit class InTxString(val underlying: String) {
+    def inReadTx(dao: => SiteDao)(f: SiteTx => Any /* Assertion */): Unit = {
+      underlying in dao.readTx(f)
+    }
+    def inWriteTx(dao: => SiteDao)(f: (SiteTx, StaleStuff) => Any /* Assertion */): Unit = {
+      underlying in dao.writeTx(f)
+    }
+  }
+
 
   Globals.setIsProdForever(false)
 

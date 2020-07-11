@@ -1474,8 +1474,12 @@ trait PostsDao {
         staleStuff: StaleStuff)
         : ChangePostStatusResult =  {
     import com.debiki.core.{PostStatusAction => PSA}
+    import context.security.{throwNoUnless, throwIndistinguishableNotFound}
 
     val page = newPageDao(pageId, tx)
+    if (!page.exists)
+      throwIndistinguishableNotFound("TyE05KSRDM3")
+
     val user = tx.loadParticipant(userId) getOrElse throwForbidden("DwE3KFW2", "Bad user id")
 
     SECURITY; COULD // Should check if may see post, not just the page?
@@ -2318,7 +2322,8 @@ trait PostsDao {
                 .filter(!_.isBodyHidden)
         }
         else {
-          tx.loadPostsByUniqueId(guestPostIds).values.filter(!_.isBodyHidden)
+          tx.loadPostsByUniqueId(guestPostIds).values.filter(p =>
+                !p.isBodyHidden && !p.isTitle)
         }
 
       // Don't hide posts that have been reviewed and deemed okay.
@@ -2361,8 +2366,10 @@ trait PostsDao {
 
   def hidePostsOnPage(posts: Iterable[Post], pageId: PageId, reason: String)(
         tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
-    dieIf(posts.exists(_.pageId != pageId), "EdE7GKU23Y4")
-    dieIf(posts.exists(_.isTitle), "EdE5KP0WY2") ; SECURITY ; ANNOYING // end users can trigger internal error
+    posts.find(_.pageId != pageId) foreach { post =>
+      die("TyE7GKU23Y4", s"post.pageId = ${post.pageId}, but pageId = $pageId")
+    }
+    dieIf(posts.exists(_.isTitle), "EdE5KP0WY2")
     val postsToHide = posts.filter(!_.isBodyHidden)
     if (postsToHide.isEmpty)
       return

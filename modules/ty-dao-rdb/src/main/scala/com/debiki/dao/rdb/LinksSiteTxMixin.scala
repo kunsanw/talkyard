@@ -178,7 +178,9 @@ trait LinksSiteTxMixin extends SiteTransaction {
             on po.site_id = ls.site_id_c
             and po.unique_post_id = ls.to_post_id_c
           where po.site_id = ?
-            and po.page_id = ? """
+            and po.page_id = ?
+          order by
+            from_post_id_c, link_url_c """
     val values = List(siteId.asAnyRef, pageId, siteId.asAnyRef, pageId)
     runQueryFindMany(query, values, rs => {
       parseLink(rs)
@@ -215,7 +217,9 @@ trait LinksSiteTxMixin extends SiteTransaction {
               on po.unique_post_id = ls.from_post_id_c
               and po.site_id = ls.site_id_c
           where po.site_id = ?
-            $andWhat """
+            $andWhat
+          order by
+            to_page_id_c"""
     runQueryFindManyAsSet(query, values.toList, rs => {
       rs.getString("to_page_id_c")
     })
@@ -223,13 +227,16 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
 
   def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
-    unimplementedIf(inclDeletedHidden, "inclDeletedHidden must be false [TyE593RKD]")
+    unimplementedIf(inclDeletedHidden,
+          "inclDeletedHidden must be false  [TyE593RKD]  [q_deld_lns]")
+
     val query = s"""
           select distinct po.page_id
           from links_t ls
               inner join posts3 po
                   on ls.from_post_id_c = po.unique_post_id and ls.site_id_c = po.site_id
-          ---- (this filters out deleted and hidden things [q_deld_lns])  TESTS_MISSING
+                  -- Excl links from deleted posts  TyT602AMDUN   [q_deld_lns]
+                  -- and from hidden posts  TyT5KD20G7)
                   -- Need not check approved_* — links aren't added until a new post,
                   -- or new edits, got approved.
                   and po.deleted_status = ${DeletedStatus.NotDeleted.toInt}
@@ -237,15 +244,19 @@ trait LinksSiteTxMixin extends SiteTransaction {
               inner join pages3 pg
                   on po.site_id = pg.site_id
                   and po.page_id = pg.page_id
+                  -- Excl links from deleted pages  TyT7RD3LM5   [q_deld_lns]
                   and pg.deleted_at is null
-              -- Not inner join — it's fine with page not in any category.
-              left join categories3 cs
-                  on pg.site_id = cs.site_id
-                  and pg.category_id = cs.id
-                  and cs.deleted_at is null
-          ---- (END filter)
           where ls.site_id_c = ?
-            and ls.to_page_id_c = ? """
+            and ls.to_page_id_c = ?
+            -- Not in a deleted category (no cat though, is fine)  TyT042RKD36  [q_deld_lns]
+            -- This does an Anti Join with categories3, good.
+            and not exists (
+                select 1 from categories3 cs
+                where pg.site_id = cs.site_id
+                  and pg.category_id = cs.id
+                  and cs.deleted_at is not null)
+          order by
+            page_id """
 
     val values = List(siteId.asAnyRef, pageId)
     runQueryFindManyAsSet(query, values, rs => {

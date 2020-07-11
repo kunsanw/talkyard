@@ -66,7 +66,6 @@ trait PagesSiteDaoMixin extends SiteTransaction {
 
   def markPagesHtmlStale(pageIds: Set[PageId]): Unit = {
     if (pageIds.isEmpty) return
-    UNTESTED
     val statement = s"""
           update page_html3
           set page_version = -1, updated_at = ?

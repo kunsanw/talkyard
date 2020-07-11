@@ -140,6 +140,8 @@ class SiteDao(
   def now(): When = globals.now()
   def nashorn: Nashorn = context.nashorn
 
+  REFACTOR // rename to anyPageDao and return a Some(PageDao) with PageMeta pre-loaded
+  // if the page exist, otherwise None? — If callers "always" want a PageMeta.
   def newPageDao(pageId: PageId, tx: SiteTransaction): PageDao =
     PageDao(pageId, loadWholeSiteSettings(tx), tx)
 
