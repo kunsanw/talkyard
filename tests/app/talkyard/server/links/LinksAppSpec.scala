@@ -15,13 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// SHOULD_CODE_REVIEW  this whole file later !
+// CR_DONE !
 
 package talkyard.server.links
 
 import com.debiki.core._
 import debiki.TitleSourceAndHtml
-import debiki.dao.{CreateForumResult, CreatePageResult, DaoAppSuite, SiteDao}
+import debiki.dao._
 import play.api.libs.json.{JsObject, JsString, Json}
 
 
@@ -42,7 +42,16 @@ class LinksAppSpec extends DaoAppSuite {
 
   lazy val forumId: PageId = createForumResult.pagePath.pageId
 
-  lazy val categoryId: CategoryId = createForumResult.defaultCategoryId
+  lazy val defCatId: CategoryId = createForumResult.defaultCategoryId
+
+  lazy val category2: Category = category2Result.category
+  lazy val category2Result: CreateCategoryResult = createCategory(
+        slug = "cat-2",
+        forumPageId = createForumResult.pagePath.pageId,
+        parentCategoryId = createForumResult.rootCategoryId,
+        authorId = SystemUserId,
+        browserIdData,
+        daoSite1)
 
   /*
   lazy val (site2, daoSite2) = createSite("site2")
@@ -60,8 +69,7 @@ class LinksAppSpec extends DaoAppSuite {
 
   // ----- External links, oEmbed
 
-  // (We don't need to create any pages or categories for these tests
-  // to work.)
+  // (We don't need any pages or categories for these tests to work.)
 
   val extLinkOneUrl = "https://ex.co/ext-widget"
   val extLinkOneOEmbUrl = s"https://ex.co/oembed?url=$extLinkOneUrl"
@@ -107,14 +115,14 @@ class LinksAppSpec extends DaoAppSuite {
   }
 
 
-  "Link previews: insert, update, find, delete" - {
+  "Link previews: Insert, update, find, delete" - {
 
-    "insert".inWriteTx(daoSite1) { (tx, _) =>
+    "Insert".inWriteTx(daoSite1) { (tx, _) =>
       tx.upsertLinkPreview(linkPreviewOneOrig)
       tx.upsertLinkPreview(linkPreviewTwo)
     }
 
-    "read back".inReadTx(daoSite1) { tx =>
+    "Read back".inReadTx(daoSite1) { tx =>
       tx.loadLinkPreviewByUrl(extLinkOneUrl, extLinkOneOEmbUrl + "-wrong") mustBe None
       tx.loadLinkPreviewByUrl(extLinkOneUrl + "-wrong", extLinkOneOEmbUrl) mustBe None
       val pv1 = tx.loadLinkPreviewByUrl(extLinkOneUrl, extLinkOneOEmbUrl).get
@@ -128,16 +136,16 @@ class LinksAppSpec extends DaoAppSuite {
       tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkOneOEmbUrl) mustBe None
     }
 
-    "update".inWriteTx(daoSite1) { (tx, _) =>
+    "Update".inWriteTx(daoSite1) { (tx, _) =>
       linkPreviewOneOrig.first_linked_by_id_c mustBe userMmm.id // not userOoo, ttt
       tx.upsertLinkPreview(
             linkPreviewOneEdited.copy(
                   // This change should get ignored — only the *first*
-                  // user who linked the ext thing, is remembered.
+                  // user who typed the ext link, is remembered.
                   first_linked_by_id_c = userOoo.id))
     }
 
-    "read back after update".inReadTx(daoSite1) { tx =>
+    "Read back after update".inReadTx(daoSite1) { tx =>
       val editedPrevw = tx.loadLinkPreviewByUrl(extLinkOneUrl, extLinkOneOEmbUrl).get
       editedPrevw mustBe linkPreviewOneEdited
       editedPrevw.first_linked_by_id_c mustBe userMmm.id  // not userOoo
@@ -147,14 +155,14 @@ class LinksAppSpec extends DaoAppSuite {
       pv2 mustBe linkPreviewTwo
     }
 
-    "delete link preview one".inWriteTx(daoSite1) { (tx, _) =>
+    "Delete link preview one".inWriteTx(daoSite1) { (tx, _) =>
       tx.deleteLinkPreviews(extLinkOneUrl)
     }
 
     "... thereafter it's gone".inReadTx(daoSite1) { tx =>
       tx.loadLinkPreviewByUrl(extLinkOneUrl, extLinkOneOEmbUrl) mustBe None
 
-      info("but not the other 2nd ext link preview")
+      info("but the 2nd preview is still there")
       val pv2 = tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoOEmbUrl).get
       pv2 mustBe linkPreviewTwo
     }
@@ -165,8 +173,8 @@ class LinksAppSpec extends DaoAppSuite {
   // ----- Internal links
 
   // The text on these posts and pages doesn't actually link to anything.
-  // We'll insert links anyway — we're testing the SQL code, not the CommonMark
-  // source parsing & find-links code.
+  // But we'll insert links anyway — we're testing the SQL code, not the CommonMark
+  // parsing & find external links code.
 
   def createLetterPage(letter: Char, anyCategoryId: Option[CategoryId] = None)
         : CreatePageResult =
@@ -176,8 +184,10 @@ class LinksAppSpec extends DaoAppSuite {
           browserIdData, daoSite1, anyCategoryId = anyCategoryId)
 
   lazy val pageA: CreatePageResult = createLetterPage('A')
-  lazy val pageB: CreatePageResult = createLetterPage('B')
-  lazy val pageC: CreatePageResult = createLetterPage('C', Some(categoryId))
+  // Place B in a category different from defCatId, so we can verify a page
+  // in another category isn't affected by deleting defCatId.
+  lazy val pageB: CreatePageResult = createLetterPage('B', Some(category2.id))
+  lazy val pageC: CreatePageResult = createLetterPage('C', Some(defCatId))
   lazy val pageD: CreatePageResult = createLetterPage('D')
   lazy val pageE: CreatePageResult = createLetterPage('E')
   lazy val pageF: CreatePageResult = createLetterPage('F')
@@ -192,7 +202,7 @@ class LinksAppSpec extends DaoAppSuite {
         SystemUserId, pageE.id, text = "pg E re Two", parentNr = Some(BodyNr))(daoSite1)
 
   lazy val pageFReplyToHide: Post = reply(
-        SystemUserId, pageF.id, text = "pg F re hide", parentNr = Some(BodyNr))(daoSite1)
+        SystemUserId, pageF.id, text = "pg F re Hide", parentNr = Some(BodyNr))(daoSite1)
 
 
   // We'll start with links A —> {B, Z} only:
@@ -228,80 +238,107 @@ class LinksAppSpec extends DaoAppSuite {
 
   "Internal links: Insert, update, find, delete" - {
 
-    "prepare: create pages".in {
+    "Prepare: Create pages" in {
       // Need to create the pages before the links, because if the pages got
-      // created via the `lazy val` links, the page tx:s would start *after* the
-      // link tx:es, and foreign keys would fail.
+      // lazy created when their `lazy val` are accessed by the links, the page
+      // tx:s would start *after* the link tx:es, and foreign keys would fail.
       pageA; pageB; pageC; pageD; pageE; pageF; pageZ; pageQ
     }
 
-    "insert".inWriteTx(daoSite1) { (tx, _) =>
+    "Insert A —> {B,Z}".inWriteTx(daoSite1) { (tx, _) =>
       tx.upsertLink(linkAToB) mustBe true
       tx.upsertLink(linkAToZ) mustBe true
     }
 
-    "find links from a post".inReadTx(daoSite1) { tx =>
+    "Find links from a post: A's body post".inReadTx(daoSite1) { tx =>
       tx.loadLinksFromPost(345678) mustBe Seq.empty
       tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToB, linkAToZ)
       tx.loadLinksFromPost(pageB.bodyPost.id) mustBe Seq.empty
-      tx.loadLinksFromPost(pageZ.bodyPost.id) mustBe Seq.empty
-    }
+      tx.loadLinksFromPost(pageC.bodyPost.id) mustBe Seq.empty
 
-    "find page ids linked from a page".inReadTx(daoSite1) { tx =>
+      info("Find page ids linked from a page")
       tx.loadPageIdsLinkedFromPage("23456789") mustBe Set.empty
       tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageB.id, pageZ.id)
       tx.loadPageIdsLinkedFromPage(pageB.id) mustBe Set.empty
-      tx.loadPageIdsLinkedFromPage(pageZ.id) mustBe Set.empty
-    }
+      tx.loadPageIdsLinkedFromPage(pageC.id) mustBe Set.empty
 
-    "find links to a page".inReadTx(daoSite1) { tx =>
+      info("Find page ids linked from a post: A –> {B,Z}")
+      tx.loadPageIdsLinkedFromPosts(Set.empty) mustBe Set.empty
+      tx.loadPageIdsLinkedFromPosts(Set(1234567, 2345678, 3456789)) mustBe Set.empty
+      tx.loadPageIdsLinkedFromPosts(Set(pageA.bodyPost.id)) mustBe Set(pageB.id, pageZ.id)
+      tx.loadPageIdsLinkedFromPosts(Set(pageB.bodyPost.id)) mustBe Set.empty
+      tx.loadPageIdsLinkedFromPosts(Set(pageC.bodyPost.id)) mustBe Set.empty
+      tx.loadPageIdsLinkedFromPosts(Set(pageZ.bodyPost.id)) mustBe Set.empty
+
+      info("Find page ids linked from many posts: {A,B} —> {B,Z}")
+      tx.loadPageIdsLinkedFromPosts(
+            Set(pageA.bodyPost.id, pageB.bodyPost.id)) mustBe Set(pageB.id, pageZ.id)
+      info("Find self-self is fine: {A,Z} —> {B,Z}  because A —> {B,Z}")
+      tx.loadPageIdsLinkedFromPosts(
+            Set(pageA.bodyPost.id, pageZ.bodyPost.id)) mustBe Set(pageB.id, pageZ.id)
+
+      info("Find links to a page")
+      tx.loadLinksToPage("3456789") mustBe Seq.empty
       tx.loadLinksToPage(pageA.id) mustBe Seq.empty
       tx.loadLinksToPage(pageB.id) mustBe Seq(linkAToB)
+      tx.loadLinksToPage(pageC.id) mustBe Seq.empty
       tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ)
+
+      info("Find page ids linking to a page")
+      tx.loadPageIdsLinkingToPage(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageB.id, inclDeletedHidden = false) mustBe Set(pageA.id)
+      tx.loadPageIdsLinkingToPage(pageC.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(pageA.id)
     }
 
-    "find page ids linking to a page".inReadTx(daoSite1) { tx =>
-      tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set(pageA.id)
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(pageA.id)
+    "Delete link A —> B".inWriteTx(daoSite1) { (tx, _) =>
+      val bodyId = pageA.bodyPost.id
+      tx.deleteLinksFromPost(bodyId, Set.empty) mustBe 0
+      tx.deleteLinksFromPost(bodyId, Set("/wrong-link")) mustBe 0
+      tx.deleteLinksFromPost(bodyId, Set("/wrong", "/and/wrong-2")) mustBe 0
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c + "wrong")) mustBe 0
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c)) mustBe 1
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c)) mustBe 0  // already gone
     }
 
-    "delete link A —> B".inWriteTx(daoSite1) { (tx, _) =>
-      tx.deleteLinksFromPost(pageA.bodyPost.id, Set.empty) mustBe 0
-      tx.deleteLinksFromPost(pageA.bodyPost.id, Set("/wrong-link")) mustBe 0
-      tx.deleteLinksFromPost(pageA.bodyPost.id, Set(linkAToB.link_url_c + "x")) mustBe 0
-      tx.deleteLinksFromPost(pageA.bodyPost.id, Set(linkAToB.link_url_c)) mustBe 1
-      tx.deleteLinksFromPost(
-            pageA.bodyPost.id, Set(linkAToB.link_url_c)) mustBe 0  // already gone
-    }
-
-    "link A —> B gone".inReadTx(daoSite1) { tx =>
-      info("find links from post")
+    "Link A —> B gone".inReadTx(daoSite1) { tx =>
+      info("Find links from post: Only A —> Z remains")
       tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToZ)
 
-      info("find page ids linked from page A — now only Z, not B")
+      info("Find page ids linked from page A: not B, only Z")
       tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageZ.id)
       tx.loadPageIdsLinkedFromPage(pageB.id) mustBe Set.empty
+      tx.loadPageIdsLinkedFromPage(pageC.id) mustBe Set.empty
       tx.loadPageIdsLinkedFromPage(pageZ.id) mustBe Set.empty
 
-      info("find links to page Z:  A —> Z only")
+      info("Find page A body post —> Z link,  but not —> B")
+      tx.loadPageIdsLinkedFromPosts(Set(pageA.bodyPost.id)) mustBe Set(pageZ.id)
+
+      info("Find links to page Z:  A —> Z only")
       tx.loadLinksToPage(pageA.id) mustBe Seq.empty
       tx.loadLinksToPage(pageB.id) mustBe Seq.empty
+      tx.loadLinksToPage(pageC.id) mustBe Seq.empty
       tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ)
 
-      info("find page ids, A, linking to Z")
-      tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(pageA.id)
+      info("Find page ids linking to Z:  page A")
+      tx.loadPageIdsLinkingToPage(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageB.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageC.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(pageA.id)
     }
 
-    "add link: {B,C,D} —> Z".inWriteTx(daoSite1) { (tx, _) =>
+    "Add links: {B,C,D} —> Z".inWriteTx(daoSite1) { (tx, _) =>
       tx.upsertLink(linkBToZ)
       tx.upsertLink(linkCToZ)
       tx.upsertLink(linkDToZ)
     }
 
-    "find link {B,C,D} —> Z".inReadTx(daoSite1) { tx =>
+    "Find link {B,C,D} —> Z".inReadTx(daoSite1) { tx =>
+      info("First, old link A —> Z")
+      tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToZ)
+      tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageZ.id)
+
+      info("The new {B,C,D} —> Z")
       tx.loadLinksFromPost(pageB.bodyPost.id) mustBe Seq(linkBToZ)
       tx.loadLinksFromPost(pageC.bodyPost.id) mustBe Seq(linkCToZ)
       tx.loadLinksFromPost(pageD.bodyPost.id) mustBe Seq(linkDToZ)
@@ -309,11 +346,7 @@ class LinksAppSpec extends DaoAppSuite {
       tx.loadPageIdsLinkedFromPage(pageC.id) mustBe Set(pageZ.id)
       tx.loadPageIdsLinkedFromPage(pageD.id) mustBe Set(pageZ.id)
 
-      info("and old link A —> Z too")
-      tx.loadLinksFromPost(pageA.bodyPost.id) mustBe Seq(linkAToZ)
-      tx.loadPageIdsLinkedFromPage(pageA.id) mustBe Set(pageZ.id)
-
-      info("now Z is linked from many pages: A, B, C, D: Exact links")
+      info("Now Z is linked from A, B, C, D: Exact links")
       tx.loadLinksToPage(pageA.id) mustBe Seq.empty
       tx.loadLinksToPage(pageB.id) mustBe Seq.empty
       tx.loadLinksToPage(pageC.id) mustBe Seq.empty
@@ -321,56 +354,65 @@ class LinksAppSpec extends DaoAppSuite {
       tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
 
       info("... and page ids")
-      tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageC.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageD.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(
+      tx.loadPageIdsLinkingToPage(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageB.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageC.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageD.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageE.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(
             pageA.id, pageB.id, pageC.id, pageD.id)
     }
 
-    "delete page A  TyT7RD3LM5".inWriteTx(daoSite1) { (tx, staleStuff) =>
-      daoSite1.deletePagesImpl(Seq(pageA.id), SystemUserId, browserIdData,
-            doingReviewTask = None)(tx, staleStuff)
+    "Links from deleted *pages* are ignored  TyT7RD3LM5" - {
+      "Delete page A".inWriteTx(daoSite1) { (tx, staleStuff) =>
+        daoSite1.deletePagesImpl(Seq(pageA.id), SystemUserId, browserIdData,
+              doingReviewTask = None)(tx, staleStuff)
+      }
+
+      "Now only pages B, C and D links to Z".inReadTx(daoSite1) { tx =>
+        // This loads also links on deleted pages.
+        tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
+        // This skips deleted pages and categories.
+        tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(
+              pageB.id, pageC.id, pageD.id)
+      }
     }
 
-    "now only pages B, C and D links to Z  TyT7RD3LM5".inReadTx(daoSite1) { tx =>
-      // This loads also links on deleted pages.
-      tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
-      // This skips deleted pages and categories.
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(
-            pageB.id, pageC.id, pageD.id)
+    "Links from deleted *categories* are ignored  TyT042RKD36" - {
+      "Delete page C's category".inWriteTx(daoSite1) { (tx, staleStuff) =>
+        pageC.anyCategoryId mustBe Some(defCatId) // page C will get deleted, implicitly, ttt
+        pageB.anyCategoryId mustBe Some(category2.id) // page B not affected, ttt
+        daoSite1.deleteUndelCategoryImpl(defCatId, delete = true,
+              Who(SystemUserId, browserIdData))(tx)
+      }
+
+      "Now only page B and D links to Z".inReadTx(daoSite1) { tx =>
+        // This loads also links from deleted pages.
+        tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
+        // This skips links from deleted pages and categories.
+        tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(
+              // Note: B didn't get accidentally deleted — it's in a category,
+              // but not the now deleted category.
+              pageB.id, pageD.id)
+      }
     }
 
-    "delete page C's category  TyT042RKD36".inWriteTx(daoSite1) { (tx, staleStuff) =>
-      daoSite1.deleteUndelCategoryImpl(categoryId, delete = true,
-            Who(SystemUserId, browserIdData))(tx)
-    }
-
-    "now only page B and D links to Z  TyT042RKD36".inReadTx(daoSite1) { tx =>
-      // This loads also links on deleted pages.
-      tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
-      // This skips deleted pages and categories.
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(
-            pageB.id, pageD.id)
-    }
-
-    "undelete page A —> link back".inWriteTx(daoSite1) { (tx, staleStuff) =>
+    "Undelete page A".inWriteTx(daoSite1) { (tx, staleStuff) =>
       daoSite1.deletePagesImpl(Seq(pageA.id), SystemUserId, browserIdData,
             doingReviewTask = None, undelete = true)(tx, staleStuff)
     }
 
-    "undelete category —> link back".inWriteTx(daoSite1) { (tx, staleStuff) =>
-      daoSite1.deleteUndelCategoryImpl(categoryId, delete = false,
+    "Undelete category".inWriteTx(daoSite1) { (tx, staleStuff) =>
+      daoSite1.deleteUndelCategoryImpl(defCatId, delete = false,
             Who(SystemUserId, browserIdData))(tx)
     }
 
-    "now page A, B, C, D links to Z".inReadTx(daoSite1) { tx =>
+    "Now page A and C link to Z again, and B and D link too".inReadTx(daoSite1) { tx =>
       // This loads also links on deleted pages.
       tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
 
       // This skips deleted pages and categories.
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(
+      tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(
             pageA.id, pageB.id, pageC.id, pageD.id)
 
       info("No other links")
@@ -381,72 +423,78 @@ class LinksAppSpec extends DaoAppSuite {
       tx.loadLinksToPage(pageE.id) mustBe Nil
       tx.loadLinksToPage(pageF.id) mustBe Nil
       tx.loadLinksToPage(pageQ.id) mustBe Nil
-      tx.loadPageIdsLinkingTo(pageA.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageB.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageC.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageD.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageE.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageF.id, inclDeletedHidden = false) mustBe Set.empty
-      tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageA.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageB.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageC.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageD.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageE.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageF.id, inclDeletedHidden = false) mustBe Set.empty
+      tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
     }
 
-    "delete page Z".inWriteTx(daoSite1) { (tx, staleStuff) =>
+    "Delete page Z".inWriteTx(daoSite1) { (tx, staleStuff) =>
       daoSite1.deletePagesImpl(Seq(pageZ.id), SystemUserId, browserIdData,
             doingReviewTask = None, undelete = true)(tx, staleStuff)
-
-      // now links from ... is Set.empty,  if excl deld linked pages.
     }
 
-    "can find links to deleted page Z".inReadTx(daoSite1) { tx =>
+    "Can find links to deleted page Z".inReadTx(daoSite1) { tx =>
       tx.loadLinksToPage(pageZ.id) mustBe Seq(linkAToZ, linkBToZ, linkCToZ, linkDToZ)
-      // This only excludes deleted pages that link to Z, ignores that Z itself
-      // is deleted:
-      tx.loadPageIdsLinkingTo(pageZ.id, inclDeletedHidden = false) mustBe Set(
+      // This only excludes deleted pages that link *to* Z, doesn't matter
+      // that Z itself is deleted:
+      tx.loadPageIdsLinkingToPage(pageZ.id, inclDeletedHidden = false) mustBe Set(
             pageA.id, pageB.id, pageC.id, pageD.id)
     }
 
 
 
-    "Replies can link too" - {
-      "add posts".in {
+    "Replies, not just page bodies, can link to other pages" - {
+      "Add replies" in {
         pageEReplyOne
         pageEReplyTwo
         pageFReplyToHide
       }
 
-      "Link reply One to Q".inWriteTx(daoSite1) { (tx, _) =>
+      "Link page E reply One to page Q".inWriteTx(daoSite1) { (tx, _) =>
         tx.upsertLink(linkEReOneToQ) mustBe true
       }
 
-      "now the reply links to Q".inReadTx(daoSite1) { tx =>
+      "Now the reply links to Q".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkEReOneToQ)
 
-        info("and thereby page E too")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
+        info("and thereby page E links to Q too")
+        tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set(pageQ.id)
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
       }
 
-      "fake edit the reply: delete the link".inWriteTx(daoSite1) { (tx, _) =>
+      "Fake edit the reply: Delete the link".inWriteTx(daoSite1) { (tx, _) =>
         tx.deleteLinksFromPost(
-              pageEReplyOne.id, Set(linkEReOneToQ.link_url_c))
+              linkEReOneToQ.from_post_id_c, Set(linkEReOneToQ.link_url_c))
       }
 
-      "then the link from E to Q is gone".inReadTx(daoSite1) { tx =>
+      "Now E —> Q link gone".inReadTx(daoSite1) { tx =>
+        info("No links at all to page Q")
         tx.loadLinksToPage(pageQ.id) mustBe Seq.empty
 
-        info("and page E no longer links to Q")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+        info("Page E doesn't link to Q")
+        tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set.empty
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
       }
 
       "Link both reply One and Two to Q".inWriteTx(daoSite1) { (tx, _) =>
+        info("Add back reply One —> page Q link")
         tx.upsertLink(linkEReOneToQ) mustBe true
+        info("Add new reply Two —> page Q link")
         tx.upsertLink(linkEReTwoToQ) mustBe true
       }
 
-      "now both posts link to Q".inReadTx(daoSite1) { tx =>
+      "Now both replies {One,Two} —> page Q".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkEReOneToQ, linkEReTwoToQ)
+        tx.loadLinksFromPost(pageEReplyOne.id) mustBe Seq(linkEReOneToQ)
+        tx.loadLinksFromPost(pageEReplyTwo.id) mustBe Seq(linkEReTwoToQ)
 
-        info("and page E too")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
+        info("And page E —> page Q")
+        tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set(pageQ.id)
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
       }
     }
 
@@ -455,28 +503,31 @@ class LinksAppSpec extends DaoAppSuite {
 
       "Delete reply One".inWriteTx(daoSite1) { (tx, staleStuff) =>
         daoSite1.deletePostImpl(
-          pageE.id, pageEReplyOne.nr, deletedById = SystemUserId,
-          doingReviewTask = None, browserIdData, tx, staleStuff)
+              pageEReplyOne.pageId, pageEReplyOne.nr, deletedById = SystemUserId,
+              doingReviewTask = None, browserIdData, tx, staleStuff)
       }
 
       "Reply Two links to Q, and Re One too although post deleted".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkEReOneToQ, linkEReTwoToQ)
 
-        info("page E still links to Q, because of reply Two (not deleted)")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
+        info("page E still —> Q, because reply Two not deleted (only re One deleted)")
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set(pageE.id)
       }
 
       "Delete reply Two too".inWriteTx(daoSite1) { (tx, staleStuff) =>
         daoSite1.deletePostImpl(
-          pageE.id, pageEReplyTwo.nr, deletedById = SystemUserId,
-          doingReviewTask = None, browserIdData, tx, staleStuff)
+              pageEReplyTwo.pageId, pageEReplyTwo.nr, deletedById = SystemUserId,
+              doingReviewTask = None, browserIdData, tx, staleStuff)
       }
 
-      "now the posts still link to Q".inReadTx(daoSite1) { tx =>
+      "Now the posts still link to Q".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkEReOneToQ, linkEReTwoToQ)
 
-        info("but page E doesn't, when deleted posts skipped")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+        info("but page E doesn't, when deleted replies One and Two skipped")
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+
+        info("however it does, if deleted replies One and Two *are* considered")
+        tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set(pageQ.id)
       }
 
       "Delete the links".inWriteTx(daoSite1) { (tx, staleStuff) =>
@@ -484,37 +535,48 @@ class LinksAppSpec extends DaoAppSuite {
         tx.deleteLinksFromPost(pageEReplyTwo.id, Set(linkEReTwoToQ.link_url_c))
       }
 
-      "now the posts don't link to Q".inReadTx(daoSite1) { tx =>
+      "Now the deleted replies very much don't link to Q".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Nil
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+        tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set.empty
+        tx.loadPageIdsLinkedFromPosts(Set(
+              linkEReOneToQ.from_post_id_c,
+              linkEReTwoToQ.from_post_id_c)) mustBe Set.empty
       }
     }
 
 
     "Links from hidden posts are ignored  TyT5KD20G7" - {
 
-      "add Reply One on page F linking to Q".inWriteTx(daoSite1) { (tx, _) =>
+      "add a reply to Hide on page F linking to Q".inWriteTx(daoSite1) { (tx, _) =>
         tx.upsertLink(linkFReToQ) mustBe true
       }
 
-      "Oh so many links to Q".inReadTx(daoSite1) { tx =>
+      "Now F —> Q".inReadTx(daoSite1) { tx =>
         info("exact links")
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkFReToQ)
+        tx.loadLinksFromPost(linkFReToQ.from_post_id_c) mustBe Seq(linkFReToQ)
 
         info("page ids")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set(pageF.id)
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set(pageF.id)
+        tx.loadPageIdsLinkedFromPosts(Set(linkFReToQ.from_post_id_c)) mustBe Set(pageQ.id)
+        tx.loadPageIdsLinkedFromPage(pageF.id) mustBe Set(pageQ.id)
       }
 
-      "hide page F's reply that links to Q".inWriteTx(daoSite1) { (tx, staleStuff) =>
+      "Hide page F's reply that links to Q".inWriteTx(daoSite1) { (tx, staleStuff) =>
         daoSite1.hidePostsOnPage(Seq(pageFReplyToHide), pageId = pageF.id,
-          reason = "Test test")(tx, staleStuff)
+              reason = "Test test")(tx, staleStuff)
       }
 
-      "the link is still there".inReadTx(daoSite1) { tx =>
+      "The link is still there".inReadTx(daoSite1) { tx =>
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkFReToQ)
+        tx.loadLinksFromPost(pageFReplyToHide.id) mustBe Seq(linkFReToQ)
 
-        info("but page F doesn't link to Q, when hidden posts skipped")
-        tx.loadPageIdsLinkingTo(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+        info("but page F doesn't —> Q, when hidden posts skipped")
+        tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
+
+        info("F does —> Q though, when hidden posts included")
+        tx.loadPageIdsLinkedFromPage(pageF.id) mustBe Set(pageQ.id)
       }
     }
 

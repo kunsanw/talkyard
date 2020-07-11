@@ -367,14 +367,12 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   def upsertLink(link: Link): Boolean
   def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int
-  def deleteAllLinksFromPost(postId: PostId): Boolean  // ?? not needed ??  or if hard delete ?
+  def deleteAllLinksFromPost(postId: PostId): Boolean  // needed later, for hard delete?
   def loadLinksFromPost(postId: PostId): Seq[Link]
-  def loadLinksToPage(pageId: PageId): Seq[Link]  // ?? not needed
+  def loadLinksToPage(pageId: PageId): Seq[Link]  // not needed? only called in test suite
   def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId]
-  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]  // needed! yes.
-  def loadPageIdsLinkedFromPost(postId: PostId): Set[PageId] =  // Not needed?
-        loadPageIdsLinkedFromPosts(Set(postId))
-  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId]
+  def loadPageIdsLinkedFromPosts(postIds: Set[PostId]): Set[PageId]
+  def loadPageIdsLinkingToPage(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId]
 
   def insertInvite(invite: Invite): Unit
   def updateInvite(invite: Invite): Boolean

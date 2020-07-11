@@ -143,6 +143,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
 
   override def deleteAllLinksFromPost(postId: PostId): Boolean = {
+    unused("TyE406MRUKT", "deleteAllLinksFromPost(some postt")
     val deleteStatement = s"""
           delete from links_t
           where site_id_c = ?
@@ -208,6 +209,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
         values.append(pageId)
         "and po.page_id = ?"
       case Right(postIds) =>
+        if (postIds.isEmpty) return Set.empty
         values.appendAll(postIds.map(_.asAnyRef))
         s"and po.unique_post_id in (${ makeInListFor(postIds) })"
     }
@@ -226,7 +228,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
+  def loadPageIdsLinkingToPage(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
     unimplementedIf(inclDeletedHidden,
           "inclDeletedHidden must be false  [TyE593RKD]  [q_deld_lns]")
 
@@ -248,7 +250,8 @@ trait LinksSiteTxMixin extends SiteTransaction {
                   and pg.deleted_at is null
           where ls.site_id_c = ?
             and ls.to_page_id_c = ?
-            -- Not in a deleted category (no cat though, is fine)  TyT042RKD36  [q_deld_lns]
+            -- Not in a deleted category  TyT042RKD36  [q_deld_lns]
+            -- (But if the page is not in any category — that's fine.)
             -- This does an Anti Join with categories3, good.
             and not exists (
                 select 1 from categories3 cs

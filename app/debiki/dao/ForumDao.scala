@@ -21,7 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import scala.collection.immutable
 import ForumDao._
-import debiki.{SafeStaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
+import debiki.{Globals, SafeStaticSourceAndHtml, TextAndHtml, TitleSourceAndHtml}
 import talkyard.server.dao._
 
 
@@ -38,6 +38,7 @@ case class CreateForumOptions(
 
 case class CreateForumResult(
   pagePath: PagePathWithId,
+  rootCategoryId: CategoryId,
   staffCategoryId: CategoryId,
   defaultCategoryId: CategoryId)
 
@@ -112,6 +113,12 @@ trait ForumDao {
       val partialResult: CreateForumResult = createDefaultCategoriesAndTopics(
         forumPageId, rootCategoryId, options, byWho, tx, staleStuff)
 
+      // Forum section page path missing.
+      DO_AFTER // 2021-01-01 remove !isDevOrTest, instead require() always.
+      require((partialResult.pagePath eq null) || !Globals.isDevOrTest, "TyE205MKT4")
+
+      val completeResult = partialResult.copy(pagePath = forumPagePath)
+
       // Delaying configuration of these settings until here, instead of here: [493MRP1],
       // lets us let people choose to create embedded comments sites, also
       // for the first site when doing a self hosted installation. Only partly impl, see [602KMRR52].
@@ -146,7 +153,7 @@ trait ForumDao {
 
       settings.foreach(tx.upsertSiteSettings)
 
-      partialResult.copy(pagePath = forumPagePath)
+      completeResult
     }
 
     // So settings get refreshed (might have been changed above.)
@@ -243,8 +250,8 @@ trait ForumDao {
         makeStaffCategoryPerms(defaultCategoryId)),
       bySystem)(tx, staleStuff)
 
-    CreateForumResult(null, defaultCategoryId = defaultCategoryId,
-      staffCategoryId = staffCategoryId)
+    CreateForumResult(null, rootCategoryId = rootCategoryId,
+          defaultCategoryId = defaultCategoryId, staffCategoryId = staffCategoryId)
   }
 
 
@@ -503,8 +510,8 @@ trait ForumDao {
       spamRelReqStuff = None,
       tx, staleStuff)
 
-    CreateForumResult(null, defaultCategoryId = defaultCategoryId,
-      staffCategoryId = staffCategoryId)
+    CreateForumResult(null, rootCategoryId = rootCategoryId,
+          defaultCategoryId = defaultCategoryId, staffCategoryId = staffCategoryId)
   }
 
 }

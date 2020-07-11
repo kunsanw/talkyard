@@ -58,7 +58,7 @@ trait PageLinksDao {
 
 
   def loadPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
-    readTx(_.loadPageIdsLinkingTo(pageId, inclDeletedHidden))
+    readTx(_.loadPageIdsLinkingToPage(pageId, inclDeletedHidden))
   }
 
 

@@ -1,6 +1,10 @@
 Talkyard Naming Notes
 ==========================
 
+`ttt` means Test the test. That is, some [assertion in a test] that doesn't test
+the real Talkyard code — instead, it tests the test code. (There's no `tttt`)
+
+
 ### Categories
 
 Each forum:

@@ -36,7 +36,8 @@ import org.owasp.encoder.Encode
 case class CreatePageResult(
   path: PagePathWithId,
   bodyPost: Post,
-  anyReviewTask: Option[ReviewTask]) {
+  anyReviewTask: Option[ReviewTask],
+  anyCategoryId: Option[CategoryId]) {
 
   def id: PageId = path.pageId
 }
@@ -132,7 +133,8 @@ trait PagesDao {
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(byWho.id, nr))
 
-      CreatePageResult(pagePath, bodyPost, anyReviewTask)
+      CreatePageResult(
+            pagePath, bodyPost, anyReviewTask, anyCategoryId = anyCategoryId)
     }
 
     memCache.firePageCreated(siteId, result.path)
