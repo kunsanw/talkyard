@@ -362,12 +362,13 @@ trait SiteTransaction {   RENAME // to SiteTx — already started with a type Si
 
   def upsertLinkPreview(linkPreview: LinkPreview): Unit
   def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String): Option[LinkPreview]
+  def loadAllLinkPreviewsByUrl(linkUrl: String): Seq[LinkPreview]
   /** Deletes for all download urls (e.g. downloaded for different screen sizes) */
-  def deleteLinkPreviews(linkUrl: String): Boolean
+  def deleteLinkPreviews(linkUrl: String): Int
 
   def upsertLink(link: Link): Boolean
   def deleteLinksFromPost(postId: PostId, urls: Set[String]): Int
-  def deleteAllLinksFromPost(postId: PostId): Boolean  // needed later, for hard delete?
+  def deleteAllLinksFromPost(postId: PostId): Int  // needed later, for hard delete?
   def loadLinksFromPost(postId: PostId): Seq[Link]
   def loadLinksToPage(pageId: PageId): Seq[Link]  // not needed? only called in test suite
   def loadPageIdsLinkedFromPage(pageId: PageId): Set[PageId]

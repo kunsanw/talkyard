@@ -20,6 +20,7 @@
 package talkyard.server.links
 
 import com.debiki.core._
+import com.debiki.core.Prelude._
 import debiki.TitleSourceAndHtml
 import debiki.dao._
 import play.api.libs.json.{JsObject, JsString, Json}
@@ -78,7 +79,9 @@ class LinksAppSpec extends DaoAppSuite {
 
   val extLinkTwoUrl = "https://ex.two.co/ext-two-widget"
   val extLinkTwoOEmbUrl = s"https://ex.two.co/wow-an-oembed?url=$extLinkTwoUrl"
+  val extLinkTwoAnotherOEmbUrl = s"$extLinkTwoOEmbUrl&par=am"
   val extLinkTwoOEmbJson: JsObject = Json.obj("html" -> JsString("<b>Two Two</b>"))
+  val extLinkTwoAnotherOEmbJson: JsObject = Json.obj("html" -> JsString("<b>Another</b>"))
 
   lazy val linkPreviewOneOrig: LinkPreview = LinkPreview(
         link_url_c = extLinkOneUrl,
@@ -103,6 +106,13 @@ class LinksAppSpec extends DaoAppSuite {
         preview_type_c = LinkPreviewTypes.OEmbed,
         first_linked_by_id_c = userOoo.id,
         content_json_c = extLinkTwoOEmbJson)
+
+  lazy val linkPreviewTwoOtherOEmbUrl: LinkPreview = linkPreviewTwo.copy(
+        link_url_c = extLinkTwoUrl,
+        downloaded_from_url_c = extLinkTwoAnotherOEmbUrl,
+        downloaded_at_c = when.plusMillis(110),
+        first_linked_by_id_c = userMmm.id,
+        content_json_c = extLinkTwoAnotherOEmbJson)
 
 
   "prepare: create site 1 and 2, and owners, forums".in {
@@ -165,6 +175,32 @@ class LinksAppSpec extends DaoAppSuite {
       info("but the 2nd preview is still there")
       val pv2 = tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoOEmbUrl).get
       pv2 mustBe linkPreviewTwo
+    }
+
+    o"""Can upsert many oEmbed previews for the same external link — e.g. if
+          downloaded for different screen sizes""".inWriteTx(daoSite1) { (tx, _) =>
+      tx.upsertLinkPreview(linkPreviewTwoOtherOEmbUrl)
+    }
+
+    "Can get from db, per link + oEmbed url".inReadTx(daoSite1) { tx =>
+      val pv2 = tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoOEmbUrl).get
+      pv2 mustBe linkPreviewTwo
+
+      val pv2Other = tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoAnotherOEmbUrl).get
+      pv2Other mustBe linkPreviewTwoOtherOEmbUrl
+
+      tx.loadAllLinkPreviewsByUrl(extLinkTwoUrl) mustBe Seq(
+            linkPreviewTwo, linkPreviewTwoOtherOEmbUrl)
+    }
+
+    "Can delete all oEmbeds per ext link at once".inWriteTx(daoSite1) { (tx, _) =>
+      tx.deleteLinkPreviews(extLinkTwoUrl) mustBe 2
+    }
+
+    "Gone".inReadTx(daoSite1) { tx =>
+      tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoOEmbUrl) mustBe None
+      tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoAnotherOEmbUrl) mustBe None
+      tx.loadAllLinkPreviewsByUrl(extLinkTwoUrl) mustBe Seq.empty
     }
   }
 
