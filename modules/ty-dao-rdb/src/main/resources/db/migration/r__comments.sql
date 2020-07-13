@@ -24,6 +24,19 @@ $_$;
 ------------------------------------------------------------------------
 comment on table  link_previews_t  is $_$
 
+Caches html <title> and <meta description> tags and any OpenGraph tags,
+and/or oEmbed json, for generating html previews of links to external
+things, e.g. Twitter tweets.
+
+Sometimes Ty downloads both 1) html and OpenGraph tags directly from
+the linked page, and 2) oEmbed json.
+Then, there'll be two rows in this table — one with downloaded_from_url_c
+= link_url_c, and one with downloaded_from_url_c = the oEmbed request url.
+The oEmbed data might not include a title, and then,
+if the external link is inside a paragraph, so we want to show the
+title of the extenal thing only, then it's good to have any html <title>
+tag too.
+
 [defense] [lnpv_t_pk] Both link_url_c and downloaded_from_url_c are part of
 the primary key — otherwise maybe an attacker could do something weird,
 like the following:

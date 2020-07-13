@@ -118,12 +118,19 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
         sanTitle("""<div>really no divs""") mustBe "really no divs"
         sanTitle("""what no divs</div>""") mustBe "what no divs"
       }
+
+      "compact title html output" in {
+        sanTitle(" <b> bold </b> <i>it</i> \n") mustBe "<b> bold </b> <i>it</i>"
+
+        val title = "<b>    bold  </b> \n \n <i>it</i>"
+        sanTitle(s"\n$title \n") mustBe title
+
+        sanTitle(s" \n <p> \n text \n text2 \n </p> \n ") mustBe "text \n text2"
+      }
     }
 
     "sanitize posts  TyT03386KTDGR" - {
-      import TextAndHtml.relaxedHtmlTagWhitelist
-
-      def sanPost(text: String): String = Jsoup.clean(text, relaxedHtmlTagWhitelist)
+      import TextAndHtml.{sanitizePost => sanPost}
 
       "remove <script> and anything inside" in {
         checkRemovesScriptTags(sanPost)
@@ -152,6 +159,50 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
         sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe (
               """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
       }
+
+      "compact posts html output" in {
+        sanPost(" \n <b>\nbold\n</b>\n \n<i>it</i> \n <script>var x;</script>") mustBe
+                    "<b>\nbold\n</b>\n \n<i>it</i>"
+        val manyLines = i"""
+              |<div>
+              |  Text text <b>bold</b>!
+              |</div>
+              |<p><a href="https://ex.co" rel="nofollow noopener">Link title</a>
+              |</p>""".trim
+        sanPost(manyLines + "\n <script>var x;\n</script>\n \n") mustBe manyLines
+      }
+    }
+
+
+    "sanitize internal links and quotes  TyT7J03SKD5" in {
+      import TextAndHtml.{sanitizeInternalLinksAndQuotes => sanInt}
+      sanInt("aa <script>alert(1)</script> <a>link</a>") mustBe "aa  <a>link</a>"
+      sanInt("""<iframe src="https://z" sandbox="allow-scripts"></iframe>""") mustBe ""
+      val t = """<div><a href="/page/path/">Page Title</a>""" +
+              """<blockquote>Excerpt</blockquote></div>"""
+      sanInt(t) mustBe t
+
+      // Compact output: (no pretty printing and extra indentation)
+      val t2 = i"""
+          |<div>
+          |  <a href="x">Pg T</a>
+          |<blockquote>Bq
+          |</blockquote>
+          |</div>""".trim
+      sanInt(t2) mustBe t2
+    }
+
+
+    "sanitize iframe  TyT603RKDL56" in {
+      import TextAndHtml.{sanitizeAllowIframeOnly => sanIfr}
+      sanIfr("<b>zz</b>") mustBe "zz"
+      sanIfr("<script>alert(1)</script>") mustBe ""
+
+      val ifr01 = """<iframe src="https://zzz" sandbox="allow-scripts"></iframe>"""
+      sanIfr(ifr01) mustBe ifr01
+
+      val ifr02 = """<iframe sandbox="allow-scripts" srcdoc="alert('hi')"></iframe>"""
+      sanIfr(ifr02) mustBe ifr02
     }
   }
 

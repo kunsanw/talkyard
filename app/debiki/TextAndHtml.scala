@@ -155,7 +155,7 @@ object TextAndHtml {
     */
   def sanitizeTitleText(unsafe: String): String = {
     // Tested here: TyT6RKKDJ563
-    Jsoup.clean(unsafe, titleHtmlTagsWhitelist)
+    compactClean(unsafe, titleHtmlTagsWhitelist)
   }
 
   /** More restrictive than Jsoup's basic() whitelist.
@@ -167,13 +167,31 @@ object TextAndHtml {
           "sup", "u")
   }
 
+  def sanitizePost(unsafeHtml: String): String = {
+    compactClean(unsafeHtml, relaxedHtmlTagWhitelist)
+  }
+
+  def sanitizeInternalLinksAndQuotes(unsafeHtml: String): String = {
+    // TyT7J03SKD5
+    compactClean(unsafeHtml,  new Whitelist()
+          .addTags("a", "div", "blockquote")
+          .addAttributes("a", "href"))
+  }
+
+  def sanitizeAllowIframeOnly(unsafeHtml: String): String = {
+    // TyT603RKDL56
+    compactClean(unsafeHtml, new org.jsoup.safety.Whitelist()
+          .addTags("iframe")
+          .addAttributes("iframe", "src", "srcdoc", "sandbox"))
+  }
+
   /** Links will have rel="nofollow noopener". Images, pre, div allowed.
     */
   def sanitizeAllowLinksAndBlocks(unsafeHtml: String,
         amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
     var whitelist = org.jsoup.safety.Whitelist.basic()
     whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
-    Jsoup.clean(unsafeHtml, whitelist)
+    compactClean(unsafeHtml, whitelist)
   }
 
   /** Links will have rel="nofollow noopener". ul, ol, code, blockquote and
@@ -184,7 +202,7 @@ object TextAndHtml {
     COULD // [disallow_h1_h2]
     var whitelist = org.jsoup.safety.Whitelist.relaxed()
     whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
-    Jsoup.clean(unsafeHtml, whitelist)
+    compactClean(unsafeHtml, whitelist)
   }
 
   // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
@@ -206,6 +224,13 @@ object TextAndHtml {
     // And don't remove target="_blank"  (Whitelist.relaxed() removes target=... ).
     whitelist.addEnforcedAttribute("a", "rel", "nofollow noopener")
   }
+
+  private def compactClean(unsafeHtml: String, whitelist: Whitelist): String = {
+    Jsoup.clean(unsafeHtml, "", whitelist, compactJsoupOutputSettings).trim()
+  }
+
+  private def compactJsoupOutputSettings: org.jsoup.nodes.Document.OutputSettings =
+    new org.jsoup.nodes.Document.OutputSettings().indentAmount(0).prettyPrint(false)
 }
 
 
@@ -411,7 +436,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           // So we won't mistake links to origin = ex.com  for pointing
           // to http://ex.com:8080?  [remember_port]
           // Doesn't matter in real life, with just http = 80 and https = 443.
-          val isSameHostname = site.allHostnames.contains(domainOrAddress)
+          val isSameHostname = site.allHostnames.contains(  // [find_int_links]
+                domainOrAddress)
 
           if (isSameHostname) {
             internalLinks += link

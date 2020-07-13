@@ -116,7 +116,7 @@ object YouTubePrevwRendrEng {
     * - https://www.youtube.com/embed/112233abc
     */
   def findVideoId(javaUri: jn.URI): Option[String] = {
-    val path = javaUri.getPathNotNull
+    val path = javaUri.getPathEmptyNotNull
     if (javaUri.getHost endsWith "youtu.be") {
       // The url is like: http://youtu.be/112233abc
       SlashVideoIdRegex findGroupIn path

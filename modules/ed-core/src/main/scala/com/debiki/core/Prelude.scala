@@ -825,8 +825,8 @@ object Prelude {
       else Some(h)
     }
 
-    def getPathNotNull: String = {
-      // Java's getPath returns null if the path is undefined.
+    def getPathEmptyNotNull: String = {
+      // Java's getPath() can return null, don't know how to reproduce that though.
       val path = underlying.getPath
       if (path eq null) "" else path
     }

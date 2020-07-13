@@ -56,7 +56,8 @@ function onMessageFromChildIframe(event: WindowEventMap['message']) {
     // Add 10 px to really avoid scrollbars. This Talkyard script: [OEMBHGHT] included
     // in the oEmbed <iframe srcdoc=...> sets any margins and paddings in the iframe
     // to 0, so maybe this + 10 isn't needed — but anyway:
-    iframe.style.height = (height + 10) + 'px';   // [oemb_extr_height]
+    iframe.style.height = (height + 10 + 15) + 'px';   // [oemb_extr_height]
+                    // And + 15  because crazy browsers  [iframe_height].
   }
   else {
     // The iframe just disappeared? Maybe an editor preview refreshed & changed,

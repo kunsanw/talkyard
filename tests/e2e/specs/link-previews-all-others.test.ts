@@ -145,7 +145,7 @@ const makePreviewBrokenSelector = (provider: LinkPreviewProvider) =>
   `.s_LnPv-${provider.lnPvClassSuffix || provider.name}${brokenPreview}`;
 
 
-describe("'All other' link previews  TyT0JSM8PF68", () => {
+describe("'All other' link previews  TyT550RMHJ25", () => {
 
   it("initialize people", () => {
     browser = new TyE2eTestBrowser(wdioBrowser);

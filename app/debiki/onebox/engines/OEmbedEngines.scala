@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// CR_DONE
+// CR_DONE except for rename file to  LinkPreviewEngines
 
 package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview.engines
 
@@ -219,6 +219,84 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
   def providerLnPvCssClassName = "s_LnPv-Instagram"
   def providerEndpoint = "https://api.instagram.com/oembed"
   override def regex: Regex = InstagramPrevwRendrEng.regex
+}
+
+
+//CR_DONE
+// ====== Internal links
+
+// Talkayrd internal links, i.e. to other pages within the same site.
+
+class InternalLinkPrevwRendrEng(globals: Globals, siteId: SiteId)
+  extends InstantLinkPrevwRendrEng(globals) {
+
+  def providerLnPvCssClassName: String = "s_LnPv-Int"
+
+  override def providerName: Option[String] = None
+  override def alreadySanitized = true
+  override def addViewAtLink = false
+
+
+  override def handles(url: String): Boolean = {
+    val uri = new java.net.URI(url)
+    val domainOrAddress: String = uri.getHost  // can be null, fine
+
+    // If no hostname, then it's a local link (right?).
+    if (domainOrAddress eq null)
+      return true
+
+    val site = globals.siteDao(siteId).getSite() getOrElse {
+      return false // weird
+    }
+
+    site.allHostnames.contains(domainOrAddress)  // [find_int_links]
+  }
+
+
+  protected def renderInstantly(unsafeUrl: String): Good[String] = {
+    COULD_OPTIMIZE // have handles(url) above pass back the URI and pass on to this fn,
+    // so ned not parse the url again? — Don't use any state, better stay thread safe.
+    val uri = new java.net.URI(unsafeUrl)
+
+    val urlPath = uri.getPathEmptyNotNull
+
+    // If the link is broken, let's use the link url as the visible text — that's
+    // a [good enough hint for the person looking at the edits preview] that
+    // the link doesn't work? (when a linked page preview won't appear)
+    var unsafeTitle = unsafeUrl
+    var unsafeExcerpt = ""
+
+    val dao = globals.siteDao(siteId)
+    dao.getPagePathForUrlPath(urlPath) match {
+      case None =>
+      case Some(pagePath) =>
+        dao.getOnePageStuffById(pagePath.pageId) match {
+          case None =>
+          case Some(pageStuff) =>
+            unsafeTitle = pageStuff.title
+            val inline = false  // for now
+            if (!inline) {
+              unsafeExcerpt = pageStuff.bodyExcerpt.getOrElse("").trim
+            }
+        }
+    }
+
+    val safeUrlAttr = TextAndHtml.safeEncodeForHtmlAttrOnly(unsafeUrl)
+    val safeTitle = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeTitle)
+    val safeLink = s"""<a href="$safeUrlAttr">$safeTitle</a>"""
+    var safePreview =
+          if (unsafeExcerpt.isEmpty) safeLink
+          else {
+            val safeExcerpt = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeExcerpt)
+            s"""<div>$safeLink</div><blockquote>$safeExcerpt</blockquote>"""
+          }
+
+    // Not needed, do anyway:
+    safePreview = TextAndHtml.sanitizeInternalLinksAndQuotes(safePreview)
+
+    Good(safePreview)
+  }
+
 }
 
 

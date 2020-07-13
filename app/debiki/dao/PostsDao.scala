@@ -1072,26 +1072,28 @@ trait PostsDao {
 
   /** Links are saved only for the approved version (if any) of a post.
     * So, if someone submits a new post, or edits an old post, we don't
-    * save any links, until the new post, or the edits, have been approved
-    * by staff or System.
+    * save any links, until the new post, or the edits, have been approved.
     *
     * If there're many links from page A to B, then, remember all of them,
-    * per unique url, e.g. both:  /some-topic  and /-123-some-topic.
+    * per unique url, e.g. both:  /some-topic  and:  /-123-some-topic.
     *
     * Reasoning: If that linked page with id 123 gets moved to:
     *   /another-url-path
     * then the  /some-topic  link breaks,
     * but /-123-some-topic will still work, because it includes the page id
     * in the url.
-    * So links can be different, although they're to the same page. Maybe
-    * therefore makes sense to remember all links, per unique url?
+    * And if later moving page /-234-replacement  to  /some-topic,
+    * then the /some-topic link will start working again — pointing
+    * to the new page. Which is sometimes what one wants.
     *
-    * But no need to remember two different /-123-some-topic  links from the
-    * same post. — That's why [[SourceAndHtml.internalLinks]] is a Set.
+    * So links can be different, although they're to the same page.
+    *
+    * No need, though, to remember two different /-123-some-topic  links from
+    * the same post.  That's why [[SourceAndHtml.internalLinks]] is a Set.
     */
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
           tx: SiteTx, staleStuff: StaleStuff): Unit = {
-    TESTS_MISSING
+    TESTS_MISSING;  CR_DONE // 07-13
 
     dieIf(!post.isCurrentVersionApproved && Globals.isDevOrTest, "TyE406RMTK2")
     if (!post.isCurrentVersionApproved)
@@ -1110,37 +1112,22 @@ trait PostsDao {
     val pageIdsLinkedBefore = tx.loadPageIdsLinkedFromPage(post.pageId)
     val linksBefore: Seq[Link] = tx.loadLinksFromPost(post.id)
 
-    val linkStrsAfter = sourceAndHtml.internalLinks
-    val newLinkStrs = linkStrsAfter.filterNot(linkStr =>
-          linksBefore.exists(_.link_url_c == linkStr))
+    val linkUrlsAfter = sourceAndHtml.internalLinks
+    val newLinkUrls: Set[String] = linkUrlsAfter.filterNot(linkUrl =>
+          linksBefore.exists(_.link_url_c == linkUrl))
 
-    val pathsSeen = mutable.HashSet[String]()
-
-    val newLinks = newLinkStrs flatMap { linkStr: String =>
-      val uri = new java.net.URI(linkStr)
-      val urlPath = uri.getPath // or getPathNotNull
-      val pagePath: Option[PagePathWithId] = PagePath.fromUrlPath(siteId, urlPath) match {
-        case PagePath.Parsed.Good(maybeOkPath) =>
-          // There's a db constraint, pgpths_page_r_pages, so if the page path
-          // exists, the page does too.
-          checkPagePath2(maybeOkPath) flatMap { path =>
-            // Don't save more than one link, per url path.
-            val duplLinkPath = pathsSeen contains path.value
-            if (duplLinkPath) None
-            else {
-              pathsSeen.add(path.value)
-              Some(path)
-            }
-          }
-        case PagePath.Parsed.Bad(error) =>
-          None
-        case PagePath.Parsed.Corrected(newPath) =>
-          None // or checkPagePath2(newPath) ?
-      }
-
-      pagePath map { path: PagePathWithId =>
+    val newLinks = newLinkUrls flatMap { linkUrl: String =>
+      val uri = new java.net.URI(linkUrl)
+      val urlPath = uri.getPathEmptyNotNull
+      val anyPagePath: Option[PagePathWithId] = getPagePathForUrlPath(urlPath)
+      // This might result in many links from a page to another — but these
+      // links will all have different url paths, e.g.:
+      //   - /-1234/link-by-id
+      //   - /-1234/by-id-but-old-page-slug
+      //   - /id-less-path-to-same-page
+      anyPagePath map { path: PagePathWithId =>
         Link(from_post_id_c = post.id,
-              link_url_c = linkStr,
+              link_url_c = linkUrl,
               added_at_c = approvedAt,
               added_by_id_c = writerId,
               is_external_c = false,
@@ -1149,8 +1136,7 @@ trait PostsDao {
     }
 
     // [On2], fine.
-    val deletedLinks = linksBefore.filterNot(link =>
-          linkStrsAfter.contains(link.link_url_c))
+    val deletedLinks = linksBefore.filter(lb => !linkUrlsAfter.contains(lb.link_url_c))
 
     tx.deleteLinksFromPost(post.id, deletedLinks.map(_.link_url_c).toSet)
     newLinks foreach tx.upsertLink

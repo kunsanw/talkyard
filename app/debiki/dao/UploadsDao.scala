@@ -385,7 +385,7 @@ object UploadsDao {
       val urlPath =
         if (urlString startsWith "/") urlString
         else {
-          try new java.net.URI(urlString).getPathNotNull
+          try new java.net.URI(urlString).getPathEmptyNotNull
           catch {
             case _: java.net.URISyntaxException | _: java.net.MalformedURLException =>
               return

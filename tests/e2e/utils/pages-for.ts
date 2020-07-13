@@ -1562,22 +1562,28 @@ export class TyE2eTestBrowser {
     }
 
     waitForAtLeast(num: number, selector: string) {
-      let numNow = 0;
-      this.waitUntil(() => {
-        numNow = this.count(selector);
-        return numNow >= num;
-      }, {
-        message: () => `Waiting for >= ${num}  ${selector}  there are only: ${numNow}`
-      });
+      this._waitForHowManyImpl(num, selector, '>= ');
     }
 
     waitForAtMost(num: number, selector: string) {
+      this._waitForHowManyImpl(num, selector, '<= ');
+    }
+
+    waitForExactly(num: number, selector: string) {
+      this._waitForHowManyImpl(num, selector, '');
+    }
+
+    _waitForHowManyImpl(num: number, selector: string, compareHow: '>= ' | '<= ' | '') {
       let numNow = 0;
       this.waitUntil(() => {
         numNow = this.count(selector);
-        return numNow <= num;
+        switch (compareHow) {
+          case '>= ': return numNow >= num;
+          case '<= ': return numNow <= num;
+          default: return numNow === num;
+        }
       }, {
-        message: () => `Waiting for <= ${num}  ${selector}  there are: ${numNow}`
+        message: () => `Waiting for ${compareHow}${num}  ${selector}  there are: ${numNow}`
       });
     }
 
@@ -1672,6 +1678,12 @@ export class TyE2eTestBrowser {
 
           if (opts.append) {
             dieIf(!value, 'TyE29TKP0565');
+            // Move the cursor to the end — it might be at the beginning, if text got
+            // loaded from the server and inserted after [the editable elem had appeared
+            // already, with the cursor at the beginning].
+            this.focus(selector);
+            this.#br.keys(Array('Control', 'End'));
+            // Now we can append.
             elem.addValue(value);
           }
           else if (_.isNumber(value)) {

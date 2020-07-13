@@ -24,37 +24,7 @@ import debiki.TextAndHtml.safeEncodeForHtml
 
 
 
-object LinkPreviewHtml {   CR_DONE  // 07-09
-
-  private def safeBoringLinkTag(unsafeUrl: String, isOk: Boolean): String = {
-    val spaceErrClass = if (!isOk) " s_LnPv_L-Err" else ""
-    val safeUrl = safeEncodeForHtml(unsafeUrl)
-    s"""<a href="$safeUrl" class="s_LnPv_L$spaceErrClass" """ +
-          s"""target="_blank" rel="nofollow noopener">$safeUrl</a>"""
-  }
-
-
-  def safeProblem(unsafeProblem: String, unsafeUrl: String,
-      extraLnPvCssClasses: String, errorCode: String = ""): String = {
-
-    require(safeEncodeForHtml(errorCode) == errorCode, "TyE906MRTD25")
-    require(safeEncodeForHtml(extraLnPvCssClasses) == extraLnPvCssClasses, "TyE306MRTD27")
-
-    val safeProblem = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeProblem)
-    val safeLinkTag = safeBoringLinkTag(unsafeUrl, isOk = false)
-    val errInBrackets = if (errorCode.isEmpty) "" else s" <code>[$errorCode]</code>"
-    val safeHtml =
-          s"""<aside class="onebox s_LnPv s_LnPv-Err $extraLnPvCssClasses clearfix">${
-            safeProblem} $safeLinkTag$errInBrackets</aside>"""
-
-    // safeHtml is safe already — let's double-sanitize just in case:
-    TextAndHtml.sanitizeAllowLinksAndBlocks(
-          safeHtml,
-          _.addTags("aside")
-            .addAttributes("aside", "class")
-            .addAttributes("a", "class")
-            .addAttributes("a", "target"))
-  }
+object LinkPreviewHtml {   CR_DONE  // 07-13
 
 
   def safeAside(safeHtml: String, extraLnPvCssClasses: String,
@@ -85,9 +55,24 @@ object LinkPreviewHtml {   CR_DONE  // 07-09
   }
 
 
-  def sandboxedIframe(unsafeUrl: String, unsafeHtml: String,
-        unsafeProviderName: Option[String], extraLnPvCssClasses: String): String = {
+  def safeProblem(unsafeProblem: String, unsafeUrl: String, errorCode: String): String = {
+    require(safeEncodeForHtml(errorCode) == errorCode, "TyE906MRTD25")
 
+    val safeProblem = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeProblem)
+    val safeUrl = safeEncodeForHtml(unsafeUrl)
+    val safeLinkTag =
+          s"""<a href="$safeUrl" class="s_LnPv_L s_LnPv_L-Err" """ +
+              s"""target="_blank" rel="nofollow noopener">$safeUrl</a>"""
+    val errInBrackets = if (errorCode.isEmpty) "" else s" <code>[$errorCode]</code>"
+    val safeHtml =
+          s"""<div>$safeProblem $safeLinkTag$errInBrackets</div>"""
+
+    // Need not sanitize here, do anyway just in case.
+    TextAndHtml.sanitizeAllowLinksAndBlocks(safeHtml)
+  }
+
+
+  def sandboxedIframe(unsafeHtml: String): String = {
 
     // Iframe sandbox permissions. [IFRMSNDBX]
     val permissions = (
@@ -145,9 +130,16 @@ object LinkPreviewHtml {   CR_DONE  // 07-09
         // looking page but on the attacker's domain].
         "allow-top-navigation-by-user-activation")
 
-    <iframe sandbox={ permissions }
-            srcdoc={ unsafeHtml + adjustIframeHeightScript }></iframe>
-        .toString
+    val safeHtmlInAttr = TextAndHtml.safeEncodeForHtmlAttrOnly(
+      unsafeHtml + adjustIframeHeightScript)
+
+    var safeHtml = s"""<iframe sandbox="$permissions" srcdoc="$safeHtmlInAttr"></iframe>"""
+
+    // Not needed but anyway:
+    safeHtml = TextAndHtml.sanitizeAllowIframeOnly(safeHtml)
+    dieIf(!safeHtml.contains(s""" sandbox="$permissions" """), "TyE402KG467")
+
+    safeHtml
   }
 
 

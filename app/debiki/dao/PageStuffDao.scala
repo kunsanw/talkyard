@@ -71,6 +71,13 @@ trait PageStuffDao {
   }
 
 
+  RENAME // to getPageStuffById
+  def getOnePageStuffById(pageId: PageId): Option[PageStuff] = {
+    getPageStuffById(Seq(pageId)).get(pageId)
+  }
+
+
+  RENAME // to getPageStuffsById
   def getPageStuffById(pageIds: Iterable[PageId]): Map[PageId, PageStuff] = {
     // Somewhat dupl code [5KWE02], PagePathMetaDao.getPageMetasAsMap() and UserDao are similar.
     // Break out helper function getManyById[K, V](keys) ?

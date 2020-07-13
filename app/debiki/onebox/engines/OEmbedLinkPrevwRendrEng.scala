@@ -40,7 +40,7 @@ import scala.concurrent.Future
     "width": 550,
     "height": null,
     "type": "rich",
-    "cache_age": "3153600000", <—— could save in  link_previews_t.cache_max_secs_c
+    "cache_age": "3153600000", <—— later: save in  link_previews_t.cache_max_secs_c
     "provider_name": "Twitter",
     "provider_url": "https://twitter.com",
     "version": "1.0"
@@ -49,7 +49,7 @@ import scala.concurrent.Future
 
 
 /** Fetches oEmbed html, renders in a sandboxed iframe, or (later) inlines
-  * the oEmbed html & scripts for some trusted providers (by default, none).
+  * the oEmbed html & scripts if the provider is trusted.
   *
   * Later, to do:
   *
@@ -76,9 +76,6 @@ import scala.concurrent.Future
   *   - Let admins optionally allow *all* safelisted providers,
   *     combined with a blocklist, if there're a few providers the admins
   *     don't trust.
-  *
-  *   - Fetch Talkyard internal link titles directly from database,
-  *     show instead of /-12345/page-slug.
   *
   * Add oEmbed & OpenGraph support to Ty  [ty_oemb_og].
   *
