@@ -1260,8 +1260,8 @@ export class TyE2eTestBrowser {
         message: `Waiting until exists:  ${selector}`,
       });
 
-      if (ps.howMany && ps.howMany >= 2) {
-        this.waitForAtLeast(ps.howMany, selector);
+      if (ps.howMany) {
+        this.waitForExactly(ps.howMany, selector);
       }
     }
 
