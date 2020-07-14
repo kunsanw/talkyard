@@ -280,16 +280,15 @@ function runAllE2eTests {
   $r s/wdio --only navigation-as-stranger $args
   # Also:  embedded-comments-navigation-as-guest  further below.
 
-
   $r s/wdio --only sanitize-posts.2browsers $args
 
   $r s/wdio --only votes-and-best-first $args
 
-  #$r s/wdio --only links-internal.2browsers $args zzz
+  #$r s/wdio --only links-internal.2browsers $args  to do
 
   $r s/wdio --only embed-images-mp4-youtube $args
   $r s/wdio --only embed-twitter-tweets-etc $args
-  ## $r s/wdio --only link-previews-all-others $args  broken! zzz
+  $r s/wdio --only link-previews-all-others $args
 
   $r s/wdio --only view-edit-history.2browsers $args
   $r s/wdio --only upload-images-and-files $args
