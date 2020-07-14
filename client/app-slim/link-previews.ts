@@ -49,7 +49,8 @@ function onMessageFromChildIframe(event: WindowEventMap['message']) {
 
   // Not too small or too tall, what about:
   if (height < 30) height = 30;
-  if (height > 700) height = 700;
+  if (height > 770) height = 770;  // 770 + 10 + 15 = tall enough for Instagram,
+                                   // but would be better to: [oemb_extr_height].
 
   const iframe = findIframeThatSent(event);
   if (iframe) {

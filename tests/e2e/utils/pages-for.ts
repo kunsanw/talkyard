@@ -441,6 +441,9 @@ export class TyE2eTestBrowser {
     // inside be just an empty obj {}.  — Mabe I forgot 'this'? Should be: this.$().
     // Anyway, this wait fn logs a message about what we're waiting for, can be nice.
     //
+    // Returns true iff the event / condition happened, that is, if fn()
+    // returned true before timeout.
+    //
     waitUntil(fn: () => Boolean, ps: {
         timeoutMs?: number,
         timeoutIsFine?: boolean,
@@ -1342,25 +1345,42 @@ export class TyE2eTestBrowser {
     _waitForClickable (selector: string,  // RENAME? to scrollToAndWaitUntilCanInteract
           opts: { maybeMoves?: boolean, timeoutMs?: number, mayScroll?: boolean,
               okayOccluders?: string, waitUntilNotOccluded?: boolean } = {}) {
-      this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
-      this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
-      if (opts.mayScroll !== false) {
-        this.scrollIntoViewInPageColumn(selector);
-      }
-      if (opts.maybeMoves) {
-        this.waitUntilDoesNotMove(selector);
-      }
+      this.waitUntil(() => {   // CR_DONE this fn, 07-14
+        this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
+        this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
+        if (opts.mayScroll !== false) {
+          this.scrollIntoViewInPageColumn(selector);
+        }
+        if (opts.maybeMoves) {
+          this.waitUntilDoesNotMove(selector);
+        }
 
-      // Sometimes, a not-yet-done-loading-data-from-server overlays the element and steals
-      // any click. Or a modal dialog, or nested modal dialog, that is fading away, steals
-      // the click. Unless:
-      if (opts.waitUntilNotOccluded !== false) {
-        this.waitUntilElementNotOccluded(selector, { okayOccluders: opts.okayOccluders });
-      }
-      else {
-        // We can at least do this — until then, nothing is clickable.
-        this.waitUntilLoadingOverlayGone();
-      }
+        // Sometimes, a not-yet-done-loading-data-from-server overlays the element and steals
+        // any click. Or a modal dialog, or nested modal dialog, that is fading away, steals
+        // the click. Unless:
+        if (opts.waitUntilNotOccluded !== false) {
+          const notOccluded = this.waitUntilElementNotOccluded(
+                  selector, { okayOccluders: opts.okayOccluders, timeoutMs: 700,
+                      timeoutIsFine: true });
+          if (notOccluded)
+            return true;
+
+          // Else: This can happen if something above `selector`, maybe an iframe or
+          // image, just finished loading, and is a bit tall so it pushed `selector`
+          // downwards, outside the viewport. Then, waitUntilElementNotOccluded() times
+          // out, returns false.
+          // — Maybe we need to scroll down to `selector` again, at its new position,
+          // so run this fn again (waitUntil() above will do for us).
+        }
+        else {
+          // We can at least do this — until then, nothing is clickable.
+          this.waitUntilLoadingOverlayGone();
+          return true;
+        }
+      }, {
+        timeoutMs: opts.timeoutMs,
+        message: `Waiting for  ${selector}  to be clickable`
+      });
     }
 
 
@@ -1485,11 +1505,13 @@ export class TyE2eTestBrowser {
       this.waitUntilGone('.fade.modal');
     }
 
+    // Returns true iff the elem is no longer occluded.
+    //
     waitUntilElementNotOccluded(selector: string, opts: {
-          okayOccluders?: string, timeoutMs?: number, timeoutIsFine?: boolean } = {}) {
+          okayOccluders?: string, timeoutMs?: number, timeoutIsFine?: boolean } = {}): boolean {
       dieIf(!selector, '!selector,  [TyE7WKSH206]');
       let result: string | true;
-      this.waitUntil(() => {
+      return this.waitUntil(() => {
         result = <string | true> this.#br.execute(function(selector, okayOccluders): boolean | string {
           var elem = document.querySelector(selector);
           if (!elem)

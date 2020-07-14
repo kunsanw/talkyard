@@ -44,6 +44,7 @@ type ProvidersMap = { [name: string]: LinkPreviewProvider };
 // wdio command line, for exampe. Or just:  --o3 reddit
 
 let providersToTest: ProvidersMap = {
+  /* Doesn't work without trusting FB's js, skip for now.
   facebookPosts: {
     name: "Facebook",
     sandboxedIframe: false,
@@ -56,6 +57,7 @@ let providersToTest: ProvidersMap = {
     linkInReply:
         'https://www.facebook.com/65239508296/photos/a.318899128296/10155689214983297/?type=3',
   },
+  */
 
   // facebookVideos:  TESTS_MISSING
 
@@ -289,9 +291,10 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
       });
 
       if (provider.linkTwoExpectedPrevwText) {
-        const noPreviewText = `No preview for ${provider.name}`; // [0LNPV]
-        it(`... with text: "${noPreviewText} ..."`, () => {
-          owensBrowser.topic.waitUntilPostTextMatches(c.BodyNr, noPreviewText,
+        const noPreviewText = `No preview for ${provider.name}`; // what? why  [0LNPV]
+        it(`... with text: "${provider.linkTwoExpectedPrevwText} ..."`, () => {
+          owensBrowser.topic.waitUntilPostTextMatches(
+                c.BodyNr, provider.linkTwoExpectedPrevwText,
                 { thingInPostSelector: '.s_LnPv-Err' });
         });
       }
@@ -300,8 +303,11 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
 
     // ----- Link preview in a Talkyard reply post
 
-    it(`Owen starts typing a reply`, () => {
+    it(`Owen clicks Reply`, () => {
       owensBrowser.topic.clickReplyToOrigPost();
+    });
+
+    it("... starts typing a reply", () => {
       owensBrowser.editor.editText(provider.linkInReply);
     });
 
