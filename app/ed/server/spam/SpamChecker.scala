@@ -895,7 +895,8 @@ class SpamChecker(
     // The content that was submitted.
     anyTextToCheck foreach { t =>
       if (t.nonEmpty)
-        body.append("&comment_content=" + encode(t))  // COULD: htmlLinksOnePerLine [4KTF0WCR]
+        // COULD: externalLinksOnePerLineHtml [4KTF0WCR]
+        body.append("&comment_content=" + encode(t))
     }
 
     // The UTC timestamp of the creation of the comment, in ISO 8601 format. May be

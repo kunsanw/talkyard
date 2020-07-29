@@ -143,34 +143,12 @@ trait PagesDao {
   }
 
 
-  /** Returns (PagePath, body-post)
-    * /
-  def createPageImpl2(pageRole: PageType,
-        title: TitleSourceAndHtml, body: TextAndHtml,
-        pageStatus: PageStatus = PageStatus.Published,
-        anyCategoryId: Option[CategoryId] = None,
-        anyFolder: Option[String] = None, anySlug: Option[String] = None, showId: Boolean = true,
-        pinOrder: Option[Int] = None, pinWhere: Option[PinPageWhere] = None,
-        byWho: Who, spamRelReqStuff: Option[SpamRelReqStuff],
-        tx: SiteTransaction): (PagePathWithId, Post) = {
-    val result = createPageImpl(pageRole, pageStatus, anyCategoryId = anyCategoryId,
-      anyFolder = anyFolder, anySlug = anySlug, showId = showId,
-      title,
-      bodySource = body.text, bodyHtmlSanitized = body.safeHtml,
-      pinOrder = pinOrder, pinWhere = pinWhere,
-      byWho, spamRelReqStuff, tx = tx,
-      layout = None)
-    (result._1, result._2)
-  } */
-
   /** Returns (PagePath, body-post, any-review-task)
     */
   def createPageImpl(pageRole: PageType, pageStatus: PageStatus,
       anyCategoryId: Option[CategoryId],
       anyFolder: Option[String], anySlug: Option[String], showId: Boolean,
-      // titleSource: String, titleHtmlSanitized: String,
       title: TitleSourceAndHtml,
-      //bodySource: String = null, bodyHtmlSanitized: String = null,  /// wants txt and html?!
       body: TextAndHtml,
       pinOrder: Option[Int] = None, pinWhere: Option[PinPageWhere] = None,
       byWho: Who, spamRelReqStuff: Option[SpamRelReqStuff],
@@ -191,7 +169,7 @@ trait PagesDao {
     val categoryPath = tx.loadCategoryPathRootLast(anyCategoryId)
     val groupIds = tx.loadGroupIdsMemberIdFirst(author)
     val permissions = tx.loadPermsOnPages()
-    //val authzCtx = ForumAuthzContext(Some(author), groupIds, permissions)
+    //val authzCtx = ForumAuthzContext(Some(author), groupIds, permissions)  ?  [5FLK02]
     val settings = loadWholeSiteSettings(tx)
 
     dieOrThrowNoUnless(Authz.mayCreatePage(  // REFACTOR COULD pass a pageAuthzCtx instead [5FLK02]

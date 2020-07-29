@@ -156,7 +156,7 @@ class RenderContentActor(
             // 50 ms —> 45% - 50% 1 core CPU, just to run the query, in a Docker
             // container on my core i7 (released 2015).
             // 1000 ms —> 10-13% CPU instead.
-            millisToPause = 2000  // and 2000 ms —> 2-12%  #205RMTD4
+            millisToPause = 2000  // and 2000 ms —> 2-12%  [205RMTD4]
           }
           context.system.scheduler.scheduleOnce(
                 millisToPause.millis, self, message)(execCtx)
@@ -243,7 +243,7 @@ class RenderContentActor(
     // ----- Is still out-of-date?
 
     // There might be many threads and servers that re-render this page, so although it was
-    // out of date a short while ago, maybe now it's been rerendered already. #205RMTD4
+    // out of date a short while ago, maybe now it's been rerendered already. [205RMTD4]
 
     val cachedAndCurrentVersions =
           globals.systemDao.loadCachedPageVersion(sitePageId, renderParams)
@@ -296,7 +296,7 @@ class RenderContentActor(
     val now = globals.now()
     val (nextIdsToRerender: Seq[PageIdToRerender], nextLoadedAt) =
           // Refresh the pages-to-rerender after some seconds. We do an extra
-          // up-to-date check anyway. #205RMTD4
+          // up-to-date check anyway. [205RMTD4]
           if (remainingPageIds.nonEmpty && now.millisSince(remainingLoadedAt) < 2500) {
             (remainingPageIds, remainingLoadedAt)
           }

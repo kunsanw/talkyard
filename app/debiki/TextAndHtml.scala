@@ -28,7 +28,7 @@ import debiki.dao.UploadsDao
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 
-// CR_DONE  07-09
+// CR_DONE  07-09 .
 
 /** Immutable.
   */
@@ -114,7 +114,7 @@ sealed abstract class TextAndHtml extends SourceAndHtml {  RENAME // to PostSour
     */
   def linkIpAddresses: immutable.Seq[String]
 
-  def htmlLinksOnePerLine: String = {
+  def externalLinksOnePerLineHtml: String = {  // [4KTF0WCR]
     TESTS_MISSING
     externalLinks map { href =>
       val hrefAttrEscaped = org.owasp.encoder.Encode.forHtmlAttribute(href)
@@ -130,8 +130,8 @@ sealed abstract class TextAndHtml extends SourceAndHtml {  RENAME // to PostSour
 
 object TextAndHtml {
 
-  /** The result can be incl in html anywhere: As html tags contents,
-    * or in a html attribute — you need to add the attr quotes youreslf (!).
+  /** The result can be incl in html anywhere: As html tags contents, or
+    * in a html attribute — but you need to add the attr quotes youreslf (!).
     */
   def safeEncodeForHtml(unsafe: String): String = {
     org.owasp.encoder.Encode.forHtml(unsafe)
@@ -407,8 +407,7 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
 
   // Break out, make static, so more testable? Pass  site: SiteIdHostnames.
-  //
-  TESTS_MISSING //  add to:  class TextAndHtmlTest, "find links" - { ... }
+  // Tests in:  class TextAndHtmlTest  TyTMLFINDLNS
   //
   def findLinksAndUplRefs(safeHtml: String): LinksFound = {
 
@@ -504,15 +503,6 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
   def testBody(text: String): TextAndHtml = test(text)
 
-
-  def wrapInParagraphNoMentionsOrLinks(safeHtml: String): TextAndHtml = {
-    new TextAndHtmlImpl(
-          safeHtml, safeHtml = s"<p>$safeHtml</p>", usernameMentions = Set.empty,
-          uploadRefs = Set.empty, internalLinks = Set.empty, externalLinks = Nil,
-          linkDomains = Set.empty, linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
-          followLinks = false, allowClassIdDataAttrs = false)
-  }
-
 }
 
 
@@ -520,6 +510,12 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 case class SafeStaticSourceAndHtml(
   override val source: String,
   override val safeHtml: String) extends TextAndHtml {
+
+  // Shouldn't be any links, mentions, tags in static default topics html.
+  dieIf((safeHtml.contains("href") || safeHtml.contains("@") || safeHtml.contains("#"))
+            && Globals.isDevOrTest,  // DO_AFTER 2020-10-01 enable this dieIf() always
+        "TyE4925KSTD",
+        s"Links/mentions/tags in internal static safeHtml: '$safeHtml'")
 
   override def text: String = source
   override def usernameMentions: Set[String] = Set.empty

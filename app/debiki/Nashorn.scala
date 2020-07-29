@@ -234,14 +234,16 @@ class Nashorn(
         embeddedOriginOrEmpty) +
           ed.server.UploadsUrlBasePath + pubSiteId + '/'
 
-    // When rendering CommonMark in Nashorn, we cannot do external requests to fetch
-    // link preview html. Instead, that needs to have been done already, and the
-    // results saved in link_previews_t, so it's available to us directly.
+    // A link preview renderer that fetches the previews from the database,
+    // link_previews_t, but no external requests — cannot do that when rendering
+    // CommonMark from inside Nashorn.
     val prevwRenderer = new LinkPreviewRendererForNashorn(
-            new LinkPreviewRenderer(
-                  globals, siteId = siteId, mayHttpFetch = false,
-                  // (The requester doesn't matter — we won't fetch external data.)
-                  requesterId = SystemUserId))
+          new LinkPreviewRenderer(
+              globals, siteId = siteId,
+              // Cannot do external requests from inside Nashorn.
+              mayHttpFetch = false,
+              // The requester doesn't matter — we won't fetch external data.
+              requesterId = SystemUserId))
 
     val (safeHtmlNoPreviews, mentions) = withJavascriptEngine(engine => {
       val resultObj: Object = engine.invokeFunction("renderAndSanitizeCommonMark",

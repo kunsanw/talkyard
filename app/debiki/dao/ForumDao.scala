@@ -396,7 +396,8 @@ trait ForumDao {
       tx, staleStuff)
 
     if (options.createSampleTopics) {
-      def wrap(text: String) = textAndHtmlMaker.wrapInParagraphNoMentionsOrLinks(text)
+      def wrap(text: String) =
+        SafeStaticSourceAndHtml(source = text, safeHtml = s"<p>$text</p>")
 
       // Create a sample open-ended discussion.
       val discussionPagePath = createPageImpl(

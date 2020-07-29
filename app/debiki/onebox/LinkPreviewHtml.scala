@@ -24,7 +24,7 @@ import debiki.TextAndHtml.safeEncodeForHtml
 
 
 
-object LinkPreviewHtml {   CR_DONE  // 07-13
+object LinkPreviewHtml {   CR_DONE  // 07-13 .
 
 
   def safeAside(safeHtml: String, extraLnPvCssClasses: String,

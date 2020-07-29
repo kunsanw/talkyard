@@ -146,8 +146,18 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       }
 
       "add rel='nofollow noopener'  if _blank  —  oh, actually removes _blank" in {
-        sanPost("""<a href="https://x.co" target="_blank">x.co</a>""") mustBe (
-              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
+        sanPost("""<a href="https://x.co" target="_blank">x.co</a>""") mustBe
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
+      }
+
+      "add 'nofollow' to rel='noopener'  —  oh, removes _blank" in {
+        sanPost("""<a href="https://x.co" target="_blank" rel="noopener">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
+      }
+
+      "add 'noopener' to rel='nofollow'  —  oh, removes _blank" in {
+        sanPost("""<a href="https://x.co" target="_blank" rel="nofollow">x.co</a>"""
+              ) mustBe """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
 
       "change rel=follow to nofollow" in {
@@ -156,8 +166,8 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       }
 
       "change rel=follow to 'nofollow noopener'  if _blank  —  oh, removes _blank" in {
-        sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe (
-              """<a href="https://x.co" rel="nofollow noopener">x.co</a>""")
+        sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe
+              """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
 
       "compact posts html output" in {
@@ -209,16 +219,18 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
 
   "TextAndHtmlMaker can" - {
 
+    val dummyHostname = "forum.example.com"
+
     val site: SiteIdHostnames = new SiteIdHostnames {
       val id: SiteId = NoSiteId
       val pubId = "123abc"
-      val canonicalHostnameStr = Some("forum.example.com")
+      val canonicalHostnameStr = Some(dummyHostname)
       val allHostnames: Seq[String] = canonicalHostnameStr.toSeq
     }
 
     val maker: TextAndHtmlMaker = new TextAndHtmlMaker(site, nashorn = null)
 
-    "find links" - {
+    "find links  TyTMLFINDLNS" - {
 
       "empty text" in {
         val textAndHtml = maker.forHtmlAlready("")
@@ -284,14 +296,38 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
         textAndHtml.linkIpAddresses mustBe Seq("22.22.11.11")
       }
 
+      "internal links" - {
+        "no origin, just url path" in {
+          val textAndHtml = maker.forHtmlAlready("<a href='/page/here'>Page here</a>")
+          textAndHtml.internalLinks mustBe Set("/page/here")
+          textAndHtml.externalLinks mustBe Nil
+          textAndHtml.linkDomains mustBe Set()
+          textAndHtml.linkIpAddresses mustBe Nil
+        }
+
+        "same origin" in {
+          val textAndHtml = maker.forHtmlAlready(
+                s"<a href='https://$dummyHostname/page2&query=param'>Page2</a>")
+          textAndHtml.internalLinks mustBe Set("/page2&query=param")
+          textAndHtml.externalLinks mustBe Nil
+          textAndHtml.linkDomains mustBe Set()
+          textAndHtml.linkIpAddresses mustBe Nil
+        }
+      }
+
       "Many links, incl <video>" in {
         val textAndHtml = maker.forHtmlAlready(o"""
            <img src='http://imgs.com/one.jpg'>
            <video src='http://vids.com/two.mp4'>
+           <a href='/internal/slash/'>internal link 01</a>
+           <a href='https://$dummyHostname/int02'>internal link 02</a>
+           <a href='//$dummyHostname/no/scheme'>internal link 03</a>
            <div><a href='http://hello.ex.co/path'>A link</a></div>
            <area href='http://1.2.3.4/path'>An ip addr</a>
            <b>Hello <a>not a link</a> and <img src="">not an img</img></b>
            """)
+        textAndHtml.internalLinks mustBe Set(
+              "/internal/slash/", "/int02", "/no/scheme")
         textAndHtml.externalLinks.sorted mustBe Seq(
           "http://imgs.com/one.jpg",
           "http://vids.com/two.mp4",

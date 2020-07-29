@@ -34,6 +34,14 @@ object MemCache {
 }
 
 
+/**
+  * BUG RACE:s [cache_race_counter]: something gets loaded and cached, but at the
+  * same time gets uncached — then, the old version might get re-insterted.
+  * Handle this by adding a counter, and all uncache fns bump the counter,
+  * and all add-to-cache fns skip adding to cache, if that counter has changed,
+  * since just before they started loading the stuff to cache.
+  * (Not important to fix, so unlikely to happen, right.)
+  */
 
 class MemCache(val siteId: SiteId, val cache: DaoMemCache, mostMetrics: MostMetrics) {
 

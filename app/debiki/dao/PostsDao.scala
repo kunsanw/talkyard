@@ -835,8 +835,6 @@ trait PostsDao {
           newLastApprovedEditById,
           newApprovedSource,
           newApprovedHtmlSanitized,
-          // newInternalLinks = ...
-          // newExternalLinks = ...
           newApprovedAt) =
         if (anyNewApprovedById.isDefined)
           (true,
@@ -1030,6 +1028,10 @@ trait PostsDao {
       anyEditedCategory.foreach(tx.updateCategoryMarkSectionPageStale)
 
       reviewTask.foreach(tx.upsertReviewTask)
+      SHOULD // generate review task notf?  [revw_task_notfs]
+      // At least if the edits not yet approved — then, annoying for the person
+      // who did the edits, if they "never" appear because the staff didn't notice.
+      // val notfs = notfGenerator(tx).generateForReviewTask( ...)
 
       if (!postToEdit.isSomeVersionApproved && editedPost.isSomeVersionApproved) {
         unimplemented("Updating visible post counts when post approved via an edit", "DwE5WE28")
@@ -1041,10 +1043,6 @@ trait PostsDao {
         val notfs = notfGenerator(tx).generateForEdits(
               postToEdit, editedPost, Some(newTextAndHtml))
         tx.saveDeleteNotifications(notfs)
-      }
-      else {
-        SHOULD // generate review task notf?  [revw_task_notfs]
-        // val notfs = notfGenerator(tx).generateForReviewTask( ...)
       }
 
       deleteDraftNr.foreach(nr => tx.deleteDraft(editorId, nr))
@@ -1080,7 +1078,7 @@ trait PostsDao {
     * If there're many links from page A to B, then, remember all of them,
     * per unique url, e.g. both:  /some-topic  and:  /-123-some-topic.
     *
-    * Reasoning: If that linked page with id 123 gets moved to:
+    * Reasoning: If that linked page with id 123 gets moved to:  [many_lns_same_page]
     *   /another-url-path
     * then the  /some-topic  link breaks,
     * but /-123-some-topic will still work, because it includes the page id
@@ -1096,7 +1094,7 @@ trait PostsDao {
     */
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
           tx: SiteTx, staleStuff: StaleStuff): Unit = {
-    TESTS_MISSING;  CR_DONE // 07-13
+    TESTS_MISSING;  CR_DONE // 07-13 .
 
     dieIf(!post.isCurrentVersionApproved && Globals.isDevOrTest, "TyE406RMTK2")
     if (!post.isCurrentVersionApproved)
@@ -1108,7 +1106,15 @@ trait PostsDao {
     }
 
     if (post.currentSource != sourceAndHtml.source) {
-      bugWarn("TyE305RKT5", s"s$siteId: post.currentSource != sourceAndHtml.source: $post")
+      bugWarn("TyE305RKT5", o"""s$siteId: post.currentSource != sourceAndHtml.source,
+            post: $post,  sourceAndHtml.source: ${sourceAndHtml.source}""")
+      return
+    }
+
+    COULD // remove param writerId? It's in the post already, right?:
+    if (post.lastApprovedEditById.getOrElse(post.createdById) != writerId) {
+      bugWarn("TyE63WKDJ356", s"s$siteId: post last writer id != writerId = ${
+            writerId}:  $post")
       return
     }
 
@@ -1124,7 +1130,7 @@ trait PostsDao {
       val urlPath = uri.getPathEmptyNotNull
       val anyPagePath: Option[PagePathWithId] = getPagePathForUrlPath(urlPath)
       // This might result in many links from a page to another — but these
-      // links will all have different url paths, e.g.:
+      // links will all have different url paths, e.g.:  [many_lns_same_page]
       //   - /-1234/link-by-id
       //   - /-1234/by-id-but-old-page-slug
       //   - /id-less-path-to-same-page
@@ -1147,7 +1153,10 @@ trait PostsDao {
     val pageIdsLinkedAfter = tx.loadPageIdsLinkedFromPage(post.pageId)
 
     // Uncache backlinked pages. [uncache_blns]
-    val stalePageIds = pageIdsLinkedBefore diff pageIdsLinkedAfter
+    COULD_OPTIMIZE // use Guava.symmetricDifference.  But not Scala's  setA.diff.setB.
+    val stalePageIds =
+          (pageIdsLinkedBefore -- pageIdsLinkedAfter) ++
+            (pageIdsLinkedAfter -- pageIdsLinkedBefore)
     staleStuff.addPageIds(stalePageIds)
   }
 
@@ -1164,6 +1173,13 @@ trait PostsDao {
       bugWarn("TyE5WKG20J", s"s$siteId: editedPost.currentSource != sourceAndHtml.source: ${
             editedPost}")
       return
+    }
+
+    if (isEditing && editedPost.isCurrentVersionApproved &&
+          editedPost.lastApprovedEditById.isNot(editorId)) {
+      bugWarn("TyE205AKT3", s"s$siteId: editedPost last editor id != editorId = ${
+            editorId}:  $editedPost")
+      // Don't return, didn't before (2020-07).
     }
 
     val oldUploadRefs = tx.loadUploadedFileReferences(postToEdit.id)
@@ -1471,7 +1487,7 @@ trait PostsDao {
 
     val user = tx.loadParticipant(userId) getOrElse throwForbidden("DwE3KFW2", "Bad user id")
 
-    SECURITY; COULD // Should check if may see post, not just the page?
+    SECURITY; COULD // check if may see post, not just the page?  [whispers] [staff_can_see]
     throwIfMayNotSeePage(page, Some(user))(tx)
 
     val postBefore = page.parts.thePostByNr(postNr)
@@ -1600,9 +1616,9 @@ trait PostsDao {
       // Uncache backlinked pages. [uncache_blns]
       // (We don't delete links, when soft-deleting a post or page. Instead, such
       // links are filtered out when querying. [q_deld_lns] )
-      val staleBacklinksPageIds = tx.loadPageIdsLinkedFromPosts(
+      val linkedPageIds = tx.loadPageIdsLinkedFromPosts(
             uncacheBacklinksFromPostIds.toSet)
-      staleStuff.addPageIds(staleBacklinksPageIds)
+      staleStuff.addPageIds(linkedPageIds)
     }
 
     val oldMeta = page.meta
@@ -1898,7 +1914,7 @@ trait PostsDao {
       deletePostImpl(pageId, postNr = postNr, deletedById = deletedById,
             doingReviewTask = None, browserIdData, tx, staleStuff)
     }
-    refreshPageInMemCache(pageId)
+    refreshPageInMemCache(pageId)  ; REMOVE // auto do via [staleStuff]
   }
 
 
@@ -1911,7 +1927,7 @@ trait PostsDao {
       tx = tx, staleStuff = staleStuff)
 
     // The caller needs to: refreshPageInMemCache(pageId) — and should be done just after tx ended.
-    // EDIT: That's soon not needed, use staleStuff instead and [rm_cache_listeners].
+    // EDIT: That's soon not needed, use [staleStuff] instead and [rm_cache_listeners].  CLEAN_UP
 
     result
   }
@@ -2143,6 +2159,7 @@ trait PostsDao {
           postAfter
         }
 
+      // Would be goog to [save_post_lns_mentions], so wouldn't need to recompute here.
       val notfs = notfGenerator(tx).generateForNewPost(
         toPage, postAfter, sourceAndHtml = None, anyReviewTask = None, skipMentions = true)
       SHOULD // tx.saveDeleteNotifications(notfs) — but would cause unique key errors
@@ -2218,7 +2235,8 @@ trait PostsDao {
       // Hide post, update page?
       val shallHide = newNumFlags >= settings.numFlagsToHidePost && !postBefore.isBodyHidden
       if (shallHide) {
-        hidePostsOnPage(Vector(postAfter), pageId, "This post was flagged")(tx, staleStuff)
+        hidePostsOnPage(Vector(postAfter), pageId,
+              "This post was flagged")(tx, staleStuff) ; I18N
       }
       else {
         tx.updatePost(postAfter)

@@ -988,13 +988,15 @@ class JsonMaker(dao: SiteDao) {
     daoOrTx match {
       case dao: SiteDao =>
         val linkerIds: Set[PageId] =
-              dao.getPageIdsLinkingTo(toPageId, inclDeletedHidden = false)
+              dao.getPageIdsLinkingTo(toPageId,
+                  inclDeletedHidden = false)  // [staff_can_see]
         val linkersMaybeSee: Map[PageId, PageStuff] =
               dao.getPageStuffById(linkerIds)
         val linkersOkSee: Iterable[PageStuff] =
               linkersMaybeSee.values.filter { page: PageStuff =>
                 val (maySee, _) = dao.maySeePageUseCacheAndAuthzCtx(
-                      page.pageMeta, authzCtx, maySeeUnlisted = false)
+                      page.pageMeta, authzCtx,
+                      maySeeUnlisted = false)  // [staff_can_see]
                 maySee
               }
         val linksJson = linkersOkSee map { page =>
@@ -1003,7 +1005,8 @@ class JsonMaker(dao: SiteDao) {
         linksJson.toSeq
     }
 
-      /*
+      /*  Later, sometimes will want a tx instead of a dao + cache? Then:
+
       case Right(tx) =>
         val linkedFromPageIds: Set[PageId] =
               tx.loadPageIdsLinkingTo(toPageId, inclDeletedHidden = false)

@@ -14,6 +14,11 @@ Primary button colors, secondary, background, arrows,
 and embedded widgets, e.g. Twitter's oEmbed has a 'link_color: #223344' attr,
                             and  theme=light/dark.
 
+[staff_can_see]
+Add a black hanglock next to things one can see, because of one's extra
+access permissions? E.g. editing category settings, or backlinks from
+access restricted topics.
+
 
 [immutable]
 Make all js objs "light weight immutable", via Typescript's 'readonly' properties:

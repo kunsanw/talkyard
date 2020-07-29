@@ -204,14 +204,14 @@ class SiteDao(
           fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
     val staleStuff = new StaleStuff()
-    val r: R = readWriteTransaction(tx => {
+    val result: R = readWriteTransaction(tx => {
       val r = fn(tx, staleStuff)
       tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
       r
     }, allowOverQuota)
     (staleStuff.stalePageIdsInDb
           ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
-    r
+    result
   }
 
 

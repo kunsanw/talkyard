@@ -49,10 +49,14 @@ trait PageLinksDao {
 
 
   def getPageIdsLinkingTo(pageId: PageId, inclDeletedHidden: Boolean): Set[PageId] = {
+    require(!inclDeletedHidden, "TyE53KTDP6")  // for now
+    // Later: Incl inclDeletedHidden in key, or always load all links,
+    // and cache, per link, if the linking page is deleted or hidden?
+    RACE // [cache_race_counter] (02526SKB)
     memCache.lookup(
           linksToKey(pageId),
           orCacheAndReturn = Some {
-            loadPageIdsLinkingTo(pageId, inclDeletedHidden = inclDeletedHidden)
+            loadPageIdsLinkingTo(pageId, inclDeletedHidden = false)
           }).get
   }
 
@@ -63,9 +67,13 @@ trait PageLinksDao {
 
 
   private def uncacheLinksToPagesLinkedFrom(pageId: PageId): Unit = {
-    val linkedPageIds: Set[PageId] = getPageIdsLinkedFrom(pageId)
-    linkedPageIds.foreach { id =>
+    // Maybe because of a race, the database and cache knows about slightly
+    // different links? So uncache based on both?
+    val linkedPageIds = loadPageIdsLinkedFrom(pageId)
+    val moreIds: Set[PageId] = getPageIdsLinkedFrom(pageId)
+    (linkedPageIds ++ moreIds).foreach { id =>
       memCache.remove(linksToKey(id))
+      RACE // [cache_race_counter]  might incorrectly get added back here (02526SKB)
     }
   }
 
