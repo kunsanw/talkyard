@@ -72,9 +72,9 @@ case class NotificationGenerator(
       return generatedNotifications  // [no_title_notfs]
 
     val anyNewTextAndHtml: Option[TextAndHtml] = sourceAndHtml.map({
-      case tah: TextAndHtml => tah
+      case t: TextAndHtml => t
       case _ =>
-        dieIf(Globals.isDevOrTest, "TyE305KTUDP3")
+        dieIf(Globals.isDevOrTest, "TyE305KTUDP3", "Got a TitleSourceAndHtml")
         return generatedNotifications
     })
 
@@ -593,13 +593,12 @@ case class NotificationGenerator(
     }
 
     val anyNewTextAndHtml: Option[TextAndHtml] = anyNewSourceAndHtml map {
+      case t: TextAndHtml => t
       case _: TitleSourceAndHtml =>
         // Currently titles cannot mention people, and editing it generates no notfs.
         // However, maybe later staff wants to get notified if titles of "important"
         // pages somehow get changed. For now, do nothing though. [no_title_notfs]
         return Notifications.None  // or: return generatedNotifications? the same?
-      case x: TextAndHtml =>
-        x
     }
 
     anyAuthor = Some(tx.loadTheParticipant(newPost.createdById))

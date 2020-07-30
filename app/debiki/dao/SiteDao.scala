@@ -206,10 +206,10 @@ class SiteDao(
     val staleStuff = new StaleStuff()
     val result: R = readWriteTransaction(tx => {
       val r = fn(tx, staleStuff)
-      tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
+      tx.markPagesHtmlStale(staleStuff.stalePageIdsMemCacheAndDb)
       r
     }, allowOverQuota)
-    (staleStuff.stalePageIdsInDb
+    (staleStuff.stalePageIdsMemCacheAndDb
           ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
     result
   }

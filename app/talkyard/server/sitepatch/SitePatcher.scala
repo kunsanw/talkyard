@@ -573,9 +573,8 @@ case class SitePatcher(globals: debiki.Globals) {
                   // If importing 9999 posts and pages, would need to convert from CommonMark
                   // to html in an external process / server? [ext_markup_processor]
                   postRealIdsNrsMaybeHtml.copy(
-                        approvedHtmlSanitized = Some(
-                          Jsoup.clean(
-                            approvedSource, TextAndHtml.relaxedHtmlTagWhitelist)))
+                        approvedHtmlSanitized = Some(TextAndHtml.sanitizeRelaxed(
+                            approvedSource)))
                 }
             }
 

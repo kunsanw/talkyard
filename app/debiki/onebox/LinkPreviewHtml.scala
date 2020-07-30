@@ -24,7 +24,7 @@ import debiki.TextAndHtml.safeEncodeForHtml
 
 
 
-object LinkPreviewHtml {   CR_DONE  // 07-13 .
+object LinkPreviewHtml {   CR_DONE  // 07-13 & 07-30 .
 
 
   def safeAside(safeHtml: String, extraLnPvCssClasses: String,
@@ -33,21 +33,21 @@ object LinkPreviewHtml {   CR_DONE  // 07-13 .
 
     require(safeEncodeForHtml(extraLnPvCssClasses) == extraLnPvCssClasses, "TyE06RKTDH2")
 
+    // 'noopener' stops [reverse_tabnabbing], prevents the new browser tab from
+    // redirecting the current browser tab to, say, a phishing site.
+    // 'ugc' means User-generated-content. There's also  "sponsored", which must
+    // be used for paid links (or "nofollow" is also ok, but not "ugc" — search
+    // engines can penalize that).
+    // rel=nofollow also added here: [rel_nofollow].
+    val relAttrs = "nofollow noopener ugc"
+
     <aside class={s"onebox s_LnPv $extraLnPvCssClasses clearfix"}>{
         // The html should have been sanitized already (that's why the param
         // name is *safe*Html).
         scala.xml.Unparsed(safeHtml)
       }{ if (!addViewAtLink) xml.Null else {
         <div class="s_LnPv_ViewAt"
-          ><a href={unsafeUrl} target="_blank" rel={
-                // 'noopener' stops [reverse_tabnabbing], prevents the new
-                // browser tab from redirecting the current browser tab to,
-                // say, a phishing site.
-                // 'ugc' means User-generated-content. There's also  "sponsored",
-                // which must be used for paid links (or "nofollow" is also ok,
-                // but not "ugc" — search engines can penalize that).
-                // rel=nofollow also added here: [rel_nofollow].
-                "nofollow noopener ugc"}>{
+          ><a href={unsafeUrl} target="_blank" rel={relAttrs}>{
             "View at " + unsafeProviderName.getOrElse(unsafeUrl)  // I18N
             } <span class="icon-link-ext"></span></a
         ></div>
@@ -62,7 +62,8 @@ object LinkPreviewHtml {   CR_DONE  // 07-13 .
     val safeUrl = safeEncodeForHtml(unsafeUrl)
     val safeLinkTag =
           s"""<a href="$safeUrl" class="s_LnPv_L s_LnPv_L-Err" """ +
-              s"""target="_blank" rel="nofollow noopener">$safeUrl</a>"""
+              s"""target="_blank" rel="nofollow noopener">""" +
+              s"""$safeUrl <span class="icon-link-ext"></span></a>"""
     val errInBrackets = if (errorCode.isEmpty) "" else s" <code>[$errorCode]</code>"
     val safeHtml =
           s"""<div>$safeProblem $safeLinkTag$errInBrackets</div>"""

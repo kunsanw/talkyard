@@ -24,7 +24,7 @@ package debiki.onebox.engines
 
 import debiki.Globals
 import debiki.onebox._
-import debiki.TextAndHtml.safeEncodeForHtml
+import debiki.TextAndHtml
 import org.scalactic.Good
 import scala.util.matching.Regex
 
@@ -50,7 +50,7 @@ class ImagePrevwRendrEng(globals: Globals)
           else
             unsafeUrl
 
-    val safeUrl = safeEncodeForHtml(betterUrl)
+    val safeUrl = TextAndHtml.safeEncodeForHtml(betterUrl)
 
     Good(s"<a href='$safeUrl' rel='nofollow noopener' target='_blank'><img src='${
           safeUrl}'></a>")

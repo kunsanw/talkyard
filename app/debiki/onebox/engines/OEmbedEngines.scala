@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// CR_DONE except for rename file to  LinkPreviewEngines
+// CR_DONE  + a bit again 07-30,  except for rename file to  LinkPreviewEngines   .
 
 package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview.engines
 
@@ -222,7 +222,7 @@ class InstagramPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boo
 }
 
 
-//CR_DONE
+//CR_DONE .
 // ====== Internal links
 
 // Talkayrd internal links, i.e. to other pages within the same site.
@@ -284,9 +284,15 @@ class InternalLinkPrevwRendrEng(globals: Globals, siteId: SiteId)
     val safeUrlAttr = TextAndHtml.safeEncodeForHtmlAttrOnly(unsafeUrl)
     val safeTitle = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeTitle)
     val safeLink = s"""<a href="$safeUrlAttr">$safeTitle</a>"""
-    var safePreview =
-          if (unsafeExcerpt.isEmpty) safeLink
+    var safePreview: String =
+          if (unsafeExcerpt.isEmpty) {
+            // This is either an inline link inside a paragraph — then just
+            // show the title. Or a link to a page that apparently is empty,
+            // no excerpt — weird.
+            safeLink
+          }
           else {
+            // This'll get wrapped in an <aside>.  [lnpv_aside]
             val safeExcerpt = TextAndHtml.safeEncodeForHtmlContentOnly(unsafeExcerpt)
             s"""<div>$safeLink</div><blockquote>$safeExcerpt</blockquote>"""
           }
@@ -355,9 +361,7 @@ class RedditPrevwRendrEng(globals: Globals, siteId: SiteId, mayHttpFetch: Boolea
 
 
 object TelegramPrevwRendrEng {
-
   val regex: Regex = """^https://t\.me/([a-zA-Z0-9]+/[0-9]+)$""".r
-
 }
 
 class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
@@ -425,11 +429,11 @@ class TelegramPrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(g
     // So let's copy-paste Telegram's iframe code to here, and sandbox it.
     // This'll be slightly fragile, in that it'll break if Telegram makes "major"
     // change to their iframe and its url & params.
-    val safeTelegramIframeUrl =
+    val safeIframeUrlAttr =
           TextAndHtml.safeEncodeForHtmlAttrOnly(s"$unsafeUrl?embed=1")
 
     val safeSandboxedIframe =
-          s"""<iframe sandbox="$permissions" src="$safeTelegramIframeUrl"></iframe>"""
+          s"""<iframe sandbox="$permissions" src="$safeIframeUrlAttr"></iframe>"""
     // Telegarm's script would add: (I suppose the height is via API?)
     //  width="100%" height="" frameborder="0" scrolling="no"
     //  style="border: none; overflow: hidden; min-width: 320px; height: 96px;">

@@ -21,7 +21,7 @@ import com.debiki.core._
 import debiki.dao._
 
 
-package object dao {  CR_DONE // 07-0
+package object dao {  CR_DONE // 07-30 .
 
 
   /** Remembers things that got out-of-date and should be uncached,
@@ -37,21 +37,18 @@ package object dao {  CR_DONE // 07-0
     */
   class StaleStuff {
     private var _stalePageIdsMemCacheOnly: Set[PageId] = Set.empty
-    private var _stalePageIdsInDb: Set[PageId] = Set.empty
+    private var _stalePageIds: Set[PageId] = Set.empty
 
-    def stalePageIdsInDb: Set[PageId] =
-      _stalePageIdsInDb
-
-    def stalePageIdsMemCacheOnly: Set[PageId] =
-      _stalePageIdsMemCacheOnly
+    def stalePageIdsMemCacheAndDb: Set[PageId] = _stalePageIds
+    def stalePageIdsMemCacheOnly: Set[PageId] = _stalePageIdsMemCacheOnly
 
     def addPageId(pageId: PageId, memCacheOnly: Boolean): Unit = {
       if (memCacheOnly) _stalePageIdsMemCacheOnly += pageId
-      else _stalePageIdsInDb += pageId
+      else _stalePageIds += pageId
     }
 
     def addPageIds(pageIds: Set[PageId]): Unit = {
-      _stalePageIdsInDb ++= pageIds
+      _stalePageIds ++= pageIds
     }
   }
 

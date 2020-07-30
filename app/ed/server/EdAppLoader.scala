@@ -1,11 +1,9 @@
 package ed.server
 
 import com.debiki.core._
-import debiki.onebox.LinkPreviewRenderer
-import debiki.{Globals, RateLimiter, Nashorn, TextAndHtmlMaker}
+import debiki.{Globals, RateLimiter, Nashorn}
 import ed.server.http.{PlainApiActions, SafeActions}
 import ed.server.security.EdSecurity
-import play.{api => p}
 import play.api._
 import play.api.http.FileMimeTypes
 import play.api.libs.ws.ahc.AhcWSComponents

@@ -1235,6 +1235,7 @@ package object core {
   def HACK = ()           // Quick crazy fix, probably should be redone later in a better way.
   def DELETE_LATER = ()   // ... hmm. Rename to CLEANUP.
   def DO_AFTER = ()       // Something that should be done after a certain date.
+  def FIX_AFTER = ()      // Bug to fix after a certain date.
   def REMOVE = ()
   def CLEAN_UP = ()       // Unused stuff that should be deleted after a grace period, or when
                           // the developers are less short of time.

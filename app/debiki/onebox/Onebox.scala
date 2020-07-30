@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// SHOULD_CODE_REVIEW later and the tests too.  !
+// CR_DONE 07-30  but not the tests
 
 package debiki.onebox   // RENAME to talkyard.server.linkpreviews
 
@@ -106,15 +106,30 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
   protected def addViewAtLink = true
 
   // (?:...) is a non-capturing group.  (for local dev search: /-/u/ below.)
-  val uploadsLinkRegex: Regex =
-    """=['"](?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)['"]""".r
+  private def makeUploadsLinkRegexStr(q: Char) =
+    s"""=$q(?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)$q"""
+
+  private val uploadsLinkRegexSingleQuote: Regex = makeUploadsLinkRegexStr('\'').r
+  private val uploadsLinkRegexDoubleQuote: Regex = makeUploadsLinkRegexStr('"').r
 
 
   private def pointUrlsToCdn(safeHtml: String): String = {
     val prefix = globals.config.cdn.uploadsUrlPrefix getOrElse {
       return safeHtml
     }
-    uploadsLinkRegex.replaceAllIn(safeHtml, s"""="$prefix$$1"""")
+
+    // What if this is a link to *another* Talkyard site, which uses a different
+    // CDN or no CDN? Then shouldn't point the links to our CDN. Harmless today, 2020-07.
+    BUG; FIX_AFTER // 2021-01 Skip links with different pub site id or origin. [cdn_nls]
+
+    SEC_TESTS_MISSING // Better keep single / double quote style — otherwise, look:
+    //    <div attr=" ='upl-url' > <script>alert(1)</script>">
+    // would become:
+    //    <div attr=" ="upl-url" > <script>alert(1)</script>">
+    // looks as if that could have been an xss attack?
+    var result = uploadsLinkRegexSingleQuote.replaceAllIn(safeHtml, s"""='$prefix$$1'""")
+    result = uploadsLinkRegexDoubleQuote.replaceAllIn(result, s"""="$prefix$$1"""")
+    result
   }
 
 
@@ -122,8 +137,8 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
 
     // ----- Any cached preview?
 
-    // This prevents pg strorage DoS.  [ln_pv_netw_err]
-    COULD_OPTIMIZE // hash the url = Redis key, so shorter?
+    // This prevents pg storage DoS.  [ln_pv_netw_err]
+    COULD_OPTIMIZE // As Redis key, use a url hash, so shorter?
     val redisCache = new RedisCache(urlAndFns.siteId, globals.redisClient, globals.now)
     redisCache.getLinkPreviewSafeHtml(urlAndFns.unsafeUrl) foreach { safeHtml =>
       SHOULD // if preview broken *and* if (urlAndFns.mayHttpFetch):
@@ -137,7 +152,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
 
     // Or generate instantly.
 
-    val futureHtml = loadAndRender(urlAndFns)
+    val futureHtml: Future[String Or LinkPreviewProblem] = loadAndRender(urlAndFns)
 
     // ----- Sanitize
 
@@ -164,14 +179,14 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
 
       // But also need to add rel="noopener" (or "noopener"), so any
       // target="_blank" linked page cannot access window.opener and change
-      // it's location to e.g. a pishing site, e.g.:
+      // it's location to e.g. a phishing site, e.g.:
       //    window.opener.location = 'https://www.example.com';
       //
       // https://web.dev/external-anchors-use-rel-noopener/
       //  when you use target="_blank", always add rel="noopener" or rel="noopener"
       //
       // Extra security check:
-      DO_AFTER // 2020-10-01 remove this extra check.
+      DO_AFTER // 2020-11-01 remove this extra check.
       // This might break previews with '_blank' in any text / description loaded
       // via OpenGraph or html tags — but Talkyard doesn't support that yet,
       // so, for now, this is fine:
@@ -184,6 +199,9 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
                   safeHtml}</pre>.toString
       }
 
+      SECURITY; SHOULD // do with Jsoup, from TextAndHtml.sanitizeRelaxed, [cdn_nls]
+      // or a  fix-links  fn if sanitized already.
+
       // Don't link to any HTTP resources from safe HTTPS pages, e.g. don't link  [1BXHTTPS]
       // to <img src="http://...">, change to https instead even if the image then breaks.
       // COULD leave <a href=...> HTTP links as is so they won't break. And also leave
@@ -195,7 +213,8 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
 
       val lnPvErr = if (htmlOrError.isBad) "s_LnPv-Err " else ""
 
-      safeHtml = LinkPreviewHtml.safeAside(
+      BUG // here urlAndFns.unsafeUrl won't point to the CDN? Doesn't really matter [cdn_nls]
+      safeHtml = LinkPreviewHtml.safeAside(   // [lnpv_aside]
             safeHtml = safeHtml, extraLnPvCssClasses = lnPvErr + extraLnPvCssClasses,
             unsafeUrl = urlAndFns.unsafeUrl, unsafeProviderName = providerName,
             addViewAtLink = addViewAtLink)
@@ -253,17 +272,18 @@ abstract class InstantLinkPrevwRendrEng(globals: Globals)
 
 
 /** What is a link preview? If you type a link to a Twitter tweet or Wikipedia page,
-  * Talkyard might download some html from that page, e.g. title, image, description.
-  * Or oEmbed html.
+  * Talkyard might download some html from that page, e.g. title, image, description,
+  * or oEmbed html.
   *
-  * This usually requires the server to download the linked page from the target website,
+  * This usually requires the server to http fetch the linked page,
   * and extract the relevant parts. When rendering client side, the client sends a request
   * to the Talkyard server and asks it to create a preview. This needs to be done
   * server side, e.g. for security reasons (cannot trust the client to provide
   * the correct html preview).
   *
-  * If !mayHttpFetch, only creates previews if link preview data
-  * has been downloaded and saved already in link_previews_t.
+  * If !mayHttpFetch, only creates previews if link preview data has been
+  * downloaded and saved already in link_previews_t, or if can be constructed
+  * without any external fetch (e.g. well known url patterns, like YouTue video links).
   */
 class LinkPreviewRenderer(
   val globals: Globals,
@@ -276,8 +296,8 @@ class LinkPreviewRenderer(
   private val PlaceholderPrefix = "onebox-"
   private val NoEngineException = new DebikiException("DwE3KEF7", "No matching preview engine")
 
+  COULD_OPTIMIZE // These are, or can be made thread safe — no need to recreate all the time.
   private val engines = Seq[LinkPreviewRenderEngine](
-    // COULD_OPTIMIZE These are, or can be made thread safe — no need to recreate all the time.
     new InternalLinkPrevwRendrEng(globals, siteId),
     new ImagePrevwRendrEng(globals),
     new VideoPrevwRendrEng(globals),
@@ -328,7 +348,7 @@ class LinkPreviewRenderer(
           s"Trying to save link preview, when may not fetch: ${linkPreview.link_url_c}")
     val siteDao = globals.siteDao(siteId)
     siteDao.writeTx { (tx, _) =>
-      COULD // refresh pages that link to this preview, add to StaleStuff.
+      COULD // refresh pages that include this link preview, add to [staleStuff].
       tx.upsertLinkPreview(linkPreview)
     }
   }
@@ -364,7 +384,7 @@ object LinkPreviewRenderer {
   */
 // CHANGE to  LinkPreviewCache(siteTx: ReadOnlySiteTransaction) ?
 // But sometimes Nashorn is used inside a tx — would mean we'd open a *read-only*
-// tx inside a posibly write tx. Should be fine, right.
+// tx inside a possibly write tx. Should be fine, right.
 // Or construct the LinkPreviewCache outside Nashorn, with any tx already in use,
 // and give to Nashorn?
 class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer)
@@ -393,6 +413,7 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
     linkPreviewRenderer.fetchRenderSanitizeInstantly(unsafeUrl, inline = inline) match {
       case RenderPreviewResult.NoPreview =>
         UX; COULD // target="_blank" — maybe site conf val? [site_conf_vals]
+        // Then don't forget  noopener
         s"""<a href="$safeUrl" rel="nofollow">$safeUrl</a>"""
       case donePreview: RenderPreviewResult.Done =>
         donePreviews.append(donePreview)
@@ -401,7 +422,7 @@ class LinkPreviewRendererForNashorn(val linkPreviewRenderer: LinkPreviewRenderer
         // the sanitizer has been run.
         donePreview.placeholder
       case pendingPreview: RenderPreviewResult.Loading =>
-        // We cannot call out to external servers from here. That should have been
+        // We cannot http fetch from external servers from here. That should have been
         // done already, and the results saved in link_previews_t.
         logger.warn(s"No cached preview for: '$unsafeUrl' [TyE306KUT5]")
         i"""

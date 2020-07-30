@@ -26,7 +26,7 @@ import play.api.libs.json.JsObject
 import play.api.libs.ws.WSRequest
 import scala.concurrent.Future
 
-// SHOULD_CODE_REVIEW this whole file.
+// CR_DONE  07-30
 
 
 /* Example oEmbed response json, this from Twitter:
@@ -58,7 +58,7 @@ import scala.concurrent.Future
   *
   *   - Add more well-known oEmbed providers.
   *
-  *   - Unknown link domain? Then, fetch linked page,
+  *   - Unknown domain? E.g. https://unknown.org/a/link. Then, fetch linked page,
   *     - use any oEmbed api url tag,
   *     - use any OpenGraph tags,
   *     - use any html < title> and < description> tags
@@ -67,11 +67,11 @@ import scala.concurrent.Future
   *     functionality)
   *
   *   - Safelist some providers that Talkyard considers okay safe
-  *     — their html & script can run in Talkyard's pages.
+  *     — admins can let their html & script can run in Talkyard's pages.
   *     But by default, they're all sandboxed and/or sanitized.
   *
-  *   - Let admins allowlist a subset of those safelisted providers
-  *     — now, those providers' scripts & stuff in Ty's pages, and is trusted.
+  *   - Let admins allowlist a subset of those safelisted providers,
+  *     to let those providers' scripts run in Ty's pages.
   *
   *   - Let admins optionally allow *all* safelisted providers,
   *     combined with a blocklist, if there're a few providers the admins
@@ -141,7 +141,7 @@ abstract class OEmbedLinkPrevwRendrEng(
         case 0 =>
           // Currently won't happen, [ln_pv_netw_err].
           return FutBad(LinkPreviewProblem(
-                networkError, unsafeUrl = unsafeUrl, errorCode = "TyELNP0"))
+                networkError, unsafeUrl = unsafeUrl, errorCode = "TyELNPVNETW0"))
         case x =>
           return FutBad(LinkPreviewProblem(
                 weirdStatusError(x), unsafeUrl = unsafeUrl, errorCode = "TyELNPVWUNK"))
@@ -160,22 +160,22 @@ abstract class OEmbedLinkPrevwRendrEng(
 
     if (!params.mayHttpFetch) {
       // This can happen if one types and saves a new post really fast, before
-      // preview data has been downloaded? (so not yet found in cache above)
+      // preview data has been http-fetched? (so not yet found in cache above)
       return FutBad(LinkPreviewProblem(
             s"No preview for $providerWidget: ", // [0LNPV]
             unsafeUrl = unsafeUrl, errorCode = "TyE0LNPV"))
     }
 
     val request: WSRequest = globals.wsClient.url(downloadUrl)
-    val response: Future[play.api.libs.ws.WSResponse] = request.get()
+    val futureResponse: Future[play.api.libs.ws.WSResponse] = request.get()
 
 
     // ----- Handle response
 
-    response.map({ r: request.Response =>
+    futureResponse.map({ response: request.Response =>
       // These can be problems with the provider, rather than Talkyard? E.g. if
       // a Twitter tweet is gone, it's nice to see a "Tweet not found" message?
-      var problem = r.status match {
+      var problem = response.status match {
         case 404 => notFoundError
         case 429 => rateLimitedError
         case 200 => "" // continue below
@@ -184,14 +184,15 @@ abstract class OEmbedLinkPrevwRendrEng(
 
       // There has to be a max-json-length restriction. There's a db constraint:
       val dbJsonMaxLength = 27*1000 // [oEmb_json_len]
-      if (problem.isEmpty && r.bodyAsBytes.length > (dbJsonMaxLength - 2000)) {
-        problem = s"Too large $provdrOrUnk oEmbed response: ${r.bodyAsBytes.length} bytes json"
+      if (problem.isEmpty && response.bodyAsBytes.length > (dbJsonMaxLength - 2000)) {
+        problem = s"Too large $provdrOrUnk oEmbed response: ${
+              response.bodyAsBytes.length} bytes json"
       }
 
       val unsafeJsObj: JsObject = if (problem.nonEmpty) JsObject(Nil) else {
         try {
-          // What does r.json do if response not json? (harmless — there's try-catch)
-          r.json match {
+          // What does response.json do if response not json? (harmless — there's try-catch)
+          response.json match {
             case jo: JsObject => jo
             case _ =>
               problem = s"Got $provdrOrUnk json but it's not a json obj, request url: "
@@ -205,8 +206,8 @@ abstract class OEmbedLinkPrevwRendrEng(
         }
       }
 
-      val anyUnsafeHtml =
-            if (problem.isEmpty) (unsafeJsObj \ "html").asOpt[String]
+      val anyUnsafeHtml: Option[String] =
+            if (problem.isEmpty) (unsafeJsObj \ "html").asOpt[String].trimNoneIfBlank
             else None
 
       if (problem.isEmpty && anyUnsafeHtml.isEmpty) {
@@ -219,13 +220,13 @@ abstract class OEmbedLinkPrevwRendrEng(
                 problem, unsafeUrl = unsafeUrl, errorCode = "TyELNPVRSP"))
         }
         else {
-          SECURITY // incl in quota? num preview links * X
+          SECURITY; QUOTA // incl in quota? num preview links * X  [lnpv_quota]
           val preview = LinkPreview(
                 link_url_c = unsafeUrl,
                 downloaded_from_url_c = downloadUrl,
                 downloaded_at_c = globals.now(),
                 // cache_max_secs_c — skip for now
-                status_code_c = r.status,
+                status_code_c = response.status,
                 preview_type_c = LinkPreviewTypes.OEmbed,
                 first_linked_by_id_c = params.requesterId,
                 content_json_c = unsafeJsObj)

@@ -441,7 +441,7 @@ case class SimpleSitePatch(
       // Dupl code [IMPCORH]
       val bodyHtmlSanitized =
         if (bodyMarkupLang is MarkupLang.Html) {
-          Jsoup.clean(bodySource, TextAndHtml.relaxedHtmlTagWhitelist)
+          TextAndHtml.sanitizeRelaxed(bodySource)
         }
         else {
           val postRenderSettings = dao.makePostRenderSettings(pageMeta.pageType)
@@ -595,7 +595,7 @@ case class SimpleSitePatch(
       // Dupl code [IMPCORH]
       val htmlSanitized =
         if (postPatch.bodyMarkupLang is MarkupLang.Html) {
-          Jsoup.clean(postPatch.bodySource, TextAndHtml.relaxedHtmlTagWhitelist)
+          TextAndHtml.sanitizeRelaxed(postPatch.bodySource)
         }
         else {
           val postRenderSettings = dao.makePostRenderSettings(pageMeta.pageType)

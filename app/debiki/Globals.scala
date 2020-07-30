@@ -101,7 +101,8 @@ class E2eTestCounters {
 }
 
 
-class Globals(
+class Globals(  // RENAME to TyApp? or AppContext? TyAppContext? variable name = appCtx
+                // But then rename EdContext  to ... what?
   private val appLoaderContext: p.ApplicationLoader.Context,
   val executionContext: scala.concurrent.ExecutionContext,
   val wsClient: WSClient,

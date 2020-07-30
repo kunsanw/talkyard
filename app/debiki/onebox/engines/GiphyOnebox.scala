@@ -22,9 +22,8 @@ import com.debiki.core.Prelude._
 import debiki.Globals
 import debiki.TextAndHtml.safeEncodeForHtml
 import debiki.onebox._
-import org.scalactic.{Bad, ErrorMessage, Good, Or}
+import org.scalactic.{Bad, Good, Or}
 import scala.util.matching.Regex
-import scala.util.{Failure, Success, Try}
 
 
 class GiphyPrevwRendrEng(globals: Globals)
@@ -44,6 +43,7 @@ class GiphyPrevwRendrEng(globals: Globals)
 
   override val alreadySanitized = true
 
+
   def renderInstantly(unsafeUrl: String): String Or LinkPreviewProblem = {
     val unsafeId = findIdRegex.findGroupIn(unsafeUrl) getOrElse {
       return Bad(LinkPreviewProblem(
@@ -61,7 +61,7 @@ class GiphyPrevwRendrEng(globals: Globals)
      <iframe src="https://giphy.com/embed/$safeId"
        width="480" height="400" frameBorder="0" class="giphy-embed" allowFullScreen>
      </iframe>
-      """)
+      """.trim)
   }
 
 }

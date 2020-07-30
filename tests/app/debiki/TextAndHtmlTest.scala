@@ -130,7 +130,7 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
     }
 
     "sanitize posts  TyT03386KTDGR" - {
-      import TextAndHtml.{sanitizePost => sanPost}
+      def sanPost(html: String) = TextAndHtml.sanitizeRelaxed(html)
 
       "remove <script> and anything inside" in {
         checkRemovesScriptTags(sanPost)
@@ -168,6 +168,11 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
       "change rel=follow to 'nofollow noopener'  if _blank  —  oh, removes _blank" in {
         sanPost("""<a href="https://x.co" target="_blank" rel="follow">x.co</a>""") mustBe
               """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
+      }
+
+      "disallow <h1> and <h2>,  but <h3>  is ok  ?" in {
+        sanPost("<h1>hh11</h1> <h2>hh22<h2> <h3>hh33</h3> <h4>hh44</h4>") mustBe
+              "hh11 hh22 <h3>hh33</h3> <h4>hh44</h4>"
       }
 
       "compact posts html output" in {

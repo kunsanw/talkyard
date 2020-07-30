@@ -10,7 +10,7 @@ Instead of this file, maybe use a combination of:
  (- https://github.com/google/git-appraise )
 
 [ty_themes]
-Primary button colors, secondary, background, arrows,
+Primary button colors, secondary, background, arrows, fonts,
 and embedded widgets, e.g. Twitter's oEmbed has a 'link_color: #223344' attr,
                             and  theme=light/dark.
 

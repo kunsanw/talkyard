@@ -17,7 +17,7 @@
 
 /// <reference path="prelude.ts" />
 
-// CR_DONE
+// CR_DONE .
 
 //------------------------------------------------------------------------------
    namespace debiki2 {
@@ -32,7 +32,7 @@ export function listenForLinkPreviewIframeSizeMessages() {
 function onMessageFromChildIframe(event: WindowEventMap['message']) {
   // TESTS_MISSING  TyT037MKAH24
 
-  console.debug('onMessageFromChildIframe: ' + JSON.stringify(event.data));
+  logT('onMessageFromChildIframe: ' + JSON.stringify(event.data));
   if (!_.isArray(event.data))
     return;
 
@@ -45,7 +45,7 @@ function onMessageFromChildIframe(event: WindowEventMap['message']) {
     return;
 
   let height: number = maybeHeight;
-  console.debug(`oEmbed ifame height: ${height}  says frame: ${event.origin}`);
+  logT(`oEmbed ifame height: ${height}  says frame: ${event.origin}`);
 
   // Not too small or too tall, what about:
   if (height < 30) height = 30;
@@ -63,7 +63,7 @@ function onMessageFromChildIframe(event: WindowEventMap['message']) {
   else {
     // The iframe just disappeared? Maybe an editor preview refreshed & changed,
     // or some React component got unmounted.
-    console.trace(`No iframe found for message from: ` + event.origin);
+    logT(`No iframe found for message from: ` + event.origin);
   }
 }
 

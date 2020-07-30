@@ -32,7 +32,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
   self: RdbSiteTransaction =>
 
 
-  override def upsertLinkPreview(linkPreview: LinkPreview): Unit = {
+  override def upsertLinkPreview(linkPreview: LinkPreview): Unit = {  QUOTA  // [lnpv_quota]
     val upsertStatement = s"""
           insert into link_previews_t (
               site_id_c,
@@ -104,7 +104,7 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  override def upsertLink(link: Link): Boolean = {
+  override def upsertLink(link: Link): Boolean = {   QUOTA
     val upsertStatement = s"""
           insert into links_t (
               site_id_c,

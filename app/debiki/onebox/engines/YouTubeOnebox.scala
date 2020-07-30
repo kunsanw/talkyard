@@ -26,9 +26,8 @@ import com.debiki.core.Prelude._
 import debiki.onebox._
 import java.{net => jn}
 import debiki.Globals
-import debiki.TextAndHtml.safeEncodeForHtml
-import org.scalactic.{Bad, ErrorMessage, Good, Or}
-import scala.util.matching.Regex
+import debiki.TextAndHtml
+import org.scalactic.{Bad, Good, Or}
 
 
 class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(globals) {
@@ -60,7 +59,6 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(gl
                 unsafeUrl = safeUrl, errorCode = "TyEYOUTBID_"))
         }
 
-        val safeId = safeEncodeForHtml(unsafeVideoId)
         val unsafeParams = findParams(javaUri) getOrElse {
           return Bad(LinkPreviewProblem(
                 "Bad YouTube video URL, cannot create preview",
@@ -77,16 +75,19 @@ class YouTubePrevwRendrEng(globals: Globals) extends InstantLinkPrevwRendrEng(gl
         // So, needs site origin too.
         // Re-render if origin changes :-(  ?  (new Talkyard hostname)  [html_json]
 
-        val safeParams = safeEncodeForHtml(unsafeParams)
+        val safeSrcAttr = TextAndHtml.safeEncodeForHtmlAttrOnly(
+              s"https://www.youtube.com/embed/$unsafeVideoId?wmode=opaque&$unsafeParams")
+
         // wmode=opaque makes it possible to cover the iframe with a transparent div,
         // which Utterscroll needs so the iframe won't steal mouse move events.
         // The default wmode is windowed which in effect places it above everything.
         // See http://stackoverflow.com/questions/3820325/overlay-opaque-div-over-youtube-iframe
         // Seems wmode might not be needed in Chrome today (June 2015) but feels better to
         // add it anyway.
-        Good(o"""
-          <iframe src="https://www.youtube.com/embed/$safeId?wmode=opaque&$safeParams"
-              frameborder="0" allowfullscreen></iframe>""")
+        SECURITY; COULD // sandbox YouTube iframe by default. Later.
+        Good(
+            s"""<iframe src="$safeSrcAttr" frameborder="0" allowfullscreen></iframe>""")
+
       case None =>
         // To do: Have a look at
         //  https://github.com/discourse/onebox/blob/master/lib/onebox/engine/youtube_onebox.rb

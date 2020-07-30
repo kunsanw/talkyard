@@ -167,10 +167,6 @@ object TextAndHtml {
           "sup", "u")
   }
 
-  def sanitizePost(unsafeHtml: String): String = {
-    compactClean(unsafeHtml, relaxedHtmlTagWhitelist)
-  }
-
   def sanitizeInternalLinksAndQuotes(unsafeHtml: String): String = {
     // TyT7J03SKD5
     compactClean(unsafeHtml,  new Whitelist()
@@ -196,24 +192,25 @@ object TextAndHtml {
 
   /** Links will have rel="nofollow noopener". ul, ol, code, blockquote and
     * much more is allowed.
+    *
+    * Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
+    * But it's slow, if importing a whole site. How deal with this?
+    * Maybe just let admins-that-import-a-site set a flag that everything has been
+    * sanitized already?_ COULD move server side js to external Nodejs or V8
+    * processes? So as not to block a thread here, running Nashorn? [external-server-js]
+    * Hmm, I think, instead, the answer:  [html_json] [save_post_lns_mentions]
+    *    Always incl both source text and sanitized html in posts_t (posts3),
+    * and when importing. Then there's no need to CommonMark-render any
+    * imported contents — that'd be done already. However, quickly sanitizing
+    * the  already-sanitized-html  via Jsoup is ok fast and still good to do?
     */
   def sanitizeRelaxed(unsafeHtml: String,
         amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
-    COULD // [disallow_h1_h2]
+    // Tested here: TyT03386KTDGR
     var whitelist = org.jsoup.safety.Whitelist.relaxed()
+          .removeTags("h1", "h2") // [disallow_h1_h2]
     whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
     compactClean(unsafeHtml, whitelist)
-  }
-
-  // Or could instead use  Nashorn.sanitizeHtml(text: String, followLinks: Boolean) ?
-  // But it's slow, if importing a whole site. How deal with this?
-  // Maybe just let admins-that-import-a-site set a flag that everything has been
-  // sanitized already?_ COULD move server side js to external Nodejs or V8
-  // processes? So as not to block a thread here, running Nashorn? [external-server-js]
-  def relaxedHtmlTagWhitelist: org.jsoup.safety.Whitelist = {
-    // Tested here: TyT03386KTDGR
-    COULD // [disallow_h1_h2]
-    addRelNofollowNoopener(org.jsoup.safety.Whitelist.relaxed())
   }
 
   private def addRelNofollowNoopener(whitelist: Whitelist): Whitelist = {

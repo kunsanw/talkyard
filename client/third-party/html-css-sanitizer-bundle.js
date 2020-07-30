@@ -4959,7 +4959,7 @@ function googleCajaSanitizeHtml(htmlTextUnsafe, allowClassAndIdAttr,
     }
   };
 
-    // CR_DONE
+    // CR_DONE .
     //var siteId = debiki2.ReactStore.allData().siteId;
     //if (siteId === 98) {  // doesn't work, site id not updated when just rendering markdown.
                             // instead, always rel=follow StackExchange links, for now.

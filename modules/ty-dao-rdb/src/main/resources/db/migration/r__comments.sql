@@ -48,22 +48,21 @@ like the following:
     VEP = https://victws/oembed?url=https://victws/widget
     and then later when someone tries to link to https://victws/widget,
     whose oEmbed endpoint is VEP for real,
-    then, if lookng up by downloaded_from_url_c = VEP only,
+    then, if looking up by downloaded_from_url_c = VEP only,
     there'd already be a link_previews_t row for VEP,
-    with link_url_c: https//atkws/widget (atkws not victws!)
-    (because VEP initially got saved via the request to https://atkws/widget)
-    that is, link_url_c would point to the attacker's site.
-    Not sure how this could be misused — since the actual oEmbed content
-    would get downloaded not from atkws, but from victws, which should
-    be safe, if victws does let one download oEmbed fro there? — But feels risky.
+    with link_url_c: https//atkws/widget — atkws not victws (!).
+    (Because VEP initially got saved via the request to https://atkws/widget.)
+    That is, link_url_c would point to the attacker's site.
+    Then, maybe other code in Talkyard adds a "View at: $link_url_c"
+    which would send a visitor to the attacker's website.
 
 But by including both link_url_c and downloaded_from_url_c in the primary key,
 that cannot happen — when looking up https://victws/widget + VEP,
 the attacker's entry wouldn't be found (because it's link_url_c is
 https://atkws/..., the wrong website).
 
-There's an index  linkpreviews_i_downl_err_at  you can use to maybe retry
-failed downlads after a while.
+There's an index  linkpreviews_i_downl_err_at  to maybe retry failed downlads
+after a while.
 $_$;
 
 
