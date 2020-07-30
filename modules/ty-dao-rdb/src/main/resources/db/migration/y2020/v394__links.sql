@@ -1,18 +1,17 @@
--- CR_DONE 07-12
 
 create table link_previews_t(
   site_id_c int not null,
   link_url_c varchar not null,
-  downloaded_from_url_c varchar not null,
-  downloaded_at_c timestamp not null,
+  fetched_from_url_c varchar not null,
+  fetched_at_c timestamp not null,
   cache_max_secs_c int,
   status_code_c int not null,
   preview_type_c int not null,
   first_linked_by_id_c int not null,
   content_json_c jsonb,
 
-  constraint linkpreviews_p_linkurl_downlurl primary key ( -- [lnpv_t_pk]
-      site_id_c, link_url_c, downloaded_from_url_c),
+  constraint linkpreviews_p_linkurl_fetchurl primary key (  -- [lnpv_t_pk]
+      site_id_c, link_url_c, fetched_from_url_c),
 
   -- fk index: linkpreviews_i_firstlinkedby
   constraint linkpreviews_firstlinkedby_r_pps foreign key (
@@ -22,8 +21,8 @@ create table link_previews_t(
   constraint linkpreviews_c_linkurl_len check (
       length(link_url_c) between 5 and 500),
 
-  constraint linkpreviews_c_downloadedfromurl_len check (
-      length(downloaded_from_url_c) between 5 and 500),
+  constraint linkpreviews_c_fetchedfromurl_len check (
+      length(fetched_from_url_c) between 5 and 500),
 
   constraint linkpreviews_c_cachemaxsecs check (
       cache_max_secs_c >= 0),
@@ -40,14 +39,14 @@ create table link_previews_t(
 
 
 create index linkpreviews_i_g_linkurl on link_previews_t (link_url_c);
-create index linkpreviews_i_g_downlat on link_previews_t (downloaded_at_c);
-create index linkpreviews_i_downlat on link_previews_t (site_id_c, downloaded_at_c);
+create index linkpreviews_i_g_fetchedat on link_previews_t (fetched_at_c);
+create index linkpreviews_i_fetchedat on link_previews_t (site_id_c, fetched_at_c);
 create index linkpreviews_i_firstlinkedby on link_previews_t (site_id_c, first_linked_by_id_c);
 
-create index linkpreviews_i_g_downl_err_at on link_previews_t (downloaded_at_c)
+create index linkpreviews_i_g_fetch_err_at on link_previews_t (fetched_at_c)
     where status_code_c <> 200;
 
-create index linkpreviews_i_downl_err_at on link_previews_t (site_id_c, downloaded_at_c)
+create index linkpreviews_i_fetch_err_at on link_previews_t (site_id_c, fetched_at_c)
     where status_code_c <> 200;
 
 
@@ -86,14 +85,14 @@ create table links_t(
       references posts3 (site_id, unique_post_id),
 
   -- fk index: links_i_toppid
-  constraint links_topp_r_pps foreign key (site_id_c, to_pp_id_c)
+  constraint links_toppid_r_pps foreign key (site_id_c, to_pp_id_c)
       references users3 (site_id, user_id),
 
   -- fk idnex: links_i_totagid
   -- constranit  tag refs tag_defs_t  — table not yet created
 
   -- fk index: links_i_tocategoryid
-  constraint links_tocat_r_categories foreign key (site_id_c, to_category_id_c)
+  constraint links_tocatid_r_categories foreign key (site_id_c, to_category_id_c)
       references categories3 (site_id, id),
 
   constraint links_c_linkurl_len check (

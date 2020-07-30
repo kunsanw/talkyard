@@ -673,7 +673,7 @@ class SpamChecker(
     */
 
     // Consider this spam if there's any link with a raw ip address.
-    textAndHtml.linkIpAddresses.headOption foreach { ipAddress =>
+    textAndHtml.extLinkIpAddresses.headOption foreach { ipAddress =>
       return Vector(successful(SpamCheckResult.SpamFound(
         spamCheckerDomain = "localhost",
         humanReadableMessage =
@@ -682,7 +682,7 @@ class SpamChecker(
           to be spam. [TyE4PUM2]""")))
     }
 
-    val domainsToCheck = textAndHtml.linkDomains // TODO: scrubDomains(textAndHtml.linkDomains)...
+    val domainsToCheck = textAndHtml.extLinkDomains // TODO: scrubDomains(textAndHtml.linkDomains)...
       // (Skip example.com, so can be used in e2e tests without the tests failing because of
       // "spam" detected here.)
       .filterNot(d => d.endsWith(".example.com") || d == "example.com")

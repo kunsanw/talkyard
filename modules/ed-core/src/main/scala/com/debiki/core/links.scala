@@ -30,19 +30,19 @@ object LinkPreviewTypes {
   val OEmbed = 3
 }
 
-/** Both link_url_c and downloaded_from_url_c are part of the database primary key
+/** Both link_url_c and fetched_from_url_c are part of the database primary key
   * — otherwise an attacker's website A could slightly mess upp the
   * LinkPreiew data for another website, see: [lnpv_t_pk].
   *
   * @param link_url_c: The thing to embed.
-  * @param downloaded_from_url_c:
-  *  Previews for the same link url can get downloaded with different oEmbed
+  * @param fetched_from_url_c:
+  *  Previews for the same link url can get fetched with different oEmbed
   *  maxwidth=... etc params, for different device sizes / resolutions,
-  *  and each params combination is then a different downloaded_from_url_c.
-  *  For OpenGraph, downloaded_from_url_c is the same as link_url_c,
+  *  and each params combination is then a different fetched_from_url_c.
+  *  For OpenGraph, fetched_from_url_c is the same as link_url_c,
   *  but for oEmbed, it instead the oEmbed API endpoint.
   *
-  * @param downloaded_at_c
+  * @param fetched_at_c
   * @param cache_max_secs_c — thereafter, try to re-fetch the preview
   * @param status_code_c: 0 if the request failed, e.g. couldn't connect to server.
   * @param preview_type_c
@@ -53,8 +53,8 @@ object LinkPreviewTypes {
   */
 case class LinkPreview(
   link_url_c: String,
-  downloaded_from_url_c: String,
-  downloaded_at_c: When,
+  fetched_from_url_c: String,
+  fetched_at_c: When,
   // cache_max_secs_c: Option[Int] — later
   status_code_c: Int,
   preview_type_c: Int, // always oEmbed, for now
@@ -66,7 +66,7 @@ case class LinkPreview(
 
   // Later:
   if (preview_type_c != LinkPreviewTypes.OEmbed) {
-    require(link_url_c == downloaded_from_url_c, "TyE603MSKU74")
+    require(link_url_c == fetched_from_url_c, "TyE603MSKU74")
   }
 }
 

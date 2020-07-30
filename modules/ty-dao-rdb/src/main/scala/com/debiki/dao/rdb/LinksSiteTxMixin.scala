@@ -26,7 +26,7 @@ import play.api.libs.json.JsNull
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-// CR_DONE  2020-07-12
+// CR_DONE  2020-07-12 .
 
 trait LinksSiteTxMixin extends SiteTransaction {
   self: RdbSiteTransaction =>
@@ -37,17 +37,17 @@ trait LinksSiteTxMixin extends SiteTransaction {
           insert into link_previews_t (
               site_id_c,
               link_url_c,
-              downloaded_from_url_c,
-              downloaded_at_c,
+              fetched_from_url_c,
+              fetched_at_c,
               cache_max_secs_c,
               status_code_c,
               preview_type_c,
               first_linked_by_id_c,
               content_json_c)
           values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          on conflict (site_id_c, link_url_c, downloaded_from_url_c)
+          on conflict (site_id_c, link_url_c, fetched_from_url_c)
           do update set
-              downloaded_at_c = excluded.downloaded_at_c,
+              fetched_at_c = excluded.fetched_at_c,
               cache_max_secs_c = excluded.cache_max_secs_c,
               status_code_c = excluded.status_code_c,
               preview_type_c = excluded.preview_type_c,
@@ -56,8 +56,8 @@ trait LinksSiteTxMixin extends SiteTransaction {
     val values = List(
           siteId.asAnyRef,
           linkPreview.link_url_c,
-          linkPreview.downloaded_from_url_c,
-          linkPreview.downloaded_at_c.asTimestamp,
+          linkPreview.fetched_from_url_c,
+          linkPreview.fetched_at_c.asTimestamp,
           NullInt, // linkPreview.cache_max_secs_c, — later
           linkPreview.status_code_c.asAnyRef,
           linkPreview.preview_type_c.asAnyRef,
@@ -68,14 +68,14 @@ trait LinksSiteTxMixin extends SiteTransaction {
   }
 
 
-  override def loadLinkPreviewByUrl(linkUrl: String, downloadUrl: String)
+  override def loadLinkPreviewByUrl(linkUrl: String, fetchedFromUrl: String)
         : Option[LinkPreview] = {
     val query = s"""
           select * from link_previews_t
           where site_id_c = ?
             and link_url_c = ?
-            and downloaded_from_url_c = ?  """
-    val values = List(siteId.asAnyRef, linkUrl, downloadUrl)
+            and fetched_from_url_c = ?  """
+    val values = List(siteId.asAnyRef, linkUrl, fetchedFromUrl)
     runQueryFindOneOrNone(query, values, rs => {
       parseLinkPreview(rs)
     })
@@ -285,8 +285,8 @@ trait LinksSiteTxMixin extends SiteTransaction {
   private def parseLinkPreview(rs: js.ResultSet): LinkPreview = {
     LinkPreview(
           link_url_c = getString(rs, "link_url_c"),
-          downloaded_from_url_c = getString(rs, "downloaded_from_url_c"),
-          downloaded_at_c = getWhen(rs, "downloaded_at_c"),
+          fetched_from_url_c = getString(rs, "fetched_from_url_c"),
+          fetched_at_c = getWhen(rs, "fetched_at_c"),
           // cache_max_secs_c = ... — later
           status_code_c = getInt(rs, "status_code_c"),
           preview_type_c = getInt(rs, "preview_type_c"),

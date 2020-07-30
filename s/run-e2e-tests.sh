@@ -285,7 +285,7 @@ function runAllE2eTests {
 
   $r s/wdio --only votes-and-best-first $args
 
-  #$r s/wdio --only links-internal.2browsers $args  to do
+  #$r s/wdio --only links-internal.2browsers $args  to do .
 
   $r s/wdio --only embed-images-mp4-youtube $args
   $r s/wdio --only embed-twitter-tweets-etc $args

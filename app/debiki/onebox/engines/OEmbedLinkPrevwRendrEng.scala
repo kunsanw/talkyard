@@ -223,8 +223,8 @@ abstract class OEmbedLinkPrevwRendrEng(
           SECURITY; QUOTA // incl in quota? num preview links * X  [lnpv_quota]
           val preview = LinkPreview(
                 link_url_c = unsafeUrl,
-                downloaded_from_url_c = downloadUrl,
-                downloaded_at_c = globals.now(),
+                fetched_from_url_c = downloadUrl,
+                fetched_at_c = globals.now(),
                 // cache_max_secs_c — skip for now
                 status_code_c = response.status,
                 preview_type_c = LinkPreviewTypes.OEmbed,

@@ -847,6 +847,8 @@ export class TyE2eTestBrowser {
         // });
         logMessage("Switched to parent frame.");
         if (this.#isWhere === IsWhere.UnknownIframe) {
+          // For now: (Later, might be in an embedded blog comments editor or discussion,
+          // but right now (2020-07) there are no such tests.)
           this.#isWhere = IsWhere.Forum;
         }
         else {
@@ -1346,7 +1348,7 @@ export class TyE2eTestBrowser {
     _waitForClickable (selector: string,  // RENAME? to scrollToAndWaitUntilCanInteract
           opts: { maybeMoves?: boolean, timeoutMs?: number, mayScroll?: boolean,
               okayOccluders?: string, waitUntilNotOccluded?: boolean } = {}) {
-      this.waitUntil(() => {   // CR_DONE this fn, 07-14
+      this.waitUntil(() => {   // CR_DONE this fn, 07-14  .
         this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
         this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
         if (opts.mayScroll !== false) {

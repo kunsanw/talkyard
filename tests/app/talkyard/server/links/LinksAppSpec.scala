@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// CR_DONE !
+// CR_DONE !  .
 
 package talkyard.server.links
 
@@ -85,8 +85,8 @@ class LinksAppSpec extends DaoAppSuite {
 
   lazy val linkPreviewOneOrig: LinkPreview = LinkPreview(
         link_url_c = extLinkOneUrl,
-        downloaded_from_url_c = extLinkOneOEmbUrl,
-        downloaded_at_c = when,
+        fetched_from_url_c = extLinkOneOEmbUrl,
+        fetched_at_c = when,
         // cache_max_secs_c = ... — later
         status_code_c = 200,
         preview_type_c = LinkPreviewTypes.OEmbed,
@@ -99,8 +99,8 @@ class LinksAppSpec extends DaoAppSuite {
 
   lazy val linkPreviewTwo: LinkPreview = LinkPreview(
         link_url_c = extLinkTwoUrl,
-        downloaded_from_url_c = extLinkTwoOEmbUrl,
-        downloaded_at_c = when.plusMillis(10),
+        fetched_from_url_c = extLinkTwoOEmbUrl,
+        fetched_at_c = when.plusMillis(10),
         // cache_max_secs_c = ... — later
         status_code_c = 200,
         preview_type_c = LinkPreviewTypes.OEmbed,
@@ -109,8 +109,8 @@ class LinksAppSpec extends DaoAppSuite {
 
   lazy val linkPreviewTwoOtherOEmbUrl: LinkPreview = linkPreviewTwo.copy(
         link_url_c = extLinkTwoUrl,
-        downloaded_from_url_c = extLinkTwoAnotherOEmbUrl,
-        downloaded_at_c = when.plusMillis(110),
+        fetched_from_url_c = extLinkTwoAnotherOEmbUrl,
+        fetched_at_c = when.plusMillis(110),
         first_linked_by_id_c = userMmm.id,
         content_json_c = extLinkTwoAnotherOEmbJson)
 

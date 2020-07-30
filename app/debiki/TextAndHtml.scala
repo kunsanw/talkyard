@@ -75,8 +75,8 @@ case class LinksFound(
   uploadRefs: Set[UploadRef],
   externalLinks: immutable.Seq[String],
   internalLinks: Set[String],
-  linkDomains: Set[String],
-  linkIpAddresses: immutable.Seq[String])
+  extLinkDomains: Set[String],
+  extLinkIpAddresses: immutable.Seq[String])
 
 
 
@@ -107,12 +107,12 @@ sealed abstract class TextAndHtml extends SourceAndHtml {  RENAME // to PostSour
 
   /** Domain names used in links. Check against a domain block list.
     */
-  def linkDomains: Set[String]
+  def extLinkDomains: Set[String]
 
   /** Raw ip addresses (ipv4 or 6) of any links that use raw ip addresses rather than
     * domain names. If there is any, the post should probably be blocked as spam?
     */
-  def linkIpAddresses: immutable.Seq[String]
+  def extLinkIpAddresses: immutable.Seq[String]
 
   def externalLinksOnePerLineHtml: String = {  // [4KTF0WCR]
     TESTS_MISSING
@@ -208,7 +208,7 @@ object TextAndHtml {
         amendWhitelistFn: Whitelist => Whitelist = x => x): String = {
     // Tested here: TyT03386KTDGR
     var whitelist = org.jsoup.safety.Whitelist.relaxed()
-          .removeTags("h1", "h2") // [disallow_h1_h2]
+          // .removeTags("h1", "h2") // [disallow_h1_h2] — wait, breaks tests.
     whitelist = addRelNofollowNoopener(amendWhitelistFn(whitelist))
     compactClean(unsafeHtml, whitelist)
   }
@@ -285,8 +285,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     override val uploadRefs: Set[UploadRef],
     override val internalLinks: Set[String],
     val externalLinks: immutable.Seq[String],
-    val linkDomains: immutable.Set[String],
-    val linkIpAddresses: immutable.Seq[String],
+    val extLinkDomains: immutable.Set[String],
+    val extLinkIpAddresses: immutable.Seq[String],
     val embeddedOriginOrEmpty: String,
     val followLinks: Boolean,
     val allowClassIdDataAttrs: Boolean) extends TextAndHtml {
@@ -313,8 +313,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
         // CLEAN_UP this  toSet  toSeq  makes no sense.
         externalLinks = (externalLinks.toSet ++ more.externalLinks.toSet).to[immutable.Seq],
         internalLinks = internalLinks ++ more.internalLinks,
-        linkDomains = linkDomains ++ more.linkDomains,
-        linkIpAddresses = (linkIpAddresses.toSet ++ more.linkIpAddresses.toSet).to[immutable.Seq],
+        extLinkDomains = extLinkDomains ++ more.extLinkDomains,
+        extLinkIpAddresses = (extLinkIpAddresses.toSet ++ more.extLinkIpAddresses.toSet).to[immutable.Seq],
         embeddedOriginOrEmpty = embeddedOriginOrEmpty,
         followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs)
@@ -330,8 +330,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           // Hmm but probably should analyze links! Well this not in use
           // now anyway, except for via UTX.
           usernameMentions = Set.empty, uploadRefs = Set.empty,
-          internalLinks = Set.empty, externalLinks = Nil, linkDomains = Set.empty,
-          linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
+          internalLinks = Set.empty, externalLinks = Nil, extLinkDomains = Set.empty,
+          extLinkIpAddresses = Nil, embeddedOriginOrEmpty = "",
           followLinks = false, allowClassIdDataAttrs = false)
     }
   }
@@ -343,8 +343,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
             usernameMentions = Set.empty, // (5LKATS0)
             uploadRefs = Set.empty,
             internalLinks = Set.empty, externalLinks = Nil,
-            linkDomains = Set.empty,
-            linkIpAddresses = Nil, embeddedOriginOrEmpty = "",
+            extLinkDomains = Set.empty,
+            extLinkIpAddresses = Nil, embeddedOriginOrEmpty = "",
             followLinks = false, allowClassIdDataAttrs = false)
     }
   }
@@ -395,8 +395,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           uploadRefs = linksFound.uploadRefs,
           internalLinks = linksFound.internalLinks,
           externalLinks = linksFound.externalLinks,
-          linkDomains = linksFound.linkDomains,
-          linkIpAddresses = linksFound.linkIpAddresses,
+          extLinkDomains = linksFound.extLinkDomains,
+          extLinkIpAddresses = linksFound.extLinkIpAddresses,
           embeddedOriginOrEmpty = embeddedOriginOrEmpty,
           followLinks = followLinks,
           allowClassIdDataAttrs = allowClassIdDataAttrs)
@@ -415,14 +415,16 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
 
     var internalLinks = Set[String]()
     var externalLinks = Vector[String]()
-    var linkDomains = Set[String]()
-    var linkAddresses = Vector[String]()
+    var extLinkDomains = Set[String]()
+    var extLinkIpAddresses = Vector[String]()
 
     allLinks foreach { link: String =>
       try {
         val uri = new java.net.URI(link)
         val domainOrAddress = uri.getHost  // can be null, fine
+        var isInternal = false
         if (domainOrAddress eq null) {
+          isInternal = true
           internalLinks += link
         }
         else {
@@ -436,16 +438,20 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
                 domainOrAddress)
 
           if (isSameHostname) {
-            internalLinks += link
+            isInternal = true
+            internalLinks += link  // or remove origin, keep only url path-query-hash?
           }
           else {
             externalLinks :+= link
           }
 
-          if (domainOrAddress.startsWith("[")) {
+          if (isInternal) {
+            // Noop, already added to internalLinks.
+          }
+          else if (domainOrAddress.startsWith("[")) {
             if (domainOrAddress.endsWith("]")) {
               // IPv6.
-              linkAddresses :+= domainOrAddress
+              extLinkIpAddresses :+= domainOrAddress
             }
             else {
               // Weird.
@@ -458,10 +464,10 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
             die("TyE603KUPRSDJ3", s"Weird url, includes ':': $domainOrAddress")
           }
           else if (Ipv4AddressRegex matches domainOrAddress) {
-            linkAddresses :+= domainOrAddress
+            extLinkIpAddresses :+= domainOrAddress
           }
           else {
-            linkDomains += domainOrAddress
+            extLinkDomains += domainOrAddress
           }
         }
       }
@@ -475,8 +481,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           uploadRefs = uploadRefs,
           internalLinks = internalLinks,
           externalLinks = externalLinks,
-          linkDomains = linkDomains,
-          linkIpAddresses = linkAddresses)
+          extLinkDomains = extLinkDomains,
+          extLinkIpAddresses = extLinkIpAddresses)
   }
 
 
@@ -489,7 +495,7 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
     new TextAndHtmlImpl(
           text, safeHtml = text, usernameMentions = Set.empty, uploadRefs = Set.empty,
           internalLinks = Set.empty, externalLinks = Nil,
-          linkDomains = Set.empty, linkIpAddresses = Nil,
+          extLinkDomains = Set.empty, extLinkIpAddresses = Nil,
           embeddedOriginOrEmpty = "", followLinks = false,
           allowClassIdDataAttrs = false)
   }
@@ -519,8 +525,8 @@ case class SafeStaticSourceAndHtml(
   override def uploadRefs: Set[UploadRef] = Set.empty
   override def internalLinks: Set[String] = Set.empty
   override def externalLinks: immutable.Seq[String] = Nil
-  override def linkDomains: Set[String] = Set.empty
-  override def linkIpAddresses: immutable.Seq[String] = Nil
+  override def extLinkDomains: Set[String] = Set.empty
+  override def extLinkIpAddresses: immutable.Seq[String] = Nil
   override def append(moreTextAndHtml: TextAndHtml): TextAndHtml = die("TyE50396SK")
   override def append(text: String): TextAndHtml = die("TyE703RSKTDH")
 }

@@ -12,7 +12,7 @@
 comment on table  links_t  is $_$
 
 There's no foreign key to link_previews_t, because maybe no preview has
-been downloaded yet (or maybe never — maybe broken external link).
+been fetched yet (or maybe never — maybe broken external link).
 $_$;
 
 
@@ -28,16 +28,16 @@ Caches html <title> and <meta description> tags and any OpenGraph tags,
 and/or oEmbed json, for generating html previews of links to external
 things, e.g. Twitter tweets.
 
-Sometimes Ty downloads both 1) html and OpenGraph tags directly from
+Sometimes Ty fetches both 1) html and OpenGraph tags directly from
 the linked page, and 2) oEmbed json.
-Then, there'll be two rows in this table — one with downloaded_from_url_c
-= link_url_c, and one with downloaded_from_url_c = the oEmbed request url.
+Then, there'll be two rows in this table — one with fetched_from_url_c
+= link_url_c, and one with fetched_from_url_c = the oEmbed request url.
 The oEmbed data might not include a title, and then,
 if the external link is inside a paragraph, so we want to show the
 title of the extenal thing only, then it's good to have any html <title>
 tag too.
 
-[defense] [lnpv_t_pk] Both link_url_c and downloaded_from_url_c are part of
+[defense] [lnpv_t_pk] Both link_url_c and fetched_from_url_c are part of
 the primary key — otherwise maybe an attacker could do something weird,
 like the following:
 
@@ -48,7 +48,7 @@ like the following:
     VEP = https://victws/oembed?url=https://victws/widget
     and then later when someone tries to link to https://victws/widget,
     whose oEmbed endpoint is VEP for real,
-    then, if looking up by downloaded_from_url_c = VEP only,
+    then, if looking up by fetched_from_url_c = VEP only,
     there'd already be a link_previews_t row for VEP,
     with link_url_c: https//atkws/widget — atkws not victws (!).
     (Because VEP initially got saved via the request to https://atkws/widget.)
@@ -56,12 +56,12 @@ like the following:
     Then, maybe other code in Talkyard adds a "View at: $link_url_c"
     which would send a visitor to the attacker's website.
 
-But by including both link_url_c and downloaded_from_url_c in the primary key,
+But by including both link_url_c and fetched_from_url_c in the primary key,
 that cannot happen — when looking up https://victws/widget + VEP,
 the attacker's entry wouldn't be found (because it's link_url_c is
 https://atkws/..., the wrong website).
 
-There's an index  linkpreviews_i_downl_err_at  to maybe retry failed downlads
+There's an index  linkpreviews_i_g_fetch_err_at  to maybe retry failed fetches
 after a while.
 $_$;
 
@@ -75,11 +75,11 @@ $_$;
 
 
 ------------------------------------------------------------------------
-comment on column  link_previews_t.downloaded_from_url_c  is $_$
+comment on column  link_previews_t.fetched_from_url_c  is $_$
 
-oEmbed json got downloaded from this url. Later: can be empty '' if
+oEmbed json was fetched from this url. Later: can be empty '' if
 not oEmbed, but instead html <title> or OpenGraph tags — then
-downloaded_from_url_c would be the same as link_url_c, need not save twice.
+fetched_from_url_c would be the same as link_url_c, need not save twice.
 $_$;
 
 
@@ -100,8 +100,8 @@ comment on column  link_previews_t.status_code_c  is $_$
 Is 0 if the request failed completely [ln_pv_netw_err], didn't get any response.
 E.g. TCP RST or timeout. 0 means the same in a browser typically, e.g. request.abort().
 
-However, currently (maybe always?) failed downloads are instead cached temporarily
-only, in Redis, so cannot DoS attack the disk storage.  [ln_pv_downl_errs]
+However, currently (maybe always?) failed fetches are instead cached temporarily
+only, in Redis, so cannot DoS attack the disk storage.  [ln_pv_downl_errs]  FETCH
 $_$;
 
 

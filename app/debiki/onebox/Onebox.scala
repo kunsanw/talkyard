@@ -106,8 +106,8 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
   protected def addViewAtLink = true
 
   // (?:...) is a non-capturing group.  (for local dev search: /-/u/ below.)
-  private def makeUploadsLinkRegexStr(q: Char) =
-    s"""=$q(?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)$q"""
+  private def makeUploadsLinkRegexStr(q: Char) = s"=$q" +
+        """(?:(?:(?:https?:)?//[^/]+)?/-/(?:u|uploads/public)/)([a-zA-Z0-9/\._-]+)""" + q
 
   private val uploadsLinkRegexSingleQuote: Regex = makeUploadsLinkRegexStr('\'').r
   private val uploadsLinkRegexDoubleQuote: Regex = makeUploadsLinkRegexStr('"').r
