@@ -22,19 +22,16 @@ import com.debiki.core.Prelude._
 import org.scalactic.{ErrorMessage, Or}
 import scala.collection.immutable
 import scala.collection.mutable
+import talkyard.server.dao.StaleStuff
 
 
 
 trait PageLinksDao {
   self: SiteDao =>
 
-  memCache.onPageCreated { (_, pagePath: PagePathWithId) =>
-    uncacheLinksToPagesLinkedFrom(pagePath.pageId)
-  }
-
-  memCache.onPageSaved { sitePageId =>
-    uncacheLinksToPagesLinkedFrom(sitePageId.pageId)
-  }
+  // No, instead, see  uncacheLinks()  below  [rm_cache_listeners]
+  // memCache.onPageCreated { ... }
+  // memCache.onPageSaved { ... }
 
 
   def getPageIdsLinkedFrom(pageId: PageId): Set[PageId] = {
@@ -66,13 +63,23 @@ trait PageLinksDao {
   }
 
 
-  private def uncacheLinksToPagesLinkedFrom(pageId: PageId): Unit = {
+  def uncacheLinks(staleStuff: StaleStuff): Unit = {
+    // Need not refresh pages linked from indirectly modified pages — any
+    // links from them shouldn't have changed, since weren't modified themselves.
+    // But if a category got deleted or access restricted — then, would need
+    // to to something here!
+    val uncacheLinksToPageIds = staleStuff.stalePageIdsInMemIndirectly
+
     // Maybe because of a race, the database and cache knows about slightly
     // different links? So uncache based on both?
-    val linkedPageIds = loadPageIdsLinkedFrom(pageId)
-    val moreIds: Set[PageId] = getPageIdsLinkedFrom(pageId)
-    (linkedPageIds ++ moreIds).foreach { id =>
-      memCache.remove(linksToKey(id))
+    val uncacheLinksFromPageIds = staleStuff.stalePageIdsInMemDirectly
+    val linkedPageIds: Set[PageId] = uncacheLinksFromPageIds.flatMap(loadPageIdsLinkedFrom)
+    val moreIds: Set[PageId] = uncacheLinksFromPageIds.flatMap(getPageIdsLinkedFrom)
+
+    val allToUncache = uncacheLinksToPageIds ++ linkedPageIds ++ moreIds
+
+    allToUncache.foreach { pageId =>
+      memCache.remove(linksToKey(pageId))
       RACE // [cache_race_counter]  might incorrectly get added back here (02526SKB)
     }
   }

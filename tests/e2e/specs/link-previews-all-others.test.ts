@@ -1,6 +1,6 @@
 /// <reference path="../test-types.ts"/>
 
-// SHOULD_CODE_REVIEW this whole file, later.  .
+// CR_DONE  07-31
 
 import * as _ from 'lodash';
 import assert = require('../utils/ty-assert');
@@ -14,40 +14,43 @@ import c = require('../test-constants');
 
 let browser: TyE2eTestBrowser;
 
-let everyone;
 let owen;
 let owensBrowser: TyE2eTestBrowser;
 let maria;
 let mariasBrowser: TyE2eTestBrowser;
 
 let idAddress: IdAddress;
-let forumTitle = "Misc Link Preview Forum";
+let forumTitle = "Link Previews Forum";
 
 interface LinkPreviewProvider {
   name: string;
-  sandboxedIframe: boolean;  // default true
+  inSandboxedIframe: boolean;  // default true
   lnPvClassSuffix?: string;
+
   linkInTopic: string;
   linkInTopicExpectedPreviewText: string;
+
   linkTwoInTopicButBroken: string;
   linkTwoExpectedPrevwText?: string;
   linkTwoNoticesIsBroken?: boolean;  // defaut true
+
   linkInReply: string;
   linkInReplyExpectedPreviewText?: string;  // later?
+
   linkInReplyTwo?: string;
   linkInReplyTwoExpectedPreviewText?: string;  // later?
 }
 
 type ProvidersMap = { [name: string]: LinkPreviewProvider };
 
-// NOTE:  To troubleshoot just one, add:  --only3rdParty reddit  to the
-// wdio command line, for exampe. Or just:  --o3 reddit
+// NOTE:  To troubleshoot just one, add:  --only3rdParty provider-name  (or --o3) to the
+// wdio command line, e.g.:  --o3 reddit
 
 let providersToTest: ProvidersMap = {
   /* Doesn't work without trusting FB's js, skip for now.
   facebookPosts: {
     name: "Facebook",
-    sandboxedIframe: false,
+    inSandboxedIframe: false,
     lnPvClassSuffix: 'FbPost',
     linkInTopic: 'https://www.facebook.com/impacthublisbon/posts/2729123110678488?__tn__=-R',
     linkInTopicExpectedPreviewText: "events to enable",
@@ -65,7 +68,7 @@ let providersToTest: ProvidersMap = {
 
   instagram: {
     name: "Instagram",
-    sandboxedIframe: true,
+    inSandboxedIframe: true,
     // With ?utm query param
     linkInTopic: 'https://www.instagram.com/p/BJlNX-rju7o/?utm_source=ig_web_button_share_sheet',
     linkInTopicExpectedPreviewText: "",
@@ -77,7 +80,7 @@ let providersToTest: ProvidersMap = {
 
   reddit: {
     name: "Reddit",
-    sandboxedIframe: true,
+    inSandboxedIframe: true,
     // With 'utm' query param.
     linkInTopic: 'https://www.reddit.com/r/aww/comments/h84ti6/' +
           'pics_if_squirrels_landing_on_the_ground/?utm_source=share&utm_medium=web2x',
@@ -96,7 +99,7 @@ let providersToTest: ProvidersMap = {
 
   telegram: {
     name: "Telegram",
-    sandboxedIframe: true,
+    inSandboxedIframe: true,
     linkInTopic: 'https://t.me/durov/68',
     linkInTopicExpectedPreviewText: "",
     linkTwoInTopicButBroken: 'https://t.me/telegram/99999999999999999',
@@ -106,7 +109,7 @@ let providersToTest: ProvidersMap = {
 
   tiktok: {
     name: "TikTok",
-    sandboxedIframe: true,
+    inSandboxedIframe: true,
     linkInTopic: 'https://www.tiktok.com/@scout2015/video/6718335390845095173',
     linkInTopicExpectedPreviewText: "",
     linkTwoInTopicButBroken: 'https://www.tiktok.com/@noone/video/99999999999999999999999',
@@ -116,7 +119,7 @@ let providersToTest: ProvidersMap = {
 
   youtube: {
     name: "YouTube",
-    sandboxedIframe: true,
+    inSandboxedIframe: true,
     // Honey badger doesn't care.
     linkInTopic: 'https://youtu.be/box0-koAuIY',
     linkInTopicExpectedPreviewText: "",
@@ -131,8 +134,10 @@ let providersToTest: ProvidersMap = {
 
 
 if (settings.only3rdParty) {
-  const provider = providersToTest[settings.only3rdParty] ||
-        _.find(providersToTest, provider => provider.name.startsWith(settings.only3rdParty));
+  const o3p = settings.only3rdParty;
+  const provider = providersToTest[o3p] ||
+        _.find(providersToTest, provider =>
+            provider.name.toLowerCase().startsWith(o3p.toLowerCase()));
   dieIf(!provider, `No such 3rd party provider: ${provider.name} [TyE402SKD7]`);
   providersToTest = { x: provider };
 }
@@ -151,7 +156,6 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
 
   it("initialize people", () => {
     browser = new TyE2eTestBrowser(wdioBrowser);
-    everyone = browser;
     owen = make.memberOwenOwner();
     owensBrowser = browser;
     maria = make.memberMaria();
@@ -159,9 +163,7 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
   });
 
   it("import a site", () => {
-    let site: SiteData = make.forumOwnedByOwen('editor-onebox', { title: forumTitle });
-    site.settings.allowGuestLogin = true;
-    site.settings.requireVerifiedEmail = false;
+    let site: SiteData = make.forumOwnedByOwen('link-previews', { title: forumTitle });
     site.members.push(maria);
     idAddress = server.importSiteData(site);
   });
@@ -178,7 +180,8 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
     const previewOkSelector = makePreviewOkSelector(provider);
     const previewBrokenSelector = makePreviewBrokenSelector(provider);
 
-    it("Owen goes to the topic list page", () => {
+    it(`\n\n*** Testing ${provider.name} ***\n\n` +
+          `Owen goes to the topic list page`, () => {
       owensBrowser.go2('/');
     });
 
@@ -190,11 +193,11 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
 
     // ----- Link preview, in new Talkyard topic
 
-    it(`... and a  ${provider.name} comment link`, () => {
+    it(`... and an external link to a widget at  ${provider.name}`, () => {
       owensBrowser.editor.editText(provider.linkInTopic);
     });
 
-    it("The comment link becomes a preview", () => {
+    it(`The link becomes a  ${provider.name}  widget preview`, () => {
       owensBrowser.preview.waitForExist(previewOkSelector, { where: 'InEditor' });
     });
 
@@ -202,14 +205,14 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
       it(`... with text: "${provider.linkInTopicExpectedPreviewText}"`, () => {
         owensBrowser.preview.waitUntilPreviewTextMatches(
               provider.linkInTopicExpectedPreviewText,
-              { where: 'InEditor', inSandboxedIframe: provider.sandboxedIframe });
+              { where: 'InEditor', inSandboxedIframe: provider.inSandboxedIframe });
       });
     }
 
 
     // ----- Broken link preview
 
-    it(`Owen types a broken ${provider.name} comment link`, () => {
+    it(`Owen types a broken  ${provider.name}  widget link`, () => {
       owensBrowser.editor.editText('\n\n' +
             provider.linkTwoInTopicButBroken, { append: true });
     });
@@ -218,7 +221,10 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
       // Currently no easy way to know if e.g. a direct  .jpg  or  .mp4  link is broken.
       // Later: the server will fetch the remote thing, to see if there're <title>
       // tags etc, and then we'll know if is broken or not. [srvr_fetch_ln_pv]
-      it("... it's broken but no way for Talkyard to know — noop.", () => {});
+      // And we can check the preview height: too small, means no content, i.e. broken.
+      it("... it's broken but no way for Talkyard to know", () => {
+        // Noop.
+      });
     }
     else {
       it("... it becomes sth like a 'Thing not found' message", () => {
@@ -272,7 +278,7 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
     if (provider.linkInTopicExpectedPreviewText) {
       it(`... with the correct text: "${provider.linkInTopicExpectedPreviewText}"`, () => {
         owensBrowser.linkPreview.waitUntilLinkPreviewMatches({
-              postNr: c.BodyNr, inSandboxedIframe: provider.sandboxedIframe,
+              postNr: c.BodyNr, inSandboxedIframe: provider.inSandboxedIframe,
               // or just the 1st one
               whichLinkPreviewSelector: previewOkSelector,
               regex: provider.linkInTopicExpectedPreviewText });
@@ -291,7 +297,6 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
       });
 
       if (provider.linkTwoExpectedPrevwText) {
-        const noPreviewText = `No preview for ${provider.name}`; // what? why  [0LNPV]
         it(`... with text: "${provider.linkTwoExpectedPrevwText} ..."`, () => {
           owensBrowser.topic.waitUntilPostTextMatches(
                 c.BodyNr, provider.linkTwoExpectedPrevwText,
@@ -307,7 +312,7 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
       owensBrowser.topic.clickReplyToOrigPost();
     });
 
-    it("... starts typing a reply", () => {
+    it(`... starts typing a reply with a ${provider.name} link`, () => {
       owensBrowser.editor.editText(provider.linkInReply);
     });
 
@@ -324,10 +329,10 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
     });
 
 
-    // ----- A 2nd preview in a reply
+    // ----- A 2nd preview in a reply, just to test different link patterns
 
     if (provider.linkInReplyTwo) {
-      it(`Owen types a 2nd reply`, () => {
+      it(`Owen types a 2nd reply with a ${provider.name} link`, () => {
         owensBrowser.topic.clickReplyToOrigPost();
         owensBrowser.editor.editText(provider.linkInReplyTwo);
       });
@@ -344,6 +349,20 @@ describe("'All other' link previews  TyT550RMHJ25", () => {
         owensBrowser.topic.waitForExistsInPost(c.FirstReplyNr + 1, previewOkSelector);
       });
     }
+
+
+    it(`But a reply with just normal text and links, won't generate any link preview`, () => {
+      const replyNr = c.FirstReplyNr + (provider.linkInReplyTwo ? 2 : 1);
+      const url = 'https://critters.example.com/critters-worrying-y2000-bug.jpg';
+      const boringLinkSelector = `a[href="${url}"]`;
+      owensBrowser.complex.replyToOrigPost(`[critters](${url})`)
+      owensBrowser.topic.waitForExistsInPost(replyNr, boringLinkSelector);
+      owensBrowser.topic.assertPostNrNotContains(replyNr, previewOkSelector);
+      owensBrowser.topic.assertPostNrNotContains(replyNr, previewBrokenSelector);
+
+      owensBrowser.topic.assertPostNrContains(c.FirstReplyNr, previewOkSelector); // ttt
+      owensBrowser.topic.assertPostNrNotContains(c.FirstReplyNr, boringLinkSelector); // ttt
+    });
   }
 
 });

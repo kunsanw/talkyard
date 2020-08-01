@@ -18,7 +18,7 @@ package object server {
   trait TyLogging {
     protected val logger: play.api.Logger = newLogger(getClass)
 
-    protected def bugWarnDieIf(condition: Boolean, errorCode: String,
+    protected def bugWarnIf(condition: Boolean, errorCode: String,
           problem: => String = "") {
       bugWarnDieIfThen(condition, errorCode, problem, thenDo = null)
     }

@@ -1,6 +1,6 @@
 /// <reference path="../test-types.ts"/>
 
-// SHOULD_CODE_REVIEW the canges here, later.  .
+// CR_DONE .
 
 import * as _ from 'lodash';
 import assert = require('assert');
@@ -49,7 +49,7 @@ const inPagePreviewSelector = '.s_P-Prvw ';
 const inEditorPreviewSelector = '#debiki-editor-controller .preview ';
 
 
-// Also try w real pics & vids:
+// Also try w real pics & vids:  TESTS_MISSING
 //  https://preview.redd.it/7fig79vdq4451.png?width=640&height=640&crop=smart&auto=webp&s=548214ef563f762152ab1c0733b37fbf16bad3c8
 //  http://techslides.com/demos/sample-videos/small.mp4
 // verify does resize & show?

@@ -203,14 +203,34 @@ class SiteDao(
   def writeTx[R](retry: Boolean = false, allowOverQuota: Boolean = false)(
           fn: (SiteTransaction, StaleStuff) => R): R = {
     dieIf(retry, "TyE403KSDH46", "writeTx(retry = true) not yet impl")
+
     val staleStuff = new StaleStuff()
     val result: R = readWriteTransaction(tx => {
-      val r = fn(tx, staleStuff)
-      tx.markPagesHtmlStale(staleStuff.stalePageIdsMemCacheAndDb)
-      r
+      val result = fn(tx, staleStuff)
+
+      // Refresh database page cache:
+      tx.markPagesHtmlStale(staleStuff.stalePageIdsInDb)
+
+      // [cache_race_counter] Maybe bump mem cache contents counter here,
+      // just before this tx ends and the mem cache thus becomes stale?
+      // Set it to an odd value — an anything read from the cache,
+      // when the counter was odd, must not be cached.
+
+      result
     }, allowOverQuota)
-    (staleStuff.stalePageIdsMemCacheAndDb
-          ++ staleStuff.stalePageIdsMemCacheOnly) foreach refreshPageInMemCache
+
+    // Refresh in-memory cache:  [rm_cache_listeners]
+    if (staleStuff.nonEmpty) {
+      staleStuff.stalePageIdsInMem foreach { pageId =>
+        refreshPageInMemCache(pageId)
+      }
+      uncacheLinks(staleStuff)
+    }
+
+    // [cache_race_counter] Maybe somehow "mark as done" the bumping of the
+    // mem cache contents counter?
+    // Set it to an even value — mem cache ok to use again.
+
     result
   }
 
@@ -252,7 +272,9 @@ class SiteDao(
 
 
   def refreshPageInMemCache(pageId: PageId): Unit = {
+    // Old approach:
     memCache.firePageSaved(SitePageId(siteId = siteId, pageId = pageId))
+    // New:  [rm_cache_listeners]
   }
 
   def refreshPagesInAnyCache(pageIds: collection.Set[PageId]): Unit = {

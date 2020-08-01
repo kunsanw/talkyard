@@ -273,6 +273,7 @@ trait PostsDao {
         postsOrderNesting = page.parts.postsOrderNesting)
       updatePagePopularity(pagePartsInclNewPost, tx)
 
+      staleStuff.addPageId(pageId)
       saveDeleteLinks(newPost, textAndHtml, authorId, tx, staleStuff)
     }
     uploadRefs foreach { uploadRef =>
@@ -624,6 +625,8 @@ trait PostsDao {
     uploadRefs foreach { uploadRef =>
       tx.insertUploadedFileReference(newPost.id, uploadRef, authorId)
     }
+
+    staleStuff.addPageId(page.id)
     saveDeleteLinks(newPost, textAndHtml, authorId, tx, staleStuff)
 
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
@@ -720,6 +723,7 @@ trait PostsDao {
     saveDeleteUploadRefs(lastPost, editedPost = editedPost, textAndHtml,
           isAppending = true, isEditing = false, authorId, tx)
 
+    staleStuff.addPageId(editedPost.pageId)
     saveDeleteLinks(editedPost, combinedTextAndHtml, authorId, tx, staleStuff)
 
     val oldMeta = tx.loadThePageMeta(lastPost.pageId)
@@ -1038,6 +1042,7 @@ trait PostsDao {
       }
 
       if (editedPost.isCurrentVersionApproved) {
+        staleStuff.addPageId(editedPost.pageId)
         saveDeleteLinks(editedPost, newTextAndHtml, editorId, tx, staleStuff)
         TESTS_MISSING // notf not sent until after ninja edit window ended?  TyTNINJED02
         val notfs = notfGenerator(tx).generateForEdits(
@@ -1091,10 +1096,21 @@ trait PostsDao {
     *
     * No need, though, to remember two different /-123-some-topic  links from
     * the same post.  That's why [[SourceAndHtml.internalLinks]] is a Set.
+    *
+    * staleStuff must include post.pageId already.
     */
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
-          tx: SiteTx, staleStuff: StaleStuff): Unit = {
-    TESTS_MISSING;  CR_DONE // 07-13 .
+          tx: SiteTx, staleStuff: StaleStuff, skipBugWarn: Boolean = false): Unit = {
+    // Some e2e tests: backlinks-basic.2browsers.test.ts  TyTINTLNS54824
+    CR_DONE // 07-13, 31
+
+    // Let's always add the page id to staleStuff before, just so that
+    // here we can check that that wasn't forgotten.
+    // Don't do from in here — that'd be unexpected?, in this fn about links.
+    if (!skipBugWarn && !staleStuff.pageModified(post.pageId)) {
+      bugWarn("TyE306KTD3", s"s$siteId: staleStuff: linking page id ${
+            post.pageId} hasn't been modified? Post: $post")
+    }
 
     dieIf(!post.isCurrentVersionApproved && Globals.isDevOrTest, "TyE406RMTK2")
     if (!post.isCurrentVersionApproved)
@@ -1157,7 +1173,7 @@ trait PostsDao {
     val stalePageIds =
           (pageIdsLinkedBefore -- pageIdsLinkedAfter) ++
             (pageIdsLinkedAfter -- pageIdsLinkedBefore)
-    staleStuff.addPageIds(stalePageIds)
+    staleStuff.addPageIds(stalePageIds, pageModified = false, backlinksStale = true)
   }
 
 
@@ -1618,7 +1634,11 @@ trait PostsDao {
       // links are filtered out when querying. [q_deld_lns] )
       val linkedPageIds = tx.loadPageIdsLinkedFromPosts(
             uncacheBacklinksFromPostIds.toSet)
-      staleStuff.addPageIds(linkedPageIds)
+
+      // This might refresh unnecessarily many pages, if there're other posts that
+      // link to the same pages, so which pages are linked, didn't actually change.
+      staleStuff.addPageIds(
+            linkedPageIds, pageModified = false, backlinksStale = true)
     }
 
     val oldMeta = page.meta
@@ -1685,6 +1705,7 @@ trait PostsDao {
       updatePagePopularity(page.parts, tx)
     }
 
+    staleStuff.addPageId(page.id)
     tx.updatePageMeta(newMeta, oldMeta = oldMeta, markSectionPageStale)
 
     // In the future: if is a forum topic, and we're restoring the OP, then bump the topic.
@@ -1747,6 +1768,8 @@ trait PostsDao {
       bodyHiddenReason = None)
     tx.updatePost(postAfter)
     tx.indexPostsSoon(postAfter)
+
+    staleStuff.addPageId(pageId)
     saveDeleteLinks(postAfter, sourceAndHtml, postAfter.createdById, tx, staleStuff)
 
     SHOULD // delete any review tasks.
@@ -1758,7 +1781,6 @@ trait PostsDao {
     val isApprovingNewPost = postBefore.approvedRevisionNr.isEmpty
 
     var newMeta = pageMeta.copy(version = pageMeta.version + 1)
-    staleStuff.addPageId(pageId, memCacheOnly = true)
 
     // If we're approving the page, unhide it.
     BUG // rather harmless: If page hidden because of flags, then if new reply approved,
@@ -1825,6 +1847,8 @@ trait PostsDao {
     var numNewVisibleReplies = 0
     var numNewVisibleOpReplies = 0
 
+    staleStuff.addPageId(pageId)
+
     for {
       post <- posts
       if !post.isSomeVersionApproved
@@ -1864,6 +1888,7 @@ trait PostsDao {
 
       tx.updatePost(postAfter)
       tx.indexPostsSoon(postAfter)
+
       saveDeleteLinks(postAfter, sourceAndHtml, post.createdById, tx, staleStuff)
 
       // ------ Notifications
@@ -1900,8 +1925,6 @@ trait PostsDao {
       bumpedAt = pageMeta.isClosed ? pageMeta.bumpedAt | Some(tx.now.toJavaDate),
       hiddenAt = newHiddenAt,
       version = pageMeta.version + 1)
-
-    staleStuff.addPageId(pageId, memCacheOnly = true)
 
     tx.updatePageMeta(newMeta, oldMeta = pageMeta, markSectionPageStale = true)
     updatePagePopularity(page.parts, tx)
@@ -2144,8 +2167,23 @@ trait PostsDao {
           // Uncache backlinked pages. [uncache_blns]
           // (Need not update links_t or upload_refs3, because links and upload refs
           // are from *posts* not from *pages*.)
+          //
+          // Note: If moving posts within the same page:
+          // Even if moved to elsewhere *on the same page*,
+          // it's good to refresh any linked pages – in case the posts
+          // somehow got moved to an access restricted location on the
+          // same page.
+          //
+          // Note: If moving posts to a different page:
+          // Even if there're other posts on the old page that still
+          // link to a page P, also after the posts got moved, we might still need
+          // to uncache page P, because now afterwards if the posts got moved to
+          // a different page, that new page now also links to P.
+          // (So don't just look at which page —> page links disappeared from
+          // the old page).
+          //
           val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsAfter.map(_.id).toSet)
-          staleStuff.addPageIds(linkedPageIds)
+          staleStuff.addPageIds(linkedPageIds, backlinksStale = true)
 
           COULD // if target page is deleted, or in a deleted category,
           // then remove upl refs, or mark as deleted?  [rm_upl_refs]
@@ -2159,7 +2197,10 @@ trait PostsDao {
           postAfter
         }
 
-      // Would be goog to [save_post_lns_mentions], so wouldn't need to recompute here.
+      staleStuff.addPageIds(
+            Set(whichPost.pageId, newParent.pageId), backlinksStale = false)
+
+      // Would be good to [save_post_lns_mentions], so wouldn't need to recompute here.
       val notfs = notfGenerator(tx).generateForNewPost(
         toPage, postAfter, sourceAndHtml = None, anyReviewTask = None, skipMentions = true)
       SHOULD // tx.saveDeleteNotifications(notfs) — but would cause unique key errors
@@ -2237,9 +2278,11 @@ trait PostsDao {
       if (shallHide) {
         hidePostsOnPage(Vector(postAfter), pageId,
               "This post was flagged")(tx, staleStuff) ; I18N
+        bugWarnIf(!staleStuff.pageModified(pageId), "TyU305RKD")
       }
       else {
         tx.updatePost(postAfter)
+        staleStuff.addPageId(pageId)
       }
 
       tx.insertPostAction(
@@ -2345,14 +2388,15 @@ trait PostsDao {
       for ((pageId, posts) <- postToHideByPage) {
         hidePostsOnPage(posts, pageId, "Many posts by this author got flagged, hiding all")(
               tx, staleStuff)
-        pageIdsToRefresh += pageId
+        bugWarnIf(!staleStuff.pageModified(pageId), "TyE304RK5B3")
+        pageIdsToRefresh += pageId  ; CLEAN_UP; REMOVE // not needed now with staleStuff
       }
 
       postsToHide
     }
 
     removeUserFromMemCache(userId)
-    pageIdsToRefresh.foreach(refreshPageInMemCache)
+    pageIdsToRefresh.foreach(refreshPageInMemCache)  ; REMOVE // not needed now with staleStuff
     postsHidden.to[immutable.Seq]
   }
 
@@ -2400,8 +2444,9 @@ trait PostsDao {
     }
 
     // Uncache backlinked pages. [uncache_blns]
+    staleStuff.addPageId(pageId)
     val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsToHide.map(_.id).toSet)
-    staleStuff.addPageIds(linkedPageIds)
+    staleStuff.addPageIds(linkedPageIds, pageModified = false, backlinksStale = true)
 
     var pageMetaAfter = pageMetaBefore.copy(
       numRepliesVisible = pageMetaBefore.numRepliesVisible - numRepliesHidden,

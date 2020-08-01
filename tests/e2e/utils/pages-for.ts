@@ -1244,14 +1244,28 @@ export class TyE2eTestBrowser {
       });
     }
 
-    waitUntilValueIs(selector: string, desiredValue: string) {
+
+    waitUntilTextIs(selector: string, desiredText: string,
+            opts: { timeoutMs?: number } = {}) {
+      return this.__waitUntilImpl(selector, 'text', desiredText, opts);
+    }
+
+    waitUntilValueIs(selector: string, desiredValue: string,
+            opts: { timeoutMs?: number } = {}) {
+      return this.__waitUntilImpl(selector, 'value', desiredValue, opts);
+    }
+
+    __waitUntilImpl(selector: string, what: 'text' | 'value', desiredValue: string,
+            opts: { timeoutMs?: number }) {
       let currentValue;
-      this.waitForVisible(selector);
+      this.waitForVisible(selector, opts);
       this.waitUntil(() => {
-        currentValue = this.$(selector).getValue();
+        const elem = this.$(selector);
+        currentValue = what === 'text' ? elem.getText() : elem.getValue();
         return currentValue === desiredValue;
       }, {
-        message: `Waiting for value of:  ${selector}  to be:  ${desiredValue}\n` +
+        timeoutMs: opts.timeoutMs,
+        message: `Waiting for ${what} of:  ${selector}  to be:  ${desiredValue}\n` +
         `  now it is: ${currentValue}`,
       });
     }
@@ -1919,8 +1933,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    assertTextMatches(selector: string, regex: string | RegExp, regex2?: string | RegExp) {
-      this._assertOneOrAnyTextMatches(false, selector, regex, regex2);
+    assertTextMatches(selector: string, regex: string | RegExp | (string | RegExp)[],
+          how: 'regex' | 'exact' | 'includes' = 'regex') {
+      this._assertOneOrAnyTextMatches(false, selector, regex, how);
     }
 
 
@@ -1940,9 +1955,9 @@ export class TyE2eTestBrowser {
     }
 
 
-    assertAnyTextMatches(selector: string, regex: string | RegExp,
-          regex2?: string | RegExp, fast?) {
-      this._assertOneOrAnyTextMatches(true, selector, regex, regex2, fast);
+    assertAnyTextMatches(selector: string, regex: string | RegExp | (string | RegExp)[],
+            how: 'regex' | 'exact' | 'includes' = 'regex') {
+      this._assertOneOrAnyTextMatches(true, selector, regex, how);
     }
 
 
@@ -1992,16 +2007,18 @@ export class TyE2eTestBrowser {
 
 
     assertNoTextMatches(selector: string, regex: string | RegExp) {
-      this._assertAnyOrNoneMatches(selector, false, regex);
+      this._assertAnyOrNoneMatches(selector, false, regex, 'regex');
     }
 
 
-    _assertOneOrAnyTextMatches (many, selector: string, regex: string | RegExp,
-          regex2?: string | RegExp, fast?) {
+    _assertOneOrAnyTextMatches (many, selector: string,
+          stringOrRegex: string | RegExp | (string | RegExp)[],
+          how: 'regex' | 'exact' | 'includes') {
+      this._assertAnyOrNoneMatches(selector, true, stringOrRegex, how);
       //process.stdout.write('■');
       //if (fast === 'FAST') {
         // This works with only one this.#br at a time, so only use if FAST, or tests will break.
-        this._assertAnyOrNoneMatches(selector, true, regex, regex2);
+        //this._assertAnyOrNoneMatches(selector, true, regex, regex2);
       /*
         //process.stdout.write('F ');
         return;
@@ -2052,9 +2069,33 @@ export class TyE2eTestBrowser {
 
 
     _assertAnyOrNoneMatches (selector: string, shallMatch: boolean,
-          stringOrRegex: string | RegExp, stringOrRegex2?: string | RegExp) {
-      const regex = getRegExpOrDie(stringOrRegex);
-      const regex2 = getAnyRegExpOrDie(stringOrRegex2);
+          stringOrRegex: string | RegExp | (string | RegExp)[],
+          how: 'regex' | 'exact' | 'includes') {
+
+      let text: string;
+      let text2: string;
+      let regex: RegExp;
+      let regex2: RegExp;
+      if (_.isArray(stringOrRegex)) {
+        dieIf(stringOrRegex.length > 2, 'TyE3056K');
+        if (how === 'regex') {
+          regex = getRegExpOrDie(stringOrRegex[0]);
+          regex2 = getAnyRegExpOrDie(stringOrRegex[1]);
+        }
+        else {
+          die('unimpl [TyE96RKT345R]');
+          //text = stringOrRegex[0] as string;
+          //text2 = stringOrRegex[1] as string;
+        }
+      }
+      else {
+        if (how === 'regex') {
+          regex = getRegExpOrDie(stringOrRegex);
+        }
+        else {
+          text = stringOrRegex as string;
+        }
+      }
 
       dieIf(_.isString(regex2) && !shallMatch,
           `two regexps only supported if shallMatch = true`);
@@ -2079,22 +2120,27 @@ export class TyE2eTestBrowser {
           problems += `  Elem ix 0: Not visible\n`;
           continue;
         }
-        const text = elem.getText();
-        const matchesRegex1 = regex.test(text);
+        const elemText = elem.getText();
+        const matchesRegex1 = regex ? regex.test(elemText) : (
+                how === 'includes'
+                    ? elemText.indexOf(text) >= 0
+                    : elemText === text);
 
-        const matchesAnyRegex2 = regex2 && regex2.test(text);
+        const matchesAnyRegex2 = regex2 && regex2.test(elemText);
+
+        const what = how === 'regex' ? 'regex' : 'text';
 
         if (shallMatch) {
           if (!matchesRegex1) {
             problems +=
-                `  Elem ix ${i}: Misses regex 1:  ${regex}\n` +
-                `    elem text:  "${text}"\n`;
+                `  Elem ix ${i}: Misses ${what} 1:  ${regex || text}\n` +
+                `    elem text:  "${elemText}"\n`;
             continue;
           }
           if (regex2 && !matchesAnyRegex2) {
             problems +=
-                `  Elem ix ${i}: Misses regex 2:  ${regex2}\n` +
-                `    elem text:  "${text}"\n`;
+                `  Elem ix ${i}: Misses ${what} 2:  ${regex2 || text2}\n` +
+                `    elem text:  "${elemText}"\n`;
             continue;
           }
           // All fine, forget all problems — it's enough if one elem matches.
@@ -2103,14 +2149,14 @@ export class TyE2eTestBrowser {
         else {
           if (matchesRegex1) {
             problems +=
-                `  Elem ix ${i}: Matches regex 1:  ${regex}  (but should not)\n` +
-                `    elem text:  "${text}"\n`;
+                `  Elem ix ${i}: Matches ${what} 1:  ${regex || text}  (but should not)\n` +
+                `    elem text:  "${elemText}"\n`;
             continue;
           }
           if (regex2 && matchesAnyRegex2) {
             problems +=
-                `  Elem ix ${i}: Matches regex 2:  ${regex2}  (but should not)\n` +
-                `    elem text:  "${text}"\n`;
+                `  Elem ix ${i}: Matches ${what} 2:  ${regex2 || text2}  (but should not)\n` +
+                `    elem text:  "${elemText}"\n`;
             continue;
           }
           if (!problems && i === (elems.length - 1)) {
@@ -3744,6 +3790,9 @@ export class TyE2eTestBrowser {
         this.waitForVisible('#e2eF_NoTopics');
       },
 
+      clickEditCategory: () => die('TyE59273',
+            "Use forumButtons.clickEditCategory() instead"),
+
       waitForCategoryName: (name: string, ps: { isSubCategory?: true } = {}) => {
         const selector = ps.isSubCategory ? '.s_F_Ts_Cat_Ttl-SubCat' : '.s_F_Ts_Cat_Ttl';
         this.waitAndGetElemWithText(selector, name);
@@ -3825,7 +3874,7 @@ export class TyE2eTestBrowser {
       },
 
       assertTopicVisible: (title: string) => {
-        this.assertAnyTextMatches(this.forumTopicList.titleSelector, title, null, 'FAST');
+        this.assertAnyTextMatches(this.forumTopicList.titleSelector, title, null);
         this.assertNoTextMatches(this.forumTopicList.hiddenTopicTitleSelector, title);
       },
 
@@ -3942,6 +3991,13 @@ export class TyE2eTestBrowser {
         this.waitUntilLoadingOverlayGone();
       },
 
+      cancel: () => {
+        this.waitAndClick('.e_CancelCatB');
+        this.waitUntilGone('.s_CD');
+        this.waitUntilModalGone();
+        this.waitUntilLoadingOverlayGone();
+      },
+
       setCategoryUnlisted: () => {
         this.waitAndClick('#e_ShowUnlRBs');
         this.waitAndClick('.e_UnlCatRB input');
@@ -3955,6 +4011,13 @@ export class TyE2eTestBrowser {
       setNotUnlisted: () => {
         this.waitAndClick('#e_ShowUnlRBs');
         this.waitAndClick('.e_DontUnlRB input');
+      },
+
+      deleteCategory: () => {
+        this.waitAndClick('.s_CD_DelB');
+        // Dismiss "Category deleted" message.
+        this.stupidDialog.clickClose();
+        this.categoryDialog.cancel();
       },
 
       openSecurityTab: () => {
@@ -4625,7 +4688,11 @@ export class TyE2eTestBrowser {
       },
 
       assertPostTextMatches: (postNr: PostNr, text: string | RegExp) => {
-        this.assertTextMatches(this.topic.postBodySelector(postNr), text)
+        this.assertTextMatches(this.topic.postBodySelector(postNr), text, 'regex')
+      },
+
+      assertPostTextIs: (postNr: PostNr, text: string) => {
+        this.assertTextMatches(this.topic.postBodySelector(postNr), text, 'exact')
       },
 
       getPostText: (postNr: PostNr): string => {
@@ -4634,6 +4701,14 @@ export class TyE2eTestBrowser {
 
       getPostHtml: (postNr: PostNr): string => {
         return this.waitAndGetVisibleHtml(this.topic.postBodySelector(postNr));
+      },
+
+      waitUntilPostTextIs: (postNr: PostNr, text: string,
+              opts: { thingInPostSelector?: string } = {}) => {
+        this.switchToEmbCommentsIframeIfNeeded();
+        const selector =
+            `${this.topic.postBodySelector(postNr)} ${opts.thingInPostSelector || ''}`;
+        this.waitUntilTextIs(selector, text);
       },
 
       waitUntilPostTextMatches: (postNr: PostNr, regex: string | RegExp,
@@ -5326,6 +5401,37 @@ export class TyE2eTestBrowser {
       _hasUnapprovedClass: (postNr: PostNr) => {
         return this.isVisible(`#post-${postNr}.dw-p-unapproved`);
       },
+
+
+      backlinks: {
+        __mkSelector: (pageId: PageId) => `.s_InLns_Ln[href="/-${pageId}"]`,
+
+        countBacklinks: (): number => this.count('.s_InLns_Ln'),
+
+        refreshUntilNum: (num: number) => {
+          let numNow: number;
+          this.waitUntil(() => {
+            this.waitForMyDataAdded();
+            numNow = this.topic.backlinks.countBacklinks();
+            if (numNow === num) return true;
+            this.refresh2();
+          }, {
+            message: () => `Waiting for ${num} backlinks, num now: ${numNow}`,
+          });
+        },
+
+        isLinkedFromPageId: (pageId: PageId): boolean => {
+          return this.isExisting(this.topic.backlinks.__mkSelector(pageId));
+        },
+
+        getLinkTitle: (pageId: PageId): string => {
+          return this.waitAndGetText(this.topic.backlinks.__mkSelector(pageId));
+        },
+
+        clickBacklinkFrom: (pageId: PageId): void => {
+          this.waitAndClick(this.topic.backlinks.__mkSelector(pageId));
+        },
+      },
     };
 
 
@@ -5767,7 +5873,7 @@ export class TyE2eTestBrowser {
 
           assertPostTextVisible: (postText: string) => {
             let selector = this.userProfilePage.activity.posts.postSelector;
-            this.assertAnyTextMatches(selector, postText, null, 'FAST');
+            this.assertAnyTextMatches(selector, postText, null);
           },
 
           assertPostTextAbsent: (postText: string) => {
@@ -5797,7 +5903,7 @@ export class TyE2eTestBrowser {
 
           assertTopicTitleVisible: (title: string) => {
             let selector = this.userProfilePage.activity.topics.topicsSelector;
-            this.assertAnyTextMatches(selector, title, null, 'FAST');
+            this.assertAnyTextMatches(selector, title, null);
           },
 
           assertTopicTitleAbsent: (title: string) => {
@@ -7376,10 +7482,18 @@ export class TyE2eTestBrowser {
         if (!data.resultInError) {
           this.waitForNewUrl();
           if (data.matchAfter !== false && data.titleMatchAfter !== false) {
+            // if (data.titleMatchAfter)
             this.assertPageTitleMatches(data.titleMatchAfter || data.title);
+            if (!data.titleMatchAfter) {
+              this.topic.assertPostTextIs(c.TitleNr, data.title);
+            }
           }
           if (data.matchAfter !== false && data.bodyMatchAfter !== false) {
+            // if (data.bodyMatchAfter)
             this.assertPageBodyMatches(data.bodyMatchAfter || data.body);
+            if (!data.bodyMatchAfter) {
+              this.topic.assertPostTextIs(c.BodyNr, data.body);
+            }
           }
         }
         this.waitUntilLoadingOverlayGone();
@@ -7397,8 +7511,14 @@ export class TyE2eTestBrowser {
         this.topic.clickEditOrigPost();
         this.editor.editText(newText, opts);
         this.editor.save();
-        this.topic.waitUntilPostTextMatches(c.BodyNr, newText);
-        this.assertPageBodyMatches(newText);
+        if (opts.append) {
+          this.topic.waitUntilPostTextMatches(c.BodyNr, newText);  // includes!
+          this.assertPageBodyMatches(newText);  // includes!
+        }
+        else {
+          this.topic.waitUntilPostTextIs(c.BodyNr, newText);
+          this.topic.assertPostTextIs(c.BodyNr, newText);
+        }
       },
 
       editPostNr: (postNr: PostNr, newText: string, opts: { append?: boolean } = {}) => {

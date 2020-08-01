@@ -364,7 +364,8 @@ trait PagesDao {
       updatePagePopularity(
         PreLoadedPageParts(pageMeta, Vector(titlePost, bodyPost)), tx)
 
-      saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff)
+      // Need not: staleStuff.addPageId(..) — it's a new page.
+      saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff, skipBugWarn = true)
     }
 
     uploadRefs foreach { hashPathSuffix =>
@@ -629,6 +630,11 @@ trait PagesDao {
       tx.insertAuditLogEntry(auditLogEntry)
       tx.indexAllPostsOnPage(pageId)
       // (Keep in top-topics table, so staff can list popular-but-deleted topics.)
+
+      val linkedPageIds = tx.loadPageIdsLinkedFromPage(pageId)
+      staleStuff.addPageIds(linkedPageIds, pageModified = false, backlinksStale = true)
+      // Page version bumped above.
+      staleStuff.addPageId(pageId, memCacheOnly = true)
 
       val un = undelete ? "un" | ""
       addMetaMessage(deleter, s" ${un}deleted this topic", pageId, tx)
