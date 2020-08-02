@@ -14,9 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-// RENAME this file to  LinkPreviewEngines   .
 
-package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview.engines
+package debiki.onebox.engines   // RENAME to  talkyard.server.linkpreview
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
