@@ -104,9 +104,9 @@ package object dao {
 
     def addPageIds(pageIds: Set[PageId], memCacheOnly: Boolean = false,
             pageModified: Boolean = true, backlinksStale: Boolean = false): Unit = {
-      pageIds.foreach(pageId => {
+      pageIds foreach { pageId =>
         addPageId(pageId, memCacheOnly = memCacheOnly, pageModified = pageModified,
-              backlinksStale = backlinksStale))
+              backlinksStale = backlinksStale)
       }
     }
 

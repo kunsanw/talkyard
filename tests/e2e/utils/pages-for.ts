@@ -2273,7 +2273,7 @@ export class TyE2eTestBrowser {
     }
 
 
-    assertNotFoundError() {
+    assertNotFoundError(ps: { whyNot?: 'CategroyDeleted' } = {}) {
       for (let i = 0; i < 20; ++i) {
         let source = this.#br.getPageSource();
         // The //s regex modifier makes '.' match newlines. But it's not available before ES2018.
@@ -2283,6 +2283,21 @@ export class TyE2eTestBrowser {
           this.#br.refresh();
           continue;
         }
+
+        let okNotFoundReason = true;
+        if (settings.prod) {
+          // Then we won't know why we got 404 Not Found.
+        }
+        else if (ps.whyNot === 'CategroyDeleted') {
+          okNotFoundReason = /TyECATDELD_/.test(source);
+        }
+        tyAssert.ok(okNotFoundReason,
+              `Wrong 404 Not Found reason, should have been: ${ps.whyNot
+                    } but source is: \n` +
+              `-----------------------------------------------------------\n` +
+              source + '\n' +
+              `-----------------------------------------------------------\n`);
+
         return;
       }
       die('EdE5FKW2', "404 Not Found never appears");

@@ -1,7 +1,5 @@
 /// <reference path="../test-types.ts"/>
 
-// SHOULD_CODE_REVIEW this whole file, later.  . .
-
 import * as _ from 'lodash';
 import assert = require('../utils/ty-assert');
 // import fs = require('fs');  EMBCMTS
@@ -178,7 +176,7 @@ describe("internal links, backlinks   TyTINTLNS54824", () => {   // RENAME this 
   });
 
   it("Owen now follows the link to Maria's page", () => {
-    owensBrowser.waitAndClickNth('#post-1 a', 2);  // ttt
+    owensBrowser.waitAndClickNth('#post-1 a', 2);
     owensBrowser.topic.waitUntilPostTextMatches(c.BodyNr, forum.topics.byMariaCategoryA.body);
     assert.eq(owensBrowser.getUrl(), mariasTopicUrl());
   });
@@ -314,7 +312,7 @@ describe("internal links, backlinks   TyTINTLNS54824", () => {   // RENAME this 
 
   it("Memah now cannot see her topic — gone, category deleted  TyTDELCATTPC054", () => {
     memahsBrowser.refresh2();
-    // ???
+    memahsBrowser.assertNotFoundError({ whyNot: 'CategroyDeleted' });
   });
 
   it("Memah and Owen go to the linked topic, i.e. Michael's page", () => {
@@ -361,11 +359,12 @@ describe("internal links, backlinks   TyTINTLNS54824", () => {   // RENAME this 
   const owensTopic_link2MiTpc = () => `owensTopic_link2MiTpc ${michelsTopicUrl()}`;
   const owensReply_link2MaTpc = () => `owensReply_link2MaTpc ${mariasTopicUrl()}`;
 
-  it("Owen wants backlinks!  He goes to the staff cateory", () => {
-    owensBrowser.forumTopicList.goHere({ categorySlug: forum.categories.staffOnlyCategory.slug });
+  it("Owen wants his own backlinks!  He goes to the staff cateory", () => {
+    owensBrowser.forumTopicList.goHere({
+          categorySlug: forum.categories.staffOnlyCategory.slug });
   });
 
-  it("Owen posts a staff-only topic with a link to Michael's page", () => {
+  it("... posts a staff-only topic with a link to Michael's page", () => {
     owensBrowser.complex.createAndSaveTopic({
           title: owensTopicTitle, body: owensTopic_link2MiTpc() })
   });
@@ -389,17 +388,21 @@ describe("internal links, backlinks   TyTINTLNS54824", () => {   // RENAME this 
   });
 
   it("... but Memah doesn't; she's an ordinary member, not staff", () => {
-    memahsBrowser.go2(michelsTopicUrl());
+    assert.eq(memahsBrowser.getUrl(), michelsTopicUrl());
+    memahsBrowser.refresh2();
+    memahsBrowser.waitForMyDataAdded();
     assert.eq(memahsBrowser.topic.backlinks.countBacklinks(), 0);
   });
 
   it("Owen sees a backlink also on Maria's page", () => {
     owensBrowser.go2(mariasTopicUrl());
+    owensBrowser.waitForMyDataAdded();
     assert.eq(owensBrowser.topic.backlinks.countBacklinks(), 1);
   });
 
   it("... but Memah doesn't; she's an ordinary member, not staff", () => {
     memahsBrowser.go2(mariasTopicUrl());
+    memahsBrowser.waitForMyDataAdded();
     assert.eq(memahsBrowser.topic.backlinks.countBacklinks(), 0);
   });
 
