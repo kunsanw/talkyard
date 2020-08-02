@@ -82,35 +82,35 @@ class LinksAppSpec extends DaoAppSuite {
   val extLinkTwoAnotherOEmbJson: JsObject = Json.obj("html" -> JsString("<b>Another</b>"))
 
   lazy val linkPreviewOneOrig: LinkPreview = LinkPreview(
-        link_url_c = extLinkOneUrl,
-        fetched_from_url_c = extLinkOneOEmbUrl,
-        fetched_at_c = when,
+        linkUrl = extLinkOneUrl,
+        fetchedFromUrl = extLinkOneOEmbUrl,
+        fetchedAt = when,
         // cache_max_secs_c = ... — later
-        status_code_c = 200,
-        preview_type_c = LinkPreviewTypes.OEmbed,
-        first_linked_by_id_c = userMmm.id,
-        content_json_c = extLinkOneOEmbJsonOrig)
+        statusCode = 200,
+        previewType = LinkPreviewTypes.OEmbed,
+        firstLinkedById = userMmm.id,
+        contentJson = extLinkOneOEmbJsonOrig)
 
   lazy val linkPreviewOneEdited: LinkPreview =
     linkPreviewOneOrig.copy(
-          content_json_c = extLinkOneOEmbJsonEdited)
+          contentJson = extLinkOneOEmbJsonEdited)
 
   lazy val linkPreviewTwo: LinkPreview = LinkPreview(
-        link_url_c = extLinkTwoUrl,
-        fetched_from_url_c = extLinkTwoOEmbUrl,
-        fetched_at_c = when.plusMillis(10),
+        linkUrl = extLinkTwoUrl,
+        fetchedFromUrl = extLinkTwoOEmbUrl,
+        fetchedAt = when.plusMillis(10),
         // cache_max_secs_c = ... — later
-        status_code_c = 200,
-        preview_type_c = LinkPreviewTypes.OEmbed,
-        first_linked_by_id_c = userOoo.id,
-        content_json_c = extLinkTwoOEmbJson)
+        statusCode = 200,
+        previewType = LinkPreviewTypes.OEmbed,
+        firstLinkedById = userOoo.id,
+        contentJson = extLinkTwoOEmbJson)
 
   lazy val linkPreviewTwoOtherOEmbUrl: LinkPreview = linkPreviewTwo.copy(
-        link_url_c = extLinkTwoUrl,
-        fetched_from_url_c = extLinkTwoAnotherOEmbUrl,
-        fetched_at_c = when.plusMillis(110),
-        first_linked_by_id_c = userMmm.id,
-        content_json_c = extLinkTwoAnotherOEmbJson)
+        linkUrl = extLinkTwoUrl,
+        fetchedFromUrl = extLinkTwoAnotherOEmbUrl,
+        fetchedAt = when.plusMillis(110),
+        firstLinkedById = userMmm.id,
+        contentJson = extLinkTwoAnotherOEmbJson)
 
 
   "prepare: create site 1 and 2, and owners, forums".in {
@@ -145,18 +145,18 @@ class LinksAppSpec extends DaoAppSuite {
     }
 
     "Update".inWriteTx(daoSite1) { (tx, _) =>
-      linkPreviewOneOrig.first_linked_by_id_c mustBe userMmm.id // not userOoo, ttt
+      linkPreviewOneOrig.firstLinkedById mustBe userMmm.id // not userOoo, ttt
       tx.upsertLinkPreview(
             linkPreviewOneEdited.copy(
                   // This change should get ignored — only the *first*
                   // user who typed the ext link, is remembered.
-                  first_linked_by_id_c = userOoo.id))
+                  firstLinkedById = userOoo.id))
     }
 
     "Read back after update".inReadTx(daoSite1) { tx =>
       val editedPrevw = tx.loadLinkPreviewByUrl(extLinkOneUrl, extLinkOneOEmbUrl).get
       editedPrevw mustBe linkPreviewOneEdited
-      editedPrevw.first_linked_by_id_c mustBe userMmm.id  // not userOoo
+      editedPrevw.firstLinkedById mustBe userMmm.id  // not userOoo
 
       info("the 2nd link preview didn't change")
       val pv2 = tx.loadLinkPreviewByUrl(extLinkTwoUrl, extLinkTwoOEmbUrl).get
@@ -241,33 +241,33 @@ class LinksAppSpec extends DaoAppSuite {
 
   // We'll start with links A —> {B, Z} only:
   lazy val linkAToB: Link = Link(
-        from_post_id_c = pageA.bodyPost.id,
-        link_url_c = s"/-${pageB.id}",
-        added_at_c = when,
-        added_by_id_c = SystemUserId,
-        is_external_c = false,
-        to_page_id_c = Some(pageB.id),
-        to_post_id_c = None,
-        to_pp_id_c = None,
-        to_tag_id_c = None,
-        to_category_id_c = None)
+        fromPostId = pageA.bodyPost.id,
+        linkUrl = s"/-${pageB.id}",
+        addedAt = when,
+        addedById = SystemUserId,
+        isExternal = false,
+        toPageId = Some(pageB.id),
+        toPostId = None,
+        toPpId = None,
+        toTagId = None,
+        toCategoryId = None)
 
   lazy val linkAToZ: Link = linkAToB.copy(
-        link_url_c = s"/-${pageZ.id}",
-        to_page_id_c = Some(pageZ.id))
+        linkUrl = s"/-${pageZ.id}",
+        toPageId = Some(pageZ.id))
 
   // These inserted a bit later:
-  lazy val linkBToZ: Link = linkAToZ.copy(from_post_id_c = pageB.bodyPost.id)
-  lazy val linkCToZ: Link = linkAToZ.copy(from_post_id_c = pageC.bodyPost.id)
-  lazy val linkDToZ: Link = linkAToZ.copy(from_post_id_c = pageD.bodyPost.id)
+  lazy val linkBToZ: Link = linkAToZ.copy(fromPostId = pageB.bodyPost.id)
+  lazy val linkCToZ: Link = linkAToZ.copy(fromPostId = pageC.bodyPost.id)
+  lazy val linkDToZ: Link = linkAToZ.copy(fromPostId = pageD.bodyPost.id)
 
   // Even later, replies linking to Z:
   lazy val linkEReOneToQ: Link = linkAToZ.copy(
-        from_post_id_c = pageEReplyOne.id,
-        link_url_c = s"/-${pageQ.id}",
-        to_page_id_c = Some(pageQ.id))
-  lazy val linkEReTwoToQ: Link = linkEReOneToQ.copy(from_post_id_c = pageEReplyTwo.id)
-  lazy val linkFReToQ: Link = linkEReOneToQ.copy(from_post_id_c = pageFReplyToHide.id)
+        fromPostId = pageEReplyOne.id,
+        linkUrl = s"/-${pageQ.id}",
+        toPageId = Some(pageQ.id))
+  lazy val linkEReTwoToQ: Link = linkEReOneToQ.copy(fromPostId = pageEReplyTwo.id)
+  lazy val linkFReToQ: Link = linkEReOneToQ.copy(fromPostId = pageFReplyToHide.id)
 
 
   "Internal links: Insert, update, find, delete" - {
@@ -330,9 +330,9 @@ class LinksAppSpec extends DaoAppSuite {
       tx.deleteLinksFromPost(bodyId, Set.empty) mustBe 0
       tx.deleteLinksFromPost(bodyId, Set("/wrong-link")) mustBe 0
       tx.deleteLinksFromPost(bodyId, Set("/wrong", "/and/wrong-2")) mustBe 0
-      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c + "wrong")) mustBe 0
-      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c)) mustBe 1
-      tx.deleteLinksFromPost(bodyId, Set(linkAToB.link_url_c)) mustBe 0  // already gone
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.linkUrl + "wrong")) mustBe 0
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.linkUrl)) mustBe 1
+      tx.deleteLinksFromPost(bodyId, Set(linkAToB.linkUrl)) mustBe 0  // already gone
     }
 
     "Link A —> B gone".inReadTx(daoSite1) { tx =>
@@ -502,7 +502,7 @@ class LinksAppSpec extends DaoAppSuite {
 
       "Fake edit the reply: Delete the link".inWriteTx(daoSite1) { (tx, _) =>
         tx.deleteLinksFromPost(
-              linkEReOneToQ.from_post_id_c, Set(linkEReOneToQ.link_url_c))
+              linkEReOneToQ.fromPostId, Set(linkEReOneToQ.linkUrl))
       }
 
       "Now E —> Q link gone".inReadTx(daoSite1) { tx =>
@@ -565,8 +565,8 @@ class LinksAppSpec extends DaoAppSuite {
       }
 
       "Delete the links".inWriteTx(daoSite1) { (tx, staleStuff) =>
-        tx.deleteLinksFromPost(pageEReplyOne.id, Set(linkEReOneToQ.link_url_c))
-        tx.deleteLinksFromPost(pageEReplyTwo.id, Set(linkEReTwoToQ.link_url_c))
+        tx.deleteLinksFromPost(pageEReplyOne.id, Set(linkEReOneToQ.linkUrl))
+        tx.deleteLinksFromPost(pageEReplyTwo.id, Set(linkEReTwoToQ.linkUrl))
       }
 
       "Now the deleted replies very much don't link to Q".inReadTx(daoSite1) { tx =>
@@ -574,8 +574,8 @@ class LinksAppSpec extends DaoAppSuite {
         tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set.empty
         tx.loadPageIdsLinkedFromPage(pageE.id) mustBe Set.empty
         tx.loadPageIdsLinkedFromPosts(Set(
-              linkEReOneToQ.from_post_id_c,
-              linkEReTwoToQ.from_post_id_c)) mustBe Set.empty
+              linkEReOneToQ.fromPostId,
+              linkEReTwoToQ.fromPostId)) mustBe Set.empty
       }
     }
 
@@ -589,11 +589,11 @@ class LinksAppSpec extends DaoAppSuite {
       "Now F —> Q".inReadTx(daoSite1) { tx =>
         info("exact links")
         tx.loadLinksToPage(pageQ.id) mustBe Seq(linkFReToQ)
-        tx.loadLinksFromPost(linkFReToQ.from_post_id_c) mustBe Seq(linkFReToQ)
+        tx.loadLinksFromPost(linkFReToQ.fromPostId) mustBe Seq(linkFReToQ)
 
         info("page ids")
         tx.loadPageIdsLinkingToPage(pageQ.id, inclDeletedHidden = false) mustBe Set(pageF.id)
-        tx.loadPageIdsLinkedFromPosts(Set(linkFReToQ.from_post_id_c)) mustBe Set(pageQ.id)
+        tx.loadPageIdsLinkedFromPosts(Set(linkFReToQ.fromPostId)) mustBe Set(pageQ.id)
         tx.loadPageIdsLinkedFromPage(pageF.id) mustBe Set(pageQ.id)
       }
 

@@ -55,14 +55,14 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
     val values = List(
           siteId.asAnyRef,
-          linkPreview.link_url_c,
-          linkPreview.fetched_from_url_c,
-          linkPreview.fetched_at_c.asTimestamp,
+          linkPreview.linkUrl,
+          linkPreview.fetchedFromUrl,
+          linkPreview.fetchedAt.asTimestamp,
           NullInt, // linkPreview.cache_max_secs_c, — later
-          linkPreview.status_code_c.asAnyRef,
-          linkPreview.preview_type_c.asAnyRef,
-          linkPreview.first_linked_by_id_c.asAnyRef,
-          linkPreview.content_json_c)
+          linkPreview.statusCode.asAnyRef,
+          linkPreview.previewType.asAnyRef,
+          linkPreview.firstLinkedById.asAnyRef,
+          linkPreview.contentJson)
 
     runUpdateSingleRow(upsertStatement, values)
   }
@@ -124,16 +124,16 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
     val values = List(
       siteId.asAnyRef,
-      link.from_post_id_c.asAnyRef,
-      link.link_url_c,
-      link.added_at_c.asTimestamp,
-      link.added_by_id_c.asAnyRef,
-      link.is_external_c.asTrueOrNull,
-      link.to_page_id_c.orNullVarchar,
-      link.to_post_id_c.orNullInt,
-      link.to_pp_id_c.orNullInt,
-      link.to_tag_id_c.orNullInt,
-      link.to_category_id_c.orNullInt)
+      link.fromPostId.asAnyRef,
+      link.linkUrl,
+      link.addedAt.asTimestamp,
+      link.addedById.asAnyRef,
+      link.isExternal.asTrueOrNull,
+      link.toPageId.orNullVarchar,
+      link.toPostId.orNullInt,
+      link.toPpId.orNullInt,
+      link.toTagId.orNullInt,
+      link.toCategoryId.orNullInt)
 
     runUpdateSingleRow(upsertStatement, values)
   }
@@ -284,30 +284,30 @@ trait LinksSiteTxMixin extends SiteTransaction {
 
   private def parseLinkPreview(rs: js.ResultSet): LinkPreview = {
     LinkPreview(
-          link_url_c = getString(rs, "link_url_c"),
-          fetched_from_url_c = getString(rs, "fetched_from_url_c"),
-          fetched_at_c = getWhen(rs, "fetched_at_c"),
+          linkUrl = getString(rs, "link_url_c"),
+          fetchedFromUrl = getString(rs, "fetched_from_url_c"),
+          fetchedAt = getWhen(rs, "fetched_at_c"),
           // cache_max_secs_c = ... — later
-          status_code_c = getInt(rs, "status_code_c"),
-          preview_type_c = getInt(rs, "preview_type_c"),
-          first_linked_by_id_c = getInt(rs, "first_linked_by_id_c"),
-          content_json_c = getOptJsObject(rs, "content_json_c").getOrElse(JsNull))
+          statusCode = getInt(rs, "status_code_c"),
+          previewType = getInt(rs, "preview_type_c"),
+          firstLinkedById = getInt(rs, "first_linked_by_id_c"),
+          contentJson = getOptJsObject(rs, "content_json_c").getOrElse(JsNull))
   }
 
 
   private def parseLink(rs: js.ResultSet): Link = {
     Link(
-          from_post_id_c = getInt(rs, "from_post_id_c"),
-          link_url_c = getString(rs, "link_url_c"),
-          added_at_c = getWhen(rs, "added_at_c"),
-          added_by_id_c = getInt(rs, "added_by_id_c"),
-          is_external_c = getOptBool(rs, "is_external_c") is true,
+          fromPostId = getInt(rs, "from_post_id_c"),
+          linkUrl = getString(rs, "link_url_c"),
+          addedAt = getWhen(rs, "added_at_c"),
+          addedById = getInt(rs, "added_by_id_c"),
+          isExternal = getOptBool(rs, "is_external_c") is true,
           //to_staff_page: getOptBool(rs, "to_staff_page") is true,
-          to_page_id_c = getOptString(rs, "to_page_id_c"),
-          to_post_id_c = getOptInt(rs, "to_post_id_c"),
-          to_pp_id_c = getOptInt(rs, "to_pp_id_c"),
-          to_tag_id_c = getOptInt(rs, "to_tag_id_c"),
-          to_category_id_c = getOptInt(rs, "to_category_id_c"))
+          toPageId = getOptString(rs, "to_page_id_c"),
+          toPostId = getOptInt(rs, "to_post_id_c"),
+          toPpId = getOptInt(rs, "to_pp_id_c"),
+          toTagId = getOptInt(rs, "to_tag_id_c"),
+          toCategoryId = getOptInt(rs, "to_category_id_c"))
   }
 
 }

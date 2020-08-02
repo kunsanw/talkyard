@@ -343,7 +343,7 @@ class LinkPreviewRenderer(
 
   private def savePreviewInDatabase(linkPreview: LinkPreview): Unit = {
     dieIf(!mayHttpFetch, "TyE305KSHW2",
-          s"Trying to save link preview, when may not fetch: ${linkPreview.link_url_c}")
+          s"Trying to save link preview, when may not fetch: ${linkPreview.linkUrl}")
     val siteDao = globals.siteDao(siteId)
     siteDao.writeTx { (tx, _) =>
       COULD // refresh pages that include this link preview, add to [staleStuff].

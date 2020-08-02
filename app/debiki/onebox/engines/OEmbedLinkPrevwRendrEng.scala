@@ -129,7 +129,7 @@ abstract class OEmbedLinkPrevwRendrEng(
     params.loadPreviewFromDb(downloadUrl) foreach { cachedPreview =>
       SECURITY; SHOULD // rate limit each user, and each site, + max db table rows per site?
       // There's already:  RateLimits.FetchLinkPreview
-      cachedPreview.status_code_c match {
+      cachedPreview.statusCode match {
         case 200 => // ok
         case 404 =>
           return FutBad(LinkPreviewProblem(
@@ -146,7 +146,7 @@ abstract class OEmbedLinkPrevwRendrEng(
                 weirdStatusError(x), unsafeUrl = unsafeUrl, errorCode = "TyELNPVWUNK"))
       }
 
-      val unsafeHtml = (cachedPreview.content_json_c \ "html").asOpt[String] getOrElse {
+      val unsafeHtml = (cachedPreview.contentJson \ "html").asOpt[String] getOrElse {
         return FutBad(LinkPreviewProblem(
                   noHtmlInOEmbed, unsafeUrl = unsafeUrl, errorCode = "TyELNPV0HTML"))
       }
@@ -221,14 +221,14 @@ abstract class OEmbedLinkPrevwRendrEng(
         else {
           SECURITY; QUOTA // incl in quota? num preview links * X  [lnpv_quota]
           val preview = LinkPreview(
-                link_url_c = unsafeUrl,
-                fetched_from_url_c = downloadUrl,
-                fetched_at_c = globals.now(),
+                linkUrl = unsafeUrl,
+                fetchedFromUrl = downloadUrl,
+                fetchedAt = globals.now(),
                 // cache_max_secs_c — skip for now
-                status_code_c = response.status,
-                preview_type_c = LinkPreviewTypes.OEmbed,
-                first_linked_by_id_c = params.requesterId,
-                content_json_c = unsafeJsObj)
+                statusCode = response.status,
+                previewType = LinkPreviewTypes.OEmbed,
+                firstLinkedById = params.requesterId,
+                contentJson = unsafeJsObj)
           params.savePreviewInDb(preview)
 
           Good(anyUnsafeHtml getOrDie "TyE6986SK")

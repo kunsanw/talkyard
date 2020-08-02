@@ -1139,7 +1139,7 @@ trait PostsDao {
 
     val linkUrlsAfter = sourceAndHtml.internalLinks
     val newLinkUrls: Set[String] = linkUrlsAfter.filterNot(linkUrl =>
-          linksBefore.exists(_.link_url_c == linkUrl))
+          linksBefore.exists(_.linkUrl == linkUrl))
 
     val newLinks = newLinkUrls flatMap { linkUrl: String =>
       val uri = new java.net.URI(linkUrl)
@@ -1151,19 +1151,19 @@ trait PostsDao {
       //   - /-1234/by-id-but-old-page-slug
       //   - /id-less-path-to-same-page
       anyPagePath map { path: PagePathWithId =>
-        Link(from_post_id_c = post.id,
-              link_url_c = linkUrl,
-              added_at_c = approvedAt,
-              added_by_id_c = writerId,
-              is_external_c = false,
-              to_page_id_c = Some(path.pageId))
+        Link(fromPostId = post.id,
+              linkUrl = linkUrl,
+              addedAt = approvedAt,
+              addedById = writerId,
+              isExternal = false,
+              toPageId = Some(path.pageId))
       }
     }
 
     // [On2], fine.
-    val deletedLinks = linksBefore.filter(lb => !linkUrlsAfter.contains(lb.link_url_c))
+    val deletedLinks = linksBefore.filter(lb => !linkUrlsAfter.contains(lb.linkUrl))
 
-    tx.deleteLinksFromPost(post.id, deletedLinks.map(_.link_url_c).toSet)
+    tx.deleteLinksFromPost(post.id, deletedLinks.map(_.linkUrl).toSet)
     newLinks foreach tx.upsertLink
 
     val pageIdsLinkedAfter = tx.loadPageIdsLinkedFromPage(post.pageId)
