@@ -2,7 +2,7 @@
 -- And columns in what seems like a "good to know first" order,
 -- maybe primary key first?
 
--- CR_DONE whole file  07-12
+
 
 --======================================================================
 --  links_t
