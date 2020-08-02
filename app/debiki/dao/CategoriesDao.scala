@@ -622,7 +622,7 @@ trait CategoriesDao {
       // affected — but also pages *linked from* those pages, since Talkyard shows
       // which other topics link to a topic. And if one of those linking topics
       // becomes access-restricted, then, the linked topic needs to be uncached
-      // and rerendered, so the link disappears.
+      // and rerendered, so the link disappears.  [cats_clear_cache]
       emptyCache()
     }
     else {
@@ -732,7 +732,7 @@ trait CategoriesDao {
     // And pages *linked from* pages in the categories — for the correct
     // backlinks to appear.
     COULD_OPTIMIZE // only remove-from-cache / mark-as-dirty pages inside the category,
-    // plus linked pages — but that's not so easy? Wait with that.
+    // plus linked pages — but that's not so easy? Wait with that.  [cats_clear_cache]
     //emptyCache()
     tx.bumpSiteVersion()
   }

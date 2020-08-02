@@ -364,7 +364,9 @@ trait PagesDao {
       updatePagePopularity(
         PreLoadedPageParts(pageMeta, Vector(titlePost, bodyPost)), tx)
 
-      // Need not: staleStuff.addPageId(..) — it's a new page.
+      // Add links, and uncache linked pages — need to rerender them, with
+      // a backlink to this new page.
+      // Need not: staleStuff.addPageId(new-page-id) — page didn't exist before.
       saveDeleteLinks(bodyPost, body, authorId, tx, staleStuff, skipBugWarn = true)
     }
 
@@ -631,6 +633,11 @@ trait PagesDao {
       tx.indexAllPostsOnPage(pageId)
       // (Keep in top-topics table, so staff can list popular-but-deleted topics.)
 
+      // Refresh backlinks — this page now deleted.
+      // (However, we don't delete from links_t, when deleting pages or categories
+      // — that would sometime cause lots of writes to the database. Instead,
+      // backlinks to deleted and access restricted pages and categories are
+      // filtered out, when reading from the db.)
       val linkedPageIds = tx.loadPageIdsLinkedFromPage(pageId)
       staleStuff.addPageIds(linkedPageIds, pageModified = false, backlinksStale = true)
       // Page version bumped above.

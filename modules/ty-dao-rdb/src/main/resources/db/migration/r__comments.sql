@@ -101,7 +101,7 @@ Is 0 if the request failed completely [ln_pv_netw_err], didn't get any response.
 E.g. TCP RST or timeout. 0 means the same in a browser typically, e.g. request.abort().
 
 However, currently (maybe always?) failed fetches are instead cached temporarily
-only, in Redis, so cannot DoS attack the disk storage.  [ln_pv_downl_errs]  FETCH
+only, in Redis, so cannot DoS attack the disk storage.  [ln_pv_fetch_errs]
 $_$;
 
 
@@ -109,7 +109,7 @@ $_$;
 comment on column  link_previews_t.content_json_c  is $_$
 
 Null if the request failed, got no response json. E.g. an error status code,
-or a request timeout or TCP RST?   [ln_pv_downl_errs]
+or a request timeout or TCP RST?   [ln_pv_fetch_errs]
 $_$;
 
 

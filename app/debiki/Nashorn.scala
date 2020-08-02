@@ -234,15 +234,15 @@ class Nashorn(
         embeddedOriginOrEmpty) +
           ed.server.UploadsUrlBasePath + pubSiteId + '/'
 
-    // A link preview renderer that fetches the previews from the database,
-    // link_previews_t, but no external requests — cannot do that when rendering
-    // CommonMark from inside Nashorn.
+    // This link preview renderer fetches previews from the database,
+    // link_previews_t, but makes no external requests — cannot do that from inside
+    // a Nashorn script.
     val prevwRenderer = new LinkPreviewRendererForNashorn(
           new LinkPreviewRenderer(
               globals, siteId = siteId,
               // Cannot do external requests from inside Nashorn.
               mayHttpFetch = false,
-              // The requester doesn't matter — we won't fetch external data.
+              // The requester doesn't matter — won't fetch external data.
               requesterId = SystemUserId))
 
     val (safeHtmlNoPreviews, mentions) = withJavascriptEngine(engine => {

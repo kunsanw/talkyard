@@ -66,17 +66,22 @@ trait PageLinksDao {
   def uncacheLinks(staleStuff: StaleStuff): Unit = {
     // Need not refresh pages linked from indirectly modified pages — any
     // links from them shouldn't have changed, since weren't modified themselves.
-    // But if a category got deleted or access restricted — then, would need
-    // to to something here!
+    // But if a category got deleted or access restricted, then, would need
+    // to to something here — if we didn't clear the whole site cache already,
+    // on such changes.  [cats_clear_cache]
     val uncacheLinksToPageIds = staleStuff.stalePageIdsInMemIndirectly
 
+    // This shouldn't be needed — stalePageIdsInMemIndirectly ought to include
+    // all pages we might need to uncache, already.
+    /* -------
     // Maybe because of a race, the database and cache knows about slightly
     // different links? So uncache based on both?
     val uncacheLinksFromPageIds = staleStuff.stalePageIdsInMemDirectly
     val linkedPageIds: Set[PageId] = uncacheLinksFromPageIds.flatMap(loadPageIdsLinkedFrom)
     val moreIds: Set[PageId] = uncacheLinksFromPageIds.flatMap(getPageIdsLinkedFrom)
+    ------- */
 
-    val allToUncache = uncacheLinksToPageIds ++ linkedPageIds ++ moreIds
+    val allToUncache = uncacheLinksToPageIds  // ++ linkedPageIds ++ moreIds
 
     allToUncache.foreach { pageId =>
       memCache.remove(linksToKey(pageId))

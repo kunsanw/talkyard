@@ -28,7 +28,6 @@ import debiki.dao.UploadsDao
 import org.jsoup.Jsoup
 import org.jsoup.safety.Whitelist
 
-// CR_DONE  07-09 .
 
 /** Immutable.
   */
@@ -198,9 +197,10 @@ object TextAndHtml {
     * Maybe just let admins-that-import-a-site set a flag that everything has been
     * sanitized already?_ COULD move server side js to external Nodejs or V8
     * processes? So as not to block a thread here, running Nashorn? [external-server-js]
-    * Hmm, I think, instead, the answer:  [html_json] [save_post_lns_mentions]
-    *    Always incl both source text and sanitized html in posts_t (posts3),
-    * and when importing. Then there's no need to CommonMark-render any
+    *
+    * ... Hmm, I think, instead, the answer:   [html_json]  [save_post_lns_mentions]
+    * Always incl both source text and sanitized html in posts_t (posts3),
+    * and when importing. Then, no need to CommonMark-render any
     * imported contents — that'd be done already. However, quickly sanitizing
     * the  already-sanitized-html  via Jsoup is ok fast and still good to do?
     */
@@ -314,7 +314,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
         externalLinks = (externalLinks.toSet ++ more.externalLinks.toSet).to[immutable.Seq],
         internalLinks = internalLinks ++ more.internalLinks,
         extLinkDomains = extLinkDomains ++ more.extLinkDomains,
-        extLinkIpAddresses = (extLinkIpAddresses.toSet ++ more.extLinkIpAddresses.toSet).to[immutable.Seq],
+        extLinkIpAddresses = (extLinkIpAddresses.toSet ++
+              more.extLinkIpAddresses.toSet).to[immutable.Seq],
         embeddedOriginOrEmpty = embeddedOriginOrEmpty,
         followLinks = followLinks,
         allowClassIdDataAttrs = allowClassIdDataAttrs)
@@ -422,9 +423,7 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
       try {
         val uri = new java.net.URI(link)
         val domainOrAddress = uri.getHost  // can be null, fine
-        var isInternal = false
         if (domainOrAddress eq null) {
-          isInternal = true
           internalLinks += link
         }
         else {
@@ -437,8 +436,8 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
           val isSameHostname = site.allHostnames.contains(  // [find_int_links]
                 domainOrAddress)
 
-          if (isSameHostname) {
-            isInternal = true
+          val isInternal = isSameHostname
+          if (isInternal) {
             internalLinks += link  // or remove origin, keep only url path-query-hash?
           }
           else {
@@ -454,8 +453,9 @@ class TextAndHtmlMaker(val site: SiteIdHostnames, nashorn: Nashorn) {
               extLinkIpAddresses :+= domainOrAddress
             }
             else {
-              // Weird.
-              die("TyE305WKUDW2", s"Weird url, starts with '[' but no ']': $domainOrAddress")
+              // Weird. Just skip this not-a-link, if prod?
+              dieIf(Globals.isDevOrTest, "TyE305WKUDW2",
+                    s"Weird url, starts with '[' but no ']': $domainOrAddress")
             }
           }
           else if (domainOrAddress contains ":") {

@@ -15,9 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// CR_DONE 07-30  but not the tests
-
-package debiki.onebox   // RENAME to talkyard.server.linkpreviews
+package debiki.onebox   // RENAME to talkyard.server.linkpreviews.LinkPreviewRenderer
 
 import com.debiki.core._
 import com.debiki.core.Prelude._
@@ -126,7 +124,7 @@ abstract class LinkPreviewRenderEngine(globals: Globals) extends TyLogging {  CL
     //    <div attr=" ='upl-url' > <script>alert(1)</script>">
     // would become:
     //    <div attr=" ="upl-url" > <script>alert(1)</script>">
-    // looks as if that could have been an xss attack?
+    // looks as if that could have been an xss vuln?
     var result = uploadsLinkRegexSingleQuote.replaceAllIn(safeHtml, s"""='$prefix$$1'""")
     result = uploadsLinkRegexDoubleQuote.replaceAllIn(result, s"""="$prefix$$1"""")
     result

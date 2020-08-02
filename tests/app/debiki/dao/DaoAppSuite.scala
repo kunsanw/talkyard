@@ -300,7 +300,7 @@ class DaoAppSuite(
   def createCategory(slug: String, forumPageId: PageId, parentCategoryId: CategoryId,
         authorId: UserId, browserIdData: BrowserIdData,
         dao: SiteDao, anyCategoryId: Option[CategoryId] = None): CreateCategoryResult = {
-CR_DONE // .
+
     val newCatId = dao.readTx(_.nextCategoryId())
 
     val categoryData: CategoryToSave = CategoryToSave(

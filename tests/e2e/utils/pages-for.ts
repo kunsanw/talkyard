@@ -1362,7 +1362,7 @@ export class TyE2eTestBrowser {
     _waitForClickable (selector: string,  // RENAME? to scrollToAndWaitUntilCanInteract
           opts: { maybeMoves?: boolean, timeoutMs?: number, mayScroll?: boolean,
               okayOccluders?: string, waitUntilNotOccluded?: boolean } = {}) {
-      this.waitUntil(() => {   // CR_DONE this fn, 07-14  .
+      this.waitUntil(() => {
         this.waitForVisible(selector, { timeoutMs: opts.timeoutMs });
         this.waitForEnabled(selector, { timeoutMs: opts.timeoutMs });
         if (opts.mayScroll !== false) {
@@ -2093,6 +2093,7 @@ export class TyE2eTestBrowser {
           regex = getRegExpOrDie(stringOrRegex);
         }
         else {
+          dieIf(_.isRegExp(stringOrRegex), 'TyE3056KTD57P');
           text = stringOrRegex as string;
         }
       }
@@ -3874,7 +3875,7 @@ export class TyE2eTestBrowser {
       },
 
       assertTopicVisible: (title: string) => {
-        this.assertAnyTextMatches(this.forumTopicList.titleSelector, title, null);
+        this.assertAnyTextMatches(this.forumTopicList.titleSelector, title);
         this.assertNoTextMatches(this.forumTopicList.hiddenTopicTitleSelector, title);
       },
 
@@ -5873,7 +5874,7 @@ export class TyE2eTestBrowser {
 
           assertPostTextVisible: (postText: string) => {
             let selector = this.userProfilePage.activity.posts.postSelector;
-            this.assertAnyTextMatches(selector, postText, null);
+            this.assertAnyTextMatches(selector, postText);
           },
 
           assertPostTextAbsent: (postText: string) => {
@@ -5903,7 +5904,7 @@ export class TyE2eTestBrowser {
 
           assertTopicTitleVisible: (title: string) => {
             let selector = this.userProfilePage.activity.topics.topicsSelector;
-            this.assertAnyTextMatches(selector, title, null);
+            this.assertAnyTextMatches(selector, title);
           },
 
           assertTopicTitleAbsent: (title: string) => {

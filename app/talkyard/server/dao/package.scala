@@ -23,8 +23,7 @@ import debiki.dao._
 import scala.collection.mutable
 
 
-package object dao {  CR_DONE // 07-30 .
-
+package object dao {
 
 
   case class StalePage(
@@ -36,14 +35,13 @@ package object dao {  CR_DONE // 07-30 .
     ppNamesStale: Boolean)
 
 
-  /** Remembers things that got out-of-date and should be uncached,
-    * e.g. posts html for a page cached in page_html3.
+  /** Remembers things that got out-of-date and should be uncached, e.g. html
+    * for a page cached in page_html_t (page_html3).
     *
-    * Since we 1) pass a mutable StaleStuff to "everywhere" (well, not yet,
-    * just getting started with this)  — then, forgetting to pass it along,
-    * causes a compile time error. And since 2) [[SiteDao.writeTx]] automatically
-    * when the transaction ends, uncaches all stale stuff, it's not so easy
-    * to forget to uncache the stale stuff?
+    * Since we 1) pass a StaleStuff to "all" functions (well, soon, getting started
+    * now), forgetting it, causes a compilation error.
+    * And since 2) [[SiteDao.writeTx]] automatically when the transaction ends,
+    * uncaches all stale stuff, cannot easily forget to uncache stale stuff?
     *
     * Mutable. Not thread safe.
     */
@@ -55,13 +53,19 @@ package object dao {  CR_DONE // 07-30 .
     def stalePages: Iterator[StalePage] = _stalePages.valuesIterator
 
     def stalePageIdsInDb: Set[PageId] =
-      // COULD_OPTIMIZE calc toSet just once, remember (forget if new page added)
+      // WOULD_OPTIMIZE calc toSet just once, remember (forget if new page added)
       stalePages.filter(!_.memCacheOnly).map(_.pageId).toSet
 
     def stalePageIdsInMem: Set[PageId] =
-      // That's all stale pages (there's no stale-only-in-database).
+      // This includes all stale pages (there's no stale-only-in-database).
       stalePages.map(_.pageId).toSet
 
+    /** Pages that need to be refreshed, not because they themselves got modified,
+      * but because something else got modified.
+      * Example: Page A links to page B. Page A got renamed — so the backlinks
+      * displayed on page B back to A, should get updated with the new title of
+      * the linking page A. Here, A was directly modified, and B indirectly.
+      */
     def stalePageIdsInMemIndirectly: Set[PageId] =
       stalePages.filter(p => !p.pageModified).map(_.pageId).toSet
 
@@ -69,12 +73,11 @@ package object dao {  CR_DONE // 07-30 .
       stalePages.filter(p => p.pageModified).map(_.pageId).toSet
 
     /**
-      * @param pageId
       * @param memCacheOnly If page_meta_t.version_c (pages3.version) got bumped,
       *   that's enough — then it's different from page_html_t.version_c already
       *   and the database "knows" the cached html is out-of-date.
-      *   Then, pass memCacheOnly = true here.
-      *   COULD_OPTIMIZE mostly forgotten to actually do that.
+      *   Then, pass memCacheOnly = true here (so won't need to write to the db
+      *   twice that the cached html is out-of-date).
       */
     def addPageId(pageId: PageId, memCacheOnly: Boolean = false,
             pageModified: Boolean = true, backlinksStale: Boolean = false): Unit = {
@@ -82,13 +85,15 @@ package object dao {  CR_DONE // 07-30 .
       val oldEntry = _stalePages.get(pageId)
       val newEntry = oldEntry.map(o =>
             o.copy(
-              backlinksStale = o.backlinksStale && backlinksStale,
-              memCacheOnly = o.memCacheOnly && memCacheOnly))
+              memCacheOnly = o.memCacheOnly && memCacheOnly,
+              pageModified = o.pageModified || pageModified,
+              backlinksStale = o.backlinksStale || backlinksStale))
           .getOrElse(StalePage(
               pageId,
               memCacheOnly = memCacheOnly,
               pageModified = pageModified,
               backlinksStale = backlinksStale,
+              // Not yet implemented:
               ancestorCategoriesStale = false,
               ppNamesStale = false))
 
@@ -97,13 +102,15 @@ package object dao {  CR_DONE // 07-30 .
       }
     }
 
-    def addPageIds(pageIds: Set[PageId], pageModified: Boolean = true,
-            backlinksStale: Boolean = false): Unit = {
-      pageIds.foreach(
-            addPageId(_, pageModified = pageModified, backlinksStale = backlinksStale))
+    def addPageIds(pageIds: Set[PageId], memCacheOnly: Boolean = false,
+            pageModified: Boolean = true, backlinksStale: Boolean = false): Unit = {
+      pageIds.foreach(pageId => {
+        addPageId(pageId, memCacheOnly = memCacheOnly, pageModified = pageModified,
+              backlinksStale = backlinksStale))
+      }
     }
 
-    def pageModified(pageId: PageId): Boolean = {
+    def includesPageModified(pageId: PageId): Boolean = {
       _stalePages.get(pageId).exists(_.pageModified)
     }
   }

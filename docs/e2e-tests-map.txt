@@ -473,6 +473,9 @@ link previews:
           - TESTS_MISSING
   misc providers:
           - link-previews-all-others.test.ts  TyT550RMHJ25
+  internal block quote preview,
+  internal inline title preview:
+          - TESTS_MISSING  TyTINTLNPRVW
 
 backlinks,
 internal links:

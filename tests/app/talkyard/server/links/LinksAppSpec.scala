@@ -15,8 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// CR_DONE !  .
-
 package talkyard.server.links
 
 import com.debiki.core._

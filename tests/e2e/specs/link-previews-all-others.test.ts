@@ -1,7 +1,5 @@
 /// <reference path="../test-types.ts"/>
 
-// CR_DONE  07-31
-
 import * as _ from 'lodash';
 import assert = require('../utils/ty-assert');
 import server = require('../utils/server');

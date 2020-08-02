@@ -170,7 +170,7 @@ class TextAndHtmlTest extends FreeSpec with matchers.must.Matchers {
               """<a href="https://x.co" rel="nofollow noopener">x.co</a>"""
       }
 
-      /* Wait, breaks tests.
+      /* Wait, breaks tests.  [disallow_h1_h2]
       "disallow <h1> and <h2>,  but <h3>  is ok  ?" in {
         sanPost("<h1>hh11</h1> <h2>hh22<h2> <h3>hh33</h3> <h4>hh44</h4>") mustBe
               "hh11 hh22 <h3>hh33</h3> <h4>hh44</h4>"

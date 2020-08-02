@@ -26,7 +26,6 @@ import play.api.libs.json.JsObject
 import play.api.libs.ws.WSRequest
 import scala.concurrent.Future
 
-// CR_DONE  07-30
 
 
 /* Example oEmbed response json, this from Twitter:

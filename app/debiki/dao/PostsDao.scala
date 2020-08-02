@@ -1102,12 +1102,11 @@ trait PostsDao {
   def saveDeleteLinks(post: Post, sourceAndHtml: SourceAndHtml, writerId: UserId,
           tx: SiteTx, staleStuff: StaleStuff, skipBugWarn: Boolean = false): Unit = {
     // Some e2e tests: backlinks-basic.2browsers.test.ts  TyTINTLNS54824
-    CR_DONE // 07-13, 31
 
     // Let's always add the page id to staleStuff before, just so that
     // here we can check that that wasn't forgotten.
     // Don't do from in here — that'd be unexpected?, in this fn about links.
-    if (!skipBugWarn && !staleStuff.pageModified(post.pageId)) {
+    if (!skipBugWarn && !staleStuff.includesPageModified(post.pageId)) {
       bugWarn("TyE306KTD3", s"s$siteId: staleStuff: linking page id ${
             post.pageId} hasn't been modified? Post: $post")
     }
@@ -1128,6 +1127,7 @@ trait PostsDao {
     }
 
     COULD // remove param writerId? It's in the post already, right?:
+    // (Or use  post.currentRevisionById — no, a new lastApprovedRevisionById ?)
     if (post.lastApprovedEditById.getOrElse(post.createdById) != writerId) {
       bugWarn("TyE63WKDJ356", s"s$siteId: post last writer id != writerId = ${
             writerId}:  $post")
@@ -1169,7 +1169,7 @@ trait PostsDao {
     val pageIdsLinkedAfter = tx.loadPageIdsLinkedFromPage(post.pageId)
 
     // Uncache backlinked pages. [uncache_blns]
-    COULD_OPTIMIZE // use Guava.symmetricDifference.  But not Scala's  setA.diff.setB.
+    WOULD_OPTIMIZE // use Guava.symmetricDifference.  But not Scala's  setA.diff.setB.
     val stalePageIds =
           (pageIdsLinkedBefore -- pageIdsLinkedAfter) ++
             (pageIdsLinkedAfter -- pageIdsLinkedBefore)
@@ -1197,6 +1197,8 @@ trait PostsDao {
             editorId}:  $editedPost")
       // Don't return, didn't before (2020-07).
     }
+    // Or use  post.currentRevisionById?:
+    dieIf(Globals.isDevOrTest && editedPost.currentRevisionById != editorId, "TyE3056KTD")
 
     val oldUploadRefs = tx.loadUploadedFileReferences(postToEdit.id)
 
@@ -1705,7 +1707,7 @@ trait PostsDao {
       updatePagePopularity(page.parts, tx)
     }
 
-    staleStuff.addPageId(page.id)
+    staleStuff.addPageId(page.id, memCacheOnly = true)
     tx.updatePageMeta(newMeta, oldMeta = oldMeta, markSectionPageStale)
 
     // In the future: if is a forum topic, and we're restoring the OP, then bump the topic.
@@ -1769,7 +1771,7 @@ trait PostsDao {
     tx.updatePost(postAfter)
     tx.indexPostsSoon(postAfter)
 
-    staleStuff.addPageId(pageId)
+    staleStuff.addPageId(pageId, memCacheOnly = true) // page version bumped below
     saveDeleteLinks(postAfter, sourceAndHtml, postAfter.createdById, tx, staleStuff)
 
     SHOULD // delete any review tasks.
@@ -1847,7 +1849,7 @@ trait PostsDao {
     var numNewVisibleReplies = 0
     var numNewVisibleOpReplies = 0
 
-    staleStuff.addPageId(pageId)
+    staleStuff.addPageId(pageId, memCacheOnly = true)  // page version bumped below
 
     for {
       post <- posts
@@ -2170,17 +2172,15 @@ trait PostsDao {
           //
           // Note: If moving posts within the same page:
           // Even if moved to elsewhere *on the same page*,
-          // it's good to refresh any linked pages – in case the posts
-          // somehow got moved to an access restricted location on the
-          // same page.
+          // it's good to refresh any linked pages – in case the posts somehow
+          // got moved to an access restricted location on the same page,
+          // say, placed as replies to a tree-deleted ancestor post.
           //
           // Note: If moving posts to a different page:
           // Even if there're other posts on the old page that still
           // link to a page P, also after the posts got moved, we might still need
           // to uncache page P, because now afterwards if the posts got moved to
           // a different page, that new page now also links to P.
-          // (So don't just look at which page —> page links disappeared from
-          // the old page).
           //
           val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsAfter.map(_.id).toSet)
           staleStuff.addPageIds(linkedPageIds, backlinksStale = true)
@@ -2198,7 +2198,8 @@ trait PostsDao {
         }
 
       staleStuff.addPageIds(
-            Set(whichPost.pageId, newParent.pageId), backlinksStale = false)
+            // Page versions bumped above — so, mem cache only, here.
+            Set(whichPost.pageId, newParent.pageId), memCacheOnly = true)
 
       // Would be good to [save_post_lns_mentions], so wouldn't need to recompute here.
       val notfs = notfGenerator(tx).generateForNewPost(
@@ -2210,8 +2211,8 @@ trait PostsDao {
       (postToMove, postAfter, patch)
     }
 
-    refreshPageInMemCache(postBefore.pageId)
-    if (postBefore.pageId != postAfter.pageId) {
+    refreshPageInMemCache(postBefore.pageId)  ; REMOVE // now not needed, instead [staleStuff] above
+    if (postBefore.pageId != postAfter.pageId) {       //
       refreshPageInMemCache(postAfter.pageId)
     }
 
@@ -2278,11 +2279,12 @@ trait PostsDao {
       if (shallHide) {
         hidePostsOnPage(Vector(postAfter), pageId,
               "This post was flagged")(tx, staleStuff) ; I18N
-        bugWarnIf(!staleStuff.pageModified(pageId), "TyU305RKD")
+        bugWarnIf(!staleStuff.includesPageModified(pageId), "TyU305RKD")
       }
       else {
         tx.updatePost(postAfter)
-        staleStuff.addPageId(pageId)
+        // Need not: staleStuff.addPageId(pageId)
+        // because the page caches don't care about flags — only staff can see.
       }
 
       tx.insertPostAction(
@@ -2388,7 +2390,7 @@ trait PostsDao {
       for ((pageId, posts) <- postToHideByPage) {
         hidePostsOnPage(posts, pageId, "Many posts by this author got flagged, hiding all")(
               tx, staleStuff)
-        bugWarnIf(!staleStuff.pageModified(pageId), "TyE304RK5B3")
+        bugWarnIf(!staleStuff.includesPageModified(pageId), "TyE304RK5B3")
         pageIdsToRefresh += pageId  ; CLEAN_UP; REMOVE // not needed now with staleStuff
       }
 
@@ -2443,11 +2445,6 @@ trait PostsDao {
       tx.updatePost(postAfter)
     }
 
-    // Uncache backlinked pages. [uncache_blns]
-    staleStuff.addPageId(pageId)
-    val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsToHide.map(_.id).toSet)
-    staleStuff.addPageIds(linkedPageIds, pageModified = false, backlinksStale = true)
-
     var pageMetaAfter = pageMetaBefore.copy(
       numRepliesVisible = pageMetaBefore.numRepliesVisible - numRepliesHidden,
       numOrigPostRepliesVisible =
@@ -2473,6 +2470,11 @@ trait PostsDao {
         // The page might be hidden now, or num-replies has changed, so refresh forum topic list.
         markSectionPageStale = true)
       updatePagePopularity(newPageDao(pageId, tx).parts, tx)
+
+      staleStuff.addPageId(pageId, memCacheOnly = true) // page version bumped above
+      // Uncache backlinks on linked pages. [uncache_blns]
+      val linkedPageIds = tx.loadPageIdsLinkedFromPosts(postsToHide.map(_.id).toSet)
+      staleStuff.addPageIds(linkedPageIds, pageModified = false, backlinksStale = true)
     }
   }
 
