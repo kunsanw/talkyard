@@ -400,7 +400,7 @@ describe("internal links, backlinks   TyTINTLNS54824", () => {   // RENAME this 
     assert.eq(owensBrowser.topic.backlinks.countBacklinks(), 1);
   });
 
-  it("... but Memah doesn't; she's an ordinary member, not staff", () => {
+  it("... but Memah doesn't", () => {
     memahsBrowser.go2(mariasTopicUrl());
     memahsBrowser.waitForMyDataAdded();
     assert.eq(memahsBrowser.topic.backlinks.countBacklinks(), 0);

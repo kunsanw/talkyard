@@ -2198,8 +2198,8 @@ trait PostsDao {
         }
 
       staleStuff.addPageIds(
-            // Page versions bumped above — so, mem cache only, here.
-            Set(whichPost.pageId, newParent.pageId), memCacheOnly = true)
+            // Page versions bumped just above — only need to refresh mem cache.
+            Set(fromPage.id, toPage.id), memCacheOnly = true)
 
       // Would be good to [save_post_lns_mentions], so wouldn't need to recompute here.
       val notfs = notfGenerator(tx).generateForNewPost(
