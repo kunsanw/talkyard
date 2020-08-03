@@ -26,6 +26,3 @@ case class IdentityProvider(
 ) {
 }
 
-///  def upsertOidcProvider(oidcProvider: OidcProvider): Unit
-///def loadOidcProvider(alias: String): Option[OidcProvider]
-///def loadAllOidcProviders(): Seq[OidcProvider]

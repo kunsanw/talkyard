@@ -42,6 +42,7 @@ class AuthOidcAppSpec extends DaoAppSuite {
         Who(SystemUserId, browserIdData)).get.pagePath.pageId
 
 
+  /*
   def makeAndUpsertStats(dao: SiteDao, userId: UserId, minutes: Int): UserStats = {
     val stats = UserStats(
       userId,
@@ -52,7 +53,7 @@ class AuthOidcAppSpec extends DaoAppSuite {
       tourTipsSeen = Some(Vector.empty))  // [7AKBR24] change Null in db and None here, to empty array?
     dao.readWriteTransaction(_.upsertUserStats(stats))
     stats
-  }
+  } */
 
 
   "prepare: create site 1 and 2" in {
