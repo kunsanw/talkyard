@@ -63,7 +63,6 @@ class AuthOidcAppSpec extends DaoAppSuite {
 
 
   lazy val oidcProvider = IdentityProvider(
-        site_id_c = daoSite1.siteId,
         id_c = 1,
         protocol_c = "oidc",
         alias_c = "odic_alias_site_1",
@@ -86,7 +85,6 @@ class AuthOidcAppSpec extends DaoAppSuite {
         idp_send_user_ip_c = None)
 
   lazy val oidcProviderEdited = IdentityProvider(
-        site_id_c = oidcProvider.site_id_c,
         id_c = oidcProvider.id_c,
         protocol_c = "oauth2",
         alias_c = oidcProvider.alias_c + "_edited",

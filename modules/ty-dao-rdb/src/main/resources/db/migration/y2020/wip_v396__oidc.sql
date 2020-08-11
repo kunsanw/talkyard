@@ -27,8 +27,11 @@ create table identity_providers_t(
   constraint identityproviders_r_sites foreign key (site_id_c) references sites3 (id) deferrable,
 
   constraint identityproviders_c_id_gtz check (id_c > 0),
+  -- Lowercase, because is lowercase in the url path.
   constraint identityproviders_c_protocol check (protocol_c in ('oidc', 'oauth1', 'oauth2')),
   constraint identityproviders_c_syncmode check (sync_mode_c between 1 and 10),
+  -- Appears in urls.
+  constraint identityproviders_c_alias_len check (alias_c ~ '^[a-z0-9]+$'),
   constraint identityproviders_c_alias_len check (length(alias_c) between 1 and 50),
   constraint identityproviders_c_displayname_len check (length(display_name_c) between 1 and 200),
   constraint identityproviders_c_description_c_len check (length(description_c) between 1 and 1000),
@@ -42,4 +45,7 @@ create table identity_providers_t(
   constraint identityproviders_c_opscopes_len check (length(idp_scopes_c) between 1 and 200),
   constraint identityproviders_c_ophosteddomain_len check (length(idp_hosted_domain_c) between 1 and 200)
 );
+
+create unique index identityproviders_u_protocol_alias on
+    identity_providers_t (site_id_c, protocol_c, alias_c);
 

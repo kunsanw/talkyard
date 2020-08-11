@@ -20,9 +20,11 @@ package controllers
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import com.github.benmanes.caffeine
-import com.github.scribejava.apis.{KeycloakApi => s_KeycloakApi}
+import com.github.scribejava.apis.openid.{OpenIdJsonTokenExtractor => s_OpenIdJsonTokenExtractor}
+import com.github.scribejava.core.builder.api.{DefaultApi20 => s_DefaultApi20}
 import com.github.scribejava.core.builder.{ServiceBuilder => s_ServiceBuilder}
-import com.github.scribejava.core.model.{OAuth2AccessTokenErrorResponse => s_OAuth2AccessTokenErrorResponse, OAuth2AccessToken => s_OAuth2AccessToken, OAuthAsyncRequestCallback => s_OAuthAsyncRequestCallback, OAuthRequest => s_OAuthRequest, Response => s_Response, Verb => s_Verb}
+import com.github.scribejava.core.extractors.{TokenExtractor => s_TokenExtractor}
+import com.github.scribejava.core.model.{OAuth2AccessToken => s_OAuth2AccessToken, OAuth2AccessTokenErrorResponse => s_OAuth2AccessTokenErrorResponse, OAuthAsyncRequestCallback => s_OAuthAsyncRequestCallback, OAuthRequest => s_OAuthRequest, Response => s_Response, Verb => s_Verb}
 import com.github.scribejava.core.oauth.{OAuth20Service => s_OAuth20Service}
 import com.mohiva.play.silhouette
 import com.mohiva.play.silhouette.api.util.HTTPLayer
@@ -49,6 +51,30 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import talkyard.server.{ProdConfFilePath, TyLogging}
 
+
+private case class TyOidcScribeJavaApi20(idp: IdentityProvider) extends s_DefaultApi20 {
+
+  // e.g.:  "http://keycloak:8080" + "/auth/realms/" + realm
+  override def getAccessTokenEndpoint: String =
+    idp.idp_access_token_url_c
+
+  override def getAuthorizationBaseUrl: String =
+    idp.idp_authorization_url_c
+
+  override def getAccessTokenExtractor: s_TokenExtractor[s_OAuth2AccessToken] =
+    s_OpenIdJsonTokenExtractor.instance
+  /*
+  val realmName = "talkyard_keycloak_test_realm"
+
+  val oidcOpOrigin = "http://keycloak:8080"
+  val odicOpConfUrlPath = s"/auth/realms/$realmName/.well-known/openid-configuration"
+  val oidcOpConfUrl = s"$oidcOpOrigin$odicOpConfUrlPath"
+
+  val redirectUrlPath = "/-/login-oidc/keycloak/callback"
+
+  val userInfoUrl = s"$oidcOpOrigin/auth/realms/$realmName/protocol/openid-connect/userinfo"
+   */
+}
 
 
 /** OpenAuth 1 and 2 login, provided by Silhouette, e.g. for Google, Facebook and Twitter.
@@ -128,22 +154,24 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
     .build().asInstanceOf[caffeine.cache.Cache[String, StateAndNonce]]
 
 
-  val keycloakClientId = "talkyard_keycloak_test_client"
-  val keycloakClientSecret = "63b9659b-db05-4f99-8aa6-bd7a993bff40" // just testing!
+  //val keycloakClientId = "talkyard_keycloak_test_client"
+  //val keycloakClientSecret = "63b9659b-db05-4f99-8aa6-bd7a993bff40" // just testing!
 
-  val alias = "local-keycloak-test"
-  val baseUrl = oidcOpOrigin
-  val realm = "talkyard_keycloak_test_realm"
+  //val alias = "local-keycloak-test"
+  //val baseUrl = oidcOpOrigin
+  //val realm = "talkyard_keycloak_test_realm"
 
   // just testing
   private def makeJavaScribeOAuthService(origin: String, idp: IdentityProvider)
         : s_OAuth20Service = {
-    val callback = origin + s"/-/login-oidc/$alias/callback"
-    new s_ServiceBuilder(keycloakClientId)
-          .apiSecret(keycloakClientSecret)
-          .defaultScope("openid")
-          .callback(callback)
-          .build(s_KeycloakApi.instance(baseUrl, realm))
+    val callbackUrl = origin + s"/-/authn/${idp.protocol_c}/${idp.alias_c}/callback"
+    new s_ServiceBuilder(idp.idp_client_id_c)
+          .apiSecret(idp.idp_client_secret_c)
+          .defaultScope(idp.idp_scopes_c getOrElse "openid")  // or don't set if absent
+          .callback(callbackUrl)
+          .build(
+              TyOidcScribeJavaApi20(idp))
+            // s_KeycloakApi.instance(baseUrl, realm))
   }
 
   //private val scribeOAuth20Service = makeJavaScribeOAuthService("http://localhost")
@@ -162,11 +190,16 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
     import request.dao
 
     protocol match {
-      case "oidc" | "oauth2" =>
+      case "oidc" | "oauth2" =>  // lowercase, from the url
       case _ => throwNotFound("TyEBADPROTO", "TyE603RFKEGM")
     }
 
-    val customIdp = dao.getIdentityProviderByAlias(protocol, providerAlias) getOrElse {
+    val customIdp: IdentityProvider =
+          dao.getIdentityProviderByAlias(protocol, providerAlias) getOrElse {
+      // For now:
+      throwForbidden("TyE6RKT0456", s"No $protocol provider with alias: '$providerAlias'")
+      /*
+
       val settings = request.siteSettings
       // if ! settings  protocol + provider  enabled
       // return Forbidden / not found
@@ -179,7 +212,7 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
       }
 
       // throw forbidden, or not found
-      ???
+      */
     }
 
     val service = makeJavaScribeOAuthService(request.origin, customIdp)
@@ -205,7 +238,9 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
       // if  is login origin   fine, use config file default login settings
       // else
       //   return forbidden
-      ???
+      // For now:
+      throwForbidden("TyE5026KSH5", s"Bad protocol: '${protocol
+            }' or IDP provider alias: '$providerAlias'")
     }
 
     val service = makeJavaScribeOAuthService(request.origin, customIdp)
@@ -286,6 +321,8 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
     Future.successful(NotImplementedResult("TyEOIDCLGO", "Not implemented"))
     // TODO backchannel logout from  /-/logout ?
   }
+
+
 
 
   def startAuthentication(providerName: String, returnToUrl: String): Action[Unit] =

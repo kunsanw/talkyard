@@ -501,7 +501,7 @@ trait UserDao {
 
   def getIdentityProviderByAlias(protocol: String, alias: String): Option[IdentityProvider] = {
     COULD_OPTIMIZE // cache
-    readOnlyTransaction(_.loadIdentityProviderByAlias(protocol: String, alias: String))
+    readOnlyTransaction(_.loadIdentityProviderByAlias(protocol, alias))
   }
 
 

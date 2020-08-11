@@ -2,7 +2,6 @@ package com.debiki.core
 
 
 case class IdentityProvider(
-  site_id_c: SiteId,
   id_c: Int, // IdentityProviderNr,
   protocol_c: String,
   alias_c: String,
@@ -12,7 +11,7 @@ case class IdentityProvider(
   trust_verified_email_c: Boolean,
   link_account_no_login_c: Boolean,
   gui_order_c: Option[Int],
-  sync_mode_c: Int,  // for now, always 1 = ImportOnFirstLogin, later, also: SyncOnAllLogins
+  sync_mode_c: Int,  // for ow, always 1 = ImportOnFirstLogin, later, also: SyncOnAllLogins
   idp_authorization_url_c: String,
   idp_access_token_url_c: String,
   idp_user_info_url_c: String,

@@ -543,6 +543,12 @@ const LoginAndSignupSettings = createFactory({
     return {};
   },
 
+  componentDidMount: function() {
+    Server.loadIdentityProviders(idps => {
+      this.setState({ idps });
+    })
+  },
+
   render: function() {
     const props = this.props;
     const currentSettings: Settings = props.currentSettings;
@@ -769,16 +775,44 @@ const LoginAndSignupSettings = createFactory({
           }
         }),
 
-        enableSso || !allowSignup || !enableOidc ? null :
-            r.button({ onClick: () => this.setState({ showOidcConfig: true })},
+        !this.state.idps?.length ? null : r.div({},
+          r.p({}, "Your custom Identity Providers (IDP:s):"),
+          r.pre({},
+            this.state.idps.map(idp => JSON.stringify(idp, undefined, 2))),
+          ),
+
+        enableSso || !allowSignup || !enableOidc || this.state.showOidcConfig ? null :
+            Button({ onClick: () => this.setState({ showOidcConfig: true }),
+                  className: 'col-sm-offset-3' },
               "Configure OIDC ..."),
 
-        enableSso || !allowSignup || !enableOidc || !this.state.showOidcConfig ? null : r.div({},
-          "CONFIG OIDC",
-            r.button({ onClick: () => this.setState({ showOidcConfig: false })},
-              "Save"),
-        ),
-
+        enableSso || !allowSignup || !enableOidc || !this.state.showOidcConfig ? null :
+            r.div({ className: 'col-sm-offset-3' },
+              Input({ type: 'textarea', label: "ODIC config, in json for now",
+                labelClassName: 'col-xs-2', wrapperClassName: 'col-xs-10',
+                value: this.state.oidcConfigText,
+                onChange: (event) => this.setState({ oidcConfigText: event.target.value }),
+                help: undefined }),
+              !!this.state.idpConfErr && r.p({}, this.state.idpConfErr),
+              !!this.state.savingOidc && r.p({}, this.state.savingOidc),
+              PrimaryButton({ onClick: () => {
+                    const jsonText = this.state.oidcConfigText;
+                    let json;
+                    try {
+                      json = JSON.parse(jsonText);
+                      this.setState({ savingOidc: "Saving ..." });
+                      Server.upsertIdentityProvider(json, () => {
+                        this.setState({ savingOidc: "Done, saved.", idpConfErr: null });
+                        //this.setState({ showOidcConfig: false });
+                      }, error => {
+                        this.setState({ savingOidc: null, idpConfErr: error });
+                      });
+                    }
+                    catch (ex) {
+                      this.setState({ idpConfErr: `Bad JSON: ${ex.toString()}` });
+                    }
+                  } },
+                "Save")),
 
         // ---- Ways to sign up: Password, Guest
 

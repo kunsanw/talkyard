@@ -25,7 +25,7 @@ GET   /-/logout                 controllers.LoginController.logout(currentUrlPat
 POST  /-/logout                 controllers.LoginController.logout(currentUrlPath: Option[String])
 POST  /-/resend-owner-email-addr-verif-email controllers.LoginController.resendSiteOwnerAddrVerifEmail
 
-# Would like to remove, use  /-/authn/password/
+# REFACTOR Would like to remove, use  /-/authn/password/
 POST  /-/login-guest            controllers.LoginAsGuestController.loginGuest
 POST  /-/login-password         controllers.LoginWithPasswordController.login
 POST  /-/login-password-create-user controllers.LoginWithPasswordController.handleCreateUserDialog
@@ -87,6 +87,8 @@ GET   /-/load-site-settings     controllers.SettingsController.loadSiteSettings
 POST  /-/save-site-settings     controllers.SettingsController.saveSiteSettings
 POST  /-/change-hostname        controllers.SettingsController.changeHostname
 POST  /-/update-extra-hostnames controllers.SettingsController.updateExtraHostnames
+GET   /-/load-oidc-config       controllers.SettingsController.loadOidcConfig
+POST  /-/upsert-oidc-config     controllers.SettingsController.upsertOidcConfig
 
 GET   /-/terms-of-use            controllers.LegalController.viewTermsOfUsePage
 GET   /-/privacy-policy          controllers.LegalController.viewPrivacyPolicyPage

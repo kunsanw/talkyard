@@ -1614,6 +1614,30 @@ interface ApiSecret {
 }
 
 
+interface IdentityProvider {
+  id: number;
+  protocol: string;
+  alias: string;
+  displayName?: string;
+  description?: string;
+  enabled: any;
+  trustVerifiedEmail: any;
+  linkAccountNoLogin: any;
+  guiOrder?: any;
+  syncMode: any;
+  idpAuthorizationUrl: string;
+  idpAccessTokenUrl: string;
+  idpUserInfoUrl: string;
+  idpLogoutUrl?: string;
+  idpClientId: string;
+  idpClientSecret: string;
+  idpIssuer?: string;
+  idpScopes?: string;
+  idpHostedDomain?: string;
+  idpSendUserIp?: string;
+}
+
+
 
 // ----- Admin Area
 

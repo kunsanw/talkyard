@@ -270,7 +270,6 @@ trait AuthnSiteTxMixin extends SiteTransaction {
     // TODO: UK on proto & alias
 
     val p = identityProvider
-    dieIf(p.site_id_c != siteId, "TyE50250RKD53")
 
     val values = List[AnyRef](
           siteId.asAnyRef,
@@ -325,7 +324,6 @@ trait AuthnSiteTxMixin extends SiteTransaction {
 
   private def readIdentityProvider(rs: js.ResultSet): IdentityProvider = {
     IdentityProvider(
-          site_id_c = rs.getInt("site_id_c"),
           id_c = rs.getInt("id_c"),
           protocol_c = rs.getString("protocol_c"),
           alias_c = rs.getString("alias_c"),

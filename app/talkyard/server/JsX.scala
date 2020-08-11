@@ -796,5 +796,30 @@ object JsX {
       "postNr" -> JsNumberOrNull(reviewTask.postNr))
   }
 
+
+  def JsIdentityProvider(idp: IdentityProvider): JsObject = {
+    Json.obj(
+        "id" -> idp.id_c,  // = readInt(jsObj, ),
+        "protocol" -> idp.protocol_c,  // = readString(jsObj, ),
+        "alias" -> idp.alias_c,  // = readString(jsObj, ),
+        "displayName" -> idp.display_name_c,  // = readOptString(jsObj, ),
+        "description" -> idp.description_c,  // = readOptString(jsObj, ),
+        "enabled" -> idp.enabled_c,  // = readBoolean(jsObj, ),
+        "trustVerifiedEmail" -> idp.trust_verified_email_c,  // = readBoolean(jsObj, ),
+        "linkAccountNoLogin" -> idp.link_account_no_login_c,  // = readBoolean(jsObj, ),
+        "guiOrder" -> idp.gui_order_c,  // = readOptInt(jsObj, ),
+        "syncMode" -> idp.sync_mode_c,  // = readInt(jsObj, ),
+        "idpAuthorizationUrl" -> idp.idp_authorization_url_c,  // = readString(jsObj, ),
+        "idpAccessTokenUrl" -> idp.idp_access_token_url_c,  // = readString(jsObj, ),
+        "idpUserInfoUrl" -> idp.idp_user_info_url_c,  // = readString(jsObj, ),
+        "idpLogoutUrl" -> idp.idp_logout_url_c,  // = readOptString(jsObj, ),
+        "idpClientId" -> idp.idp_client_id_c,  // = readString(jsObj, ),
+        "idpClientSecret" -> idp.idp_client_secret_c,  // = readString(jsObj, ),
+        "idpIssuer" -> idp.idp_issuer_c,  // = readOptString(jsObj, ),
+        "idpScopes" -> idp.idp_scopes_c,  // = readOptString(jsObj, ),
+        "idpHostedDomain" -> idp.idp_hosted_domain_c,  // = readOptString(jsObj, ),
+        "idpSendUserIp" -> idp.idp_send_user_ip_c)  // = readOptBool(jsObj, )))
+  }
+
 }
 
