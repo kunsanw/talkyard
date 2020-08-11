@@ -518,6 +518,8 @@ case class SitePatchParser(context: EdContext) {
         // guest_prefs3 db table — which works also if a human returns later and gets
         // a different guest user account but uses the same email address.
         emailNotfPrefs = EmailNotfPrefs.Unspecified,
+        website = readOptString(jsObj, "website"),
+        about = readOptString(jsObj, "about"),
         country = readOptString(jsObj, "country").trimNoneIfBlank,
         lockedThreatLevel = readOptInt(jsObj, "lockedThreatLevel").flatMap(ThreatLevel.fromInt)))
     }

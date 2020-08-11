@@ -830,6 +830,8 @@ case class Guest( // [exp] ok
   email: String, // COULD rename to emailAddr
   emailNotfPrefs: EmailNotfPrefs,
   country: Option[String] = None, // COULD rename to Location
+  website: Option[String] = None,
+  about: Option[String] = None,
   lockedThreatLevel: Option[ThreatLevel] = None) extends Participant with ParticipantInclDetails {
 
   def emailVerifiedAt: Option[ju.Date] = None

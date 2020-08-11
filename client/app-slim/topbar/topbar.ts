@@ -363,7 +363,8 @@ export const TopBar = createComponent({
     // (Is it ok to call another React component from here? I.e. the page tools dialog.)
     const toolsButton = !isStaff(me) || !store_shallShowPageToolsButton(store) ? null :
         Button({ className: 'dw-a-tools', onClick: this.showTools },
-          r.a({ className: 'icon-wrench' }, t.Tools));
+          r.a({ className: 'icon-wrench' },
+              r.span({ className: 's_Ttl' }, t.Tools)));
 
 
     // ------- Search button
@@ -653,7 +654,7 @@ export const TopBar = createComponent({
         TitleCatsTags(),  // [dbl_tb_ttl]
         searchAndMyButtonsRow1);
 
-    let fixItClass = '';
+    let fixItClass = ' s_Tb-Stc';  // static
     let placeholderIfFixed;
     if (this.state.fixed) {
       fixItClass = ' dw-fixed-topbar-wrap s_Tb-Fxd';  // RENAME to s_Tb-Fxd
