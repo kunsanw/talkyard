@@ -1620,11 +1620,11 @@ interface IdentityProvider {
   alias: string;
   displayName?: string;
   description?: string;
-  enabled: any;
-  trustVerifiedEmail: any;
-  linkAccountNoLogin: any;
-  guiOrder?: any;
-  syncMode: any;
+  enabled: boolean;
+  trustVerifiedEmail: boolean;
+  linkAccountNoLogin: boolean;
+  guiOrder?: number;
+  syncMode: number;
   idpAuthorizationUrl: string;
   idpAccessTokenUrl: string;
   idpUserInfoUrl: string;
@@ -1634,7 +1634,7 @@ interface IdentityProvider {
   idpIssuer?: string;
   idpScopes?: string;
   idpHostedDomain?: string;
-  idpSendUserIp?: string;
+  idpSendUserIp?: boolean;
 }
 
 

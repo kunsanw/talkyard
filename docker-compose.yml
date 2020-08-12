@@ -244,41 +244,96 @@ services:
   # plus management interface and login. )
   #
   # Comment in the below container, type:  s/d up -d keycloak
-  # then, go here: http://localhost:8080/auth/admin
+  # then, go here: http://localhost:8113/auth/admin,
+  #   login as 'admin' with password $KEYCLOAK_PASSWORD, see below.
+  #
+  # ##### Create a realm:
   # Mouse hover on "Master" in the upper left corner, then click "Add realm".
-  # Create this realm:  'talkyard_keycloak_test_realm'
+  # Create this realm:  'ty_test_realm'
+  #
+  # ##### Create a user to OIDC login with:
   # Click Users to the left,
-  #   create user: 'kcuser',
+  #   create user: 'tykc',  (for Takyard-Keycloak)
   #   click Save.
   # Click Credentials at the top,
-  #   set password: 'pub-kcpw',
+  #   set password: 'pub-tykc',
   #   make the password permanent: click 'On' next to Temporary to toggle to Off,
   #   click  Set Password.
   #
-  # Test login here: http://localhost:8080/auth/realms/talkyard_keycloak_test_realm/account
-  # (You can use a different browser.)
+  # Test login here: http://localhost:8113/auth/realms/ty_test_realm/account
+  # (Use a different browser or Ctrl+N or Ctrl+P open an incognito window.)
   #
-  # Create an OIDC app for Talkyard:
-  # Click 'Clients' to the left, then fill in:
-  # Client id: 'talkyard_keycloak_test_client'
+  # #### Create a test Talkyard site
+  # Run in a shell:  s/wdio --only manual.2browsers --da --dt 
+  # This creates a Talkyard test site, on localhost, and logs you in as
+  # "owen_owner", the site admin, and member "memah".
+  # Copy the site URL, sth like:  http://e2e-test-cid-0-0-now-1298.localhost/
+  #
+  # #### Create an OIDC app for Talkyard:
+  # As admin, in the Talkyard test realm:
+  # Click 'Clients' to the left, then the Create button to the right, and fill in:
+  # Client id: 'ty_test_client'
   # Protocol: 'openid-connect'
+  # Click Save. Thereafter:
   # Access Type: Change from 'public' 'confidential' ('public' is for mobile apps
   # and single page apps — they have no OIDC client app API secret.)
-  # Keep the 'Standard' flow = 'code' flow enabled.
-  #   Do not enable 'Implicit' flow — it's not so secure.
+  # Keep the 'Standard' flow = 'code' flow enabled,
+  #    do not enable 'Implicit' flow — it's not so secure.
   # Root URL: 
-  #   1) KeyCloack has this OpenID Connect demo login app you can try,
-  #      if you want to:  https://www.keycloak.org/app/
-  #   2) But later, change the Root URL to ... what?
-  #      sth like:  e2e-test-keycloak.localhost ?
-  #               for now:     http://localhost/-/login-oidc/local-keycloak-test
+  # (KeyCloack has this OpenID Connect demo login app you can try now,
+  # if you want to:  https://www.keycloak.org/app/ )
+  #
+  # Change the Root URL to the Talkyard test site addres from
+  # above, plus  /-/authn/oidc/keycloak_test_alias,
+  # will look like:
+  #   http://e2e-test-cid-0-0-now-1298.localhost/-/authn/oidc/keycloak_test_alias
+  # Set the Redirect URI to the above + '/callback',
+  # will look like:
+  #   http://e2e-test-cid-0-0-now-1298.localhost/-/authn/oidc/keycloak_test_alias/callback
   #
   # Since you selected 'confidential' above, a tab 'Credentials' appear once you click Save,
   # go there and copy the client secret.
   #
+  # #### Configure Talkyard
+  # In owen_owner's browser, go to the Admin Area, /-/admin/settings/login, and
+  # configure and OIDC loginn provider:
+  #
+  #  {
+  #  "id": 1,
+  #  "protocol": "oidc",
+  #  "alias": "keycloak_test_alias",
+  #  "displayName": "Keycloak Test",
+  #  "description": "Local Keycloak OIDC login test",
+  #  "enabled": true,
+  #  "trustVerifiedEmail": true,
+  #  "linkAccountNoLogin": false,
+  #  "guiOrder": 1,
+  #  "syncMode": 1,
+  #  "idpAuthorizationUrl":
+  #    "http://localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/auth",
+  #  "idpAccessTokenUrl":
+  #    "http://localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/token",
+  #  "idpUserInfoUrl":
+  #    "http://localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/userinfo",
+  #  "idpLogoutUrl": null,
+  #  "idpClientId": "ty_test_client",
+  #  "idpClientSecret": "c1b11e44-f950-414e-9764-47d8fae6abe8",
+  #  "idpIssuer": "http://localhost:8113/auth/realms/ty_test_realm",
+  #  "idpScopes": "openid"
+  # }
+  #
+  # Then, in a differnt browser where you're not logged in to Talkyard,
+  # go to:
+  #   http://e2e-test-cid-0-0-now-1298.localhost/-/authn/oidc/keycloak_test_alias
+  #
+  # This should redirect your browser to:
+  #   http://localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/
+  #          auth?response_type=code&client_id=ty_test_client&...
+  #
+  # Type username and password from above:  'tykc'  'pub-tykc'.
   #
   # From the docs, https://www.keycloak.org/getting-started/getting-started-docker:
-  #     docker run -p 8080:8080 -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin \
+  #     docker run -p 8113:8080 -e KEYCLOAK_USER=admin -e KEYCLOAK_PASSWORD=admin \
   #         quay.io/keycloak/keycloak:10.0.0
   #     + -e DB_VENDOR=h2  is a good idea, see below.
   #
