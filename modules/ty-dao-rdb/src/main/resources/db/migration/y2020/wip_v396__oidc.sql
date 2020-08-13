@@ -31,7 +31,7 @@ create table identity_providers_t(
   constraint identityproviders_c_protocol check (protocol_c in ('oidc', 'oauth1', 'oauth2')),
   constraint identityproviders_c_syncmode check (sync_mode_c between 1 and 10),
   -- Appears in urls.
-  constraint identityproviders_c_alias_len check (alias_c ~ '^[a-z0-9]+$'),
+  constraint identityproviders_c_alias_chars check (alias_c ~ '^[a-z0-9_-]+$'),
   constraint identityproviders_c_alias_len check (length(alias_c) between 1 and 50),
   constraint identityproviders_c_displayname_len check (length(display_name_c) between 1 and 200),
   constraint identityproviders_c_description_c_len check (length(description_c) between 1 and 1000),
