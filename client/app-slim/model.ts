@@ -968,6 +968,7 @@ interface SettingsVisibleClientSide extends TopicInterfaceSettings {
   allowSignup?: boolean;                // default: true
   allowLocalSignup?: boolean;           // default: true
   allowGuestLogin?: boolean;            // default: false
+  customIdps?: IdentityProviderPubFields[];   // default: undefined
   enableGoogleLogin: boolean;           // default: depends on config file
   enableFacebookLogin: boolean;         // default: depends on config file
   enableTwitterLogin: boolean;          // default: depends on config file
@@ -1614,16 +1615,21 @@ interface ApiSecret {
 }
 
 
-interface IdentityProvider {
-  id: number;
+interface IdentityProviderPubFields {
   protocol: string;
   alias: string;
   displayName?: string;
   description?: string;
+  // iconUrl?: string;  — later
+  guiOrder?: number;
+}
+
+
+interface IdentityProviderSecretConf extends IdentityProviderPubFields {
+  id: number;
   enabled: boolean;
   trustVerifiedEmail: boolean;
   linkAccountNoLogin: boolean;
-  guiOrder?: number;
   syncMode: number;
   idpAuthorizationUrl: string;
   idpAccessTokenUrl: string;

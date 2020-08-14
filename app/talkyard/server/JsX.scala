@@ -633,10 +633,13 @@ object JsX {
   def readJsString(json: JsObject, field: String): String =
     JsonUtils.readString(json, field)
 
-  def JsBooleanOrNull(value: Option[Boolean]): JsValue =
+  def JsBooleanOrNull(value: Option[Boolean]): JsValue =  // RENAME to JsBoolOrNull
+    JsBoolOrNull(value)
+
+  def JsBoolOrNull(value: Option[Boolean]): JsValue =
     value.map(JsBoolean).getOrElse(JsNull)
 
-  def JsNumberOrNull(value: Option[Int]): JsValue =
+  def JsNumberOrNull(value: Option[Int]): JsValue =  // RENAME to JsNumOrNull
     value.map(JsNumber(_)).getOrElse(JsNull)
 
   def JsLongOrNull(value: Option[Long]): JsValue =
@@ -797,28 +800,37 @@ object JsX {
   }
 
 
-  def JsIdentityProvider(idp: IdentityProvider): JsObject = {
+  /** Public login info, for this Identity Provider (IDP) — does Not include
+    * the OIDC client id or secret.
+    */
+  def JsIdentityProviderPubFields(idp: IdentityProvider): JsObject = {
     Json.obj(
-        "id" -> idp.id_c,  // = readInt(jsObj, ),
-        "protocol" -> idp.protocol_c,  // = readString(jsObj, ),
-        "alias" -> idp.alias_c,  // = readString(jsObj, ),
-        "displayName" -> idp.display_name_c,  // = readOptString(jsObj, ),
-        "description" -> idp.description_c,  // = readOptString(jsObj, ),
-        "enabled" -> idp.enabled_c,  // = readBoolean(jsObj, ),
-        "trustVerifiedEmail" -> idp.trust_verified_email_c,  // = readBoolean(jsObj, ),
+      "id" -> idp.id_c,
+      "protocol" -> idp.protocol_c,
+      "alias" -> idp.alias_c,
+      "enabled" -> idp.enabled_c,
+      "displayName" -> JsStringOrNull(idp.display_name_c),
+      "description" -> JsStringOrNull(idp.description_c),
+      "guiOrder" -> JsNumberOrNull(idp.gui_order_c))
+  }
+
+
+  def JsIdentityProviderSecretConf(idp: IdentityProvider): JsObject = {
+    val pubFields = JsIdentityProviderPubFields(idp)
+    pubFields ++ Json.obj(
+        "trustVerifiedEmail" -> idp.trust_verified_email_c,
         "linkAccountNoLogin" -> idp.link_account_no_login_c,  // = readBoolean(jsObj, ),
-        "guiOrder" -> idp.gui_order_c,  // = readOptInt(jsObj, ),
         "syncMode" -> idp.sync_mode_c,  // = readInt(jsObj, ),
         "idpAuthorizationUrl" -> idp.idp_authorization_url_c,  // = readString(jsObj, ),
         "idpAccessTokenUrl" -> idp.idp_access_token_url_c,  // = readString(jsObj, ),
         "idpUserInfoUrl" -> idp.idp_user_info_url_c,  // = readString(jsObj, ),
-        "idpLogoutUrl" -> idp.idp_logout_url_c,  // = readOptString(jsObj, ),
+        "idpLogoutUrl" -> JsStringOrNull(idp.idp_logout_url_c),
         "idpClientId" -> idp.idp_client_id_c,  // = readString(jsObj, ),
         "idpClientSecret" -> idp.idp_client_secret_c,  // = readString(jsObj, ),
-        "idpIssuer" -> idp.idp_issuer_c,  // = readOptString(jsObj, ),
-        "idpScopes" -> idp.idp_scopes_c,  // = readOptString(jsObj, ),
-        "idpHostedDomain" -> idp.idp_hosted_domain_c,  // = readOptString(jsObj, ),
-        "idpSendUserIp" -> idp.idp_send_user_ip_c)  // = readOptBool(jsObj, )))
+        "idpIssuer" -> JsStringOrNull(idp.idp_issuer_c),
+        "idpScopes" -> JsStringOrNull(idp.idp_scopes_c),
+        "idpHostedDomain" -> JsStringOrNull(idp.idp_hosted_domain_c),
+        "idpSendUserIp" -> JsBoolOrNull(idp.idp_send_user_ip_c))
   }
 
 }

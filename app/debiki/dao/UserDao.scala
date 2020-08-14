@@ -493,6 +493,7 @@ trait UserDao {
   }
 
 
+  REFACTOR; MOVE // to package  talkyard.server.authn  ------------------------
   def upsertIdentityProvider(identityProvider: IdentityProvider): AnyProblem = {
     COULD_OPTIMIZE // clear idp cache
     readWriteTransaction(_.upsertIdentityProvider(identityProvider))
@@ -505,9 +506,16 @@ trait UserDao {
   }
 
 
+  def getIdentityProviders(onlyEnabled: Boolean): Seq[IdentityProvider] = {
+    unimplementedIf(!onlyEnabled, "!onlyEnabled [TyE05KSG205")
+    loadAllIdentityProviders().filter(_.enabled_c)
+  }
+
+
   def loadAllIdentityProviders(): Seq[IdentityProvider] = {
     readOnlyTransaction(_.loadAllIdentityProviders())
   }
+  // -------------------------------------------------------------------------
 
 
   def createIdentityUserAndLogin(newUserData: NewUserData, browserIdData: BrowserIdData)

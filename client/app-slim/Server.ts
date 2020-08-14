@@ -948,12 +948,12 @@ export function stopRedirectingExtraHostnames(success: () => void) {
 
 
 
-export function loadIdentityProviders(onDone: (idps: IdentityProvider[]) => void) {
+export function loadIdentityProviders(onDone: (idps: IdentityProviderSecretConf[]) => void) {
   get('/-/load-oidc-config', onDone);
 }
 
 
-export function upsertIdentityProvider(config: IdentityProvider, onDone: () => void,
+export function upsertIdentityProvider(config: IdentityProviderSecretConf, onDone: () => void,
         onError: (message: string) => void) {
   postJsonSuccess('/-/upsert-oidc-config', onDone, config);
 }

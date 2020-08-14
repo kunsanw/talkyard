@@ -119,7 +119,7 @@ class SettingsController @Inject()(cc: ControllerComponents, edContext: EdContex
     val idp = request.dao.readTx(_.loadAllIdentityProviders()).headOption getOrElse {
       return OkSafeJson(JsNull)
     }
-    val json = JsX.JsIdentityProvider(idp)
+    val json = JsX.JsIdentityProviderSecretConf(idp)
     OkSafeJson(json)
   }
 

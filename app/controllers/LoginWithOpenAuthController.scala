@@ -20,12 +20,7 @@ package controllers
 import com.debiki.core._
 import com.debiki.core.Prelude._
 import com.github.benmanes.caffeine
-import com.github.scribejava.apis.openid.{OpenIdJsonTokenExtractor => s_OpenIdJsonTokenExtractor}
-import com.github.scribejava.core.builder.api.{DefaultApi20 => s_DefaultApi20}
-import com.github.scribejava.core.builder.{ServiceBuilder => s_ServiceBuilder}
-import com.github.scribejava.core.extractors.{TokenExtractor => s_TokenExtractor}
 import com.github.scribejava.core.model.{OAuth2AccessToken => s_OAuth2AccessToken, OAuth2AccessTokenErrorResponse => s_OAuth2AccessTokenErrorResponse, OAuthAsyncRequestCallback => s_OAuthAsyncRequestCallback, OAuthRequest => s_OAuthRequest, Response => s_Response, Verb => s_Verb}
-import com.github.scribejava.core.oauth.{OAuth20Service => s_OAuth20Service}
 import com.mohiva.play.silhouette
 import com.mohiva.play.silhouette.api.util.HTTPLayer
 import com.mohiva.play.silhouette.api.LoginInfo
@@ -52,31 +47,6 @@ import scala.util.{Failure, Success}
 import talkyard.server.{ProdConfFilePath, TyLogging}
 
 
-private case class TyOidcScribeJavaApi20(idp: IdentityProvider) extends s_DefaultApi20 {
-
-  // e.g.:  "http://keycloak:8080" + "/auth/realms/" + realm
-  override def getAccessTokenEndpoint: String =
-    idp.idp_access_token_url_c
-
-  override def getAuthorizationBaseUrl: String =
-    idp.idp_authorization_url_c
-
-  override def getAccessTokenExtractor: s_TokenExtractor[s_OAuth2AccessToken] =
-    s_OpenIdJsonTokenExtractor.instance
-  /*
-  val realmName = "talkyard_keycloak_test_realm"
-
-  val oidcOpOrigin = "http://keycloak:8080"
-  val odicOpConfUrlPath = s"/auth/realms/$realmName/.well-known/openid-configuration"
-  val oidcOpConfUrl = s"$oidcOpOrigin$odicOpConfUrlPath"
-
-  val redirectUrlPath = "/-/login-oidc/keycloak/callback"
-
-  val userInfoUrl = s"$oidcOpOrigin/auth/realms/$realmName/protocol/openid-connect/userinfo"
-   */
-}
-
-
 /** OpenAuth 1 and 2 login, provided by Silhouette, e.g. for Google, Facebook and Twitter.
   *
   * This class is a bit complicated, because it supports logging in at site X
@@ -88,6 +58,9 @@ private case class TyOidcScribeJavaApi20(idp: IdentityProvider) extends s_Defaul
   */
 class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext: EdContext)
   extends EdController(cc, edContext) with TyLogging {
+
+  REFACTOR // MOVE this file to package talkyard.server.authn
+  REFACTOR // Split into   AuthnController  and  OldAuthnControllerSilhouette  ?
 
   import context.globals
   import context.security._
@@ -129,24 +102,15 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
 
   private case class StateAndNonce(browserIdOrEmpty: String, nonce: String)
 
-  val realmName = "talkyard_keycloak_test_realm"
 
-  val oidcOpOrigin = "http://keycloak:8080"
-  val odicOpConfUrlPath = s"/auth/realms/$realmName/.well-known/openid-configuration"
-  val oidcOpConfUrl = s"$oidcOpOrigin$odicOpConfUrlPath"
-
-  val redirectUrlPath = "/-/login-oidc/keycloak/callback"
-
-  val userInfoUrl = s"$oidcOpOrigin/auth/realms/$realmName/protocol/openid-connect/userinfo"
-  //val protectedResourceUrl =
-  //                    baseUrl + "/auth/realms/" + realm + "/protocol/openid-connect/userinfo"
-
+  /*
   private val oidcProviderMetadataByConfigUrl = caffeine.cache.Caffeine.newBuilder()
     // 2000 sites with OIDC enabled on this server is a lot
     .maximumSize(2000)
     // Let's refresh daily? Caching forever would be ok too.
     .expireAfterWrite(24, java.util.concurrent.TimeUnit.HOURS)
     .build().asInstanceOf[caffeine.cache.Cache[String, AnyRef]]  // n_OIDCProviderMetadata
+    */
 
   private val oidcStateNonceCache = caffeine.cache.Caffeine.newBuilder()
     .maximumSize(20*1000) // [ADJMEMUSG]
@@ -154,96 +118,98 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
     .build().asInstanceOf[caffeine.cache.Cache[String, StateAndNonce]]
 
 
-  //val keycloakClientId = "talkyard_keycloak_test_client"
-  //val keycloakClientSecret = "63b9659b-db05-4f99-8aa6-bd7a993bff40" // just testing!
 
-  //val alias = "local-keycloak-test"
-  //val baseUrl = oidcOpOrigin
-  //val realm = "talkyard_keycloak_test_realm"
-
-  // just testing
-  private def makeJavaScribeOAuthService(origin: String, idp: IdentityProvider)
-        : s_OAuth20Service = {
-    val callbackUrl = origin + s"/-/authn/${idp.protocol_c}/${idp.alias_c}/callback"
-    new s_ServiceBuilder(idp.idp_client_id_c)
-          .apiSecret(idp.idp_client_secret_c)
-          .defaultScope(idp.idp_scopes_c getOrElse "openid")  // or don't set if absent
-          .callback(callbackUrl)
-          .build(
-              TyOidcScribeJavaApi20(idp))
-            // s_KeycloakApi.instance(baseUrl, realm))
-  }
-
-  //private val scribeOAuth20Service = makeJavaScribeOAuthService("http://localhost")
-
-
-  def oidcOrOauth2Start(protocol: String, providerAlias: String,
+  def authnStart(protocol: String, providerAlias: String,
           returnToUrl: String): Action[Unit]
           = AsyncGetActionIsLogin { request =>
-      oidcOrOauth2StartImpl(protocol, providerAlias, returnToUrl, request)
+      authnStartImpl(protocol, providerAlias, returnToUrl, request)
     }
 
 
-  private def oidcOrOauth2StartImpl(protocol: String, providerAlias: String,
+  private def authnStartImpl(protocol: String, providerAlias: String,
         returnToUrl: String, request: GetRequest): Future[Result] = {
 
-    import request.dao
+    import request.{dao, siteId}
 
     protocol match {
       case "oidc" | "oauth2" =>  // lowercase, from the url
       case _ => throwNotFound("TyEBADPROTO", "TyE603RFKEGM")
     }
 
-    val customIdp: IdentityProvider =
+    val idp: IdentityProvider =
           dao.getIdentityProviderByAlias(protocol, providerAlias) getOrElse {
       // For now:
       throwForbidden("TyE6RKT0456", s"No $protocol provider with alias: '$providerAlias'")
+
       /*
-
-      val settings = request.siteSettings
-      // if ! settings  protocol + provider  enabled
-      // return Forbidden / not found
-
       if (globals.anyLoginOrigin isSomethingButNot originOf(request)) {
         // OAuth providers have been configured to send authentication data to
         // anyLoginOrigin.get. We'll redirect to that origin, login there, and it'll
         // send the user back here.
         return loginViaLoginOrigin(providerAlias, request.underlying)
-      }
-
-      // throw forbidden, or not found
-      */
+      } */
     }
 
-    val service = makeJavaScribeOAuthService(request.origin, customIdp)
+    // Is it ok to reveal that this provider exists? Otherwise could be really
+    // confusing to troubleshoot this.  There could be another setting:
+    // hide: Boolean  or  hideIfDisabled: Boolean,
+    // if Ty should try to not show that it even exists?
+    throwForbiddenIf(!idp.enabled_c, "TyEIDPDISBLD",
+          s"Identity provider $providerAlias, protocol $protocol, is disabled")
 
-    // Obtain the Authorization URL
-    System.out.println("Fetching the KeyCloak Authorization URL...")
-    val authorizationUrl: String = service.getAuthorizationUrl()
-    System.out.println("Got the Authorization URL!")
-    System.out.println(s"Redirecting the browser to: $authorizationUrl")
+    val service = dao.getAuthnServices(request.origin, idp) getOrElse {
+      throwInternalError("TyEMAKEIDPSVC01",
+            s"s$siteId: Cannot get/create ScribeJava service for '$providerAlias'")
+    }
+
+    // Redirect the browser to the OAuth2 auth endpoint, to login over there.
+    val state = "state_TODO_random"
+    val authorizationUrl: String = service.createAuthorizationUrlBuilder()
+          .state(state)
+          //.additionalParams(... IDP specific &query=params ...)
+          .build()
+
     Future.successful(
           play.api.mvc.Results.Redirect(
                 authorizationUrl, status = play.api.http.Status.SEE_OTHER))
   }
 
 
-  def oidcOrOauth2Callback(protocol: String, providerAlias: String,
-          session_state: String, code: String): Action[Unit]
+  /** (IDP = identity provider.)
+    *
+    * @param state — specified by Ty. For preventing xsrf attacks.
+    * @param session_state — if the IDP, say, Keycloak, supports
+    *  session management (like, logout?), it'll include a &session_state=...
+    *  query param. Talkyard can then include this param in all subsequent
+    *  requests to the IDP, so that the IDP knows which user Talkyard has
+    *  in mind, from the IDP:s point of view. And (?) if Ty tells the IDP that
+    *  the user has logged out, then the IDP can log the user out from other
+    *  services (other than Ty) managed by the IDP too  ?
+    * @param code — send to the IDP to get back an access token.
+    * @return
+    */
+  def authnCallback(protocol: String, providerAlias: String,
+          state: String, session_state: String, code: String): Action[Unit]
           = AsyncGetActionIsLogin { request =>
 
-    // !! check the state !! xsrf
+    import request.{dao, siteId}
 
-    val customIdp = request.dao.getIdentityProviderByAlias(protocol, providerAlias) getOrElse {
+    // !! check the state !! xsrf
+    System.out.println(s"State: $session_state \n\nCode: $code\n\n")
+
+    val idp = request.dao.getIdentityProviderByAlias(protocol, providerAlias) getOrElse {
       // if  is login origin   fine, use config file default login settings
       // else
       //   return forbidden
       // For now:
-      throwForbidden("TyE5026KSH5", s"Bad protocol: '${protocol
-            }' or IDP provider alias: '$providerAlias'")
+      throwForbidden("TyE5026KSH5",
+            s"Bad protocol: '$protocol' or IDP provider alias: '$providerAlias'")
     }
 
-    val service = makeJavaScribeOAuthService(request.origin, customIdp)
+    val service = dao.getAuthnServices(request.origin, idp) getOrElse {
+      throwInternalError("TyEMAKEIDPSVC02",
+            s"s$siteId: Cannot get/create ScribeJava service for '$providerAlias'")
+    }
 
     val accessTokenPromise = Promise[s_OAuth2AccessToken]()
     val userInfoPromise = Promise[s_Response]()
@@ -260,18 +226,22 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
     accessTokenPromise.future.onComplete({
       case Failure(throwable: Throwable) => throwable match {
         case ex: s_OAuth2AccessTokenErrorResponse =>
-          Future.successful(ForbiddenResult(
-            "TyEOIDCTOKENRSP", s"Error response from OIDC token endpoint: ${ex.toString}"))
+          Future.successful(ForbiddenResult("TyEOIDCTOKENRSP",
+                s"Error response from OIDC token endpoint: ${ex.toString}"))
         case ex @ (_: InterruptedException | _: j_ExecutionException | _: j_IOException) =>
+          Future.successful(InternalErrorResult("TyEOIDCTOKENREQ",
+                s"Error requesting OIDC token: ${ex.toString}"))
+        case ex: Exception =>
           Future.successful(InternalErrorResult(
-            "TyEOIDCTOKENREQ", s"Error requesting OIDC token: ${ex.toString}"))
+                "TyEOIDCTKNRQUNK",
+                s"Unknown error requesting OIDC token: ${ex.toString}"))
       }
 
       case Success(oauthAccessToken: s_OAuth2AccessToken) =>
-        val getUserInfoRequest = new s_OAuthRequest(s_Verb.GET, userInfoUrl)
-        service.signRequest(oauthAccessToken, getUserInfoRequest)
+        val userInfoRequest = new s_OAuthRequest(s_Verb.GET, idp.idp_user_info_url_c)
+        service.signRequest(oauthAccessToken, userInfoRequest)
 
-        service.execute(getUserInfoRequest, new s_OAuthAsyncRequestCallback[s_Response] {
+        service.execute(userInfoRequest, new s_OAuthAsyncRequestCallback[s_Response] {
           override def onCompleted(response: s_Response): Unit = {
             userInfoPromise.success(response)
           }
@@ -293,15 +263,15 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
         val body = response.getBody
         lazy val randVal = nextRandomString()
 
-        if (httpStatusCode < 200 || 299 < httpStatusCode) {
+        val result = if (httpStatusCode < 200 || 299 < httpStatusCode) {
           logger.warn(i"""Weird status code from userinfo endpoint: $httpStatusCode,
               |Error id: '$randVal'
               |Provider: $providerAlias
               |Response body:
               |$body
               |""")
-          Success(InternalErrorResult("TyEOIDCUSRINFRSP", o"""Unexpected status code:
-                $httpStatusCode, see logs for details, search for '$randVal'"""))
+          InternalErrorResult("TyEOIDCUSRINFRSP", o"""Unexpected status code:
+                $httpStatusCode, see logs for details, search for '$randVal'""")
         }
         else {
           val sb = StringBuilder.newBuilder
@@ -309,20 +279,42 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
           sb.append(response.getCode + '\n')
           sb.append(response.getBody + '\n')
 
-          Success(Ok(sb.toString))
+          val profile = ExternalSocialProfile(
+                providerId = idp.alias_c,
+                providerUserId = "response.sub",
+                username = Some("resp.preferred_username"),
+                firstName = None,
+                lastName = None,
+                fullName = None,
+                gender = None, // Option[Gender],
+                avatarUrl = None,
+                publicEmail = None,
+                publicEmailIsVerified = None,  // Option[Boolean],
+                primaryEmail = None,
+                primaryEmailIsVerified = None,  //  response-json.email_verified
+                company = None,
+                location = None,
+                aboutUser = None,
+                createdAt = None)
+          handleAuthenticationData(request, profile)
         }
+        Success(result)
     }
 
     futureResponseToBrowser
   }
 
 
-  def oidcLogout(): Action[Unit] = AsyncGetActionIsLogin { request =>
+  def authnLogout(): Action[Unit] = AsyncGetActionIsLogin { request =>
     Future.successful(NotImplementedResult("TyEOIDCLGO", "Not implemented"))
     // TODO backchannel logout from  /-/logout ?
   }
 
 
+
+
+
+  // ======= OLD with Silhouette ============
 
 
   def startAuthentication(providerName: String, returnToUrl: String): Action[Unit] =
@@ -440,7 +432,8 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
         // We're finishing authentication.
         val futureProfile: Future[SocialProfile] = provider.retrieveProfile(authInfo)
         futureProfile flatMap { profile: SocialProfile =>   // TalkyardSocialProfile?  (TYSOCPROF)
-          handleAuthenticationData(request, profile)
+          Future.successful(
+                handleAuthenticationData(request, profile))
         }
     } recoverWith {
       case ex: Exception =>
@@ -470,7 +463,7 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
 
 
   private def handleAuthenticationData(request: GetRequest, profile: SocialProfile)
-        : Future[Result] = {
+        : Result = {
     logger.debug(s"OAuth data received at ${originOf(request)}: $profile")
 
     val (anyReturnToSiteOrigin: Option[String], anyReturnToSiteXsrfToken: Option[String]) =
@@ -494,10 +487,9 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
         |anyReturnToUrl = $anyReturnToUrl"""
       // Delete the cookies, so if the user tries again, there'll be only one cookie and things
       // will work properly.
-      return Future.successful(
-        Forbidden(errorMessage).discardingCookies(
+      return Forbidden(errorMessage).discardingCookies(
           DiscardingSecureCookie(ReturnToSiteOriginTokenCookieName),
-          DiscardingSecureCookie(ReturnToUrlCookieName)))
+          DiscardingSecureCookie(ReturnToUrlCookieName))
     }
 
     REFACTOR; CLEAN_UP // stop using CommonSocialProfile. Use ExternalSocialProfile instead,  (TYSOCPROF)
@@ -540,7 +532,7 @@ class LoginWithOpenAuthController @Inject()(cc: ControllerComponents, edContext:
         tryLoginOrShowCreateUserDialog(request, anyOauthDetails = Some(oauthDetails))
     }
 
-    Future.successful(result)
+    result
   }
 
 
@@ -1134,7 +1126,7 @@ object Gender {
 }
 
 
-case class ExternalSocialProfile(
+case class ExternalSocialProfile(   // RENAME to ExternalIdentity? It's from an Identity Provider (IDP)
   providerId: String,
   providerUserId: String,
   username: Option[String],

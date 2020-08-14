@@ -32,8 +32,8 @@ POST  /-/login-password-create-user controllers.LoginWithPasswordController.hand
 GET   /-/login-password-confirm-email controllers.LoginWithPasswordController.confirmEmailAddressAndLogin(confirmationEmailId, returnToUrl)
 # also: /-/v0/sso-login via ApiV0Controller
 
-GET   /-/authn/:protocol/:providerAlias           controllers.LoginWithOpenAuthController.oidcOrOauth2Start(protocol, providerAlias, returnToUrl: String = "/")
-GET   /-/authn/:protocol/:providerAlias/callback  controllers.LoginWithOpenAuthController.oidcOrOauth2Callback(protocol, providerAlias, session_state, code)
+GET   /-/authn/:protocol/:providerAlias           controllers.LoginWithOpenAuthController.authnStart(protocol, providerAlias, returnToUrl: String = "/")
+GET   /-/authn/:protocol/:providerAlias/callback  controllers.LoginWithOpenAuthController.authnCallback(protocol, providerAlias, state, session_state, code)
 
 # Would like to remove, use /-/authn/oauth2/:name  instead:
 GET   /-/login-openauth/:providerName controllers.LoginWithOpenAuthController.startAuthentication(providerName, returnToUrl: String = "/")

@@ -1,4 +1,4 @@
-FROM quay.io/keycloak/keycloak:10.0.0
+FROM quay.io/keycloak/keycloak:11.0.0
 
 EXPOSE 8113
 EXPOSE 8553

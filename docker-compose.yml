@@ -260,21 +260,11 @@ services:
   #   click Save.
   # Click Credentials at the top,
   #   set password: 'pub-tykc',
-  #   make the password permanent: click 'On' next to Temporary to toggle to Off,
+  #   click 'On' next to Temporary to toggle to Off, so the password becomes permanent,
   #   click  Set Password.
   #
   # Test login here: http://localhost:8113/auth/realms/ty_test_realm/account
   # (Use a different browser or Ctrl+N or Ctrl+P open an incognito window.)
-  #
-  # ##### Create a test Talkyard site
-  # Run in a shell:
-  #    s/wdio --only manual.2browsers --da --dt 
-  # This creates a Talkyard test site, on localhost, and logs you in as
-  # "owen_owner", the site admin, and member "memah".
-  # (--da means "debug afterwards" — pauses Webdriverio, instead of exiting.
-  # --dt means use the DevTools protocol, so you won't need Selenium.)
-  # Copy the Talkyard site URL, sth like: (as of Aug 2020)
-  #   http://e2e-test-cid-0-0-now-1298.localhost
   #
   # #### Create an OIDC app for Talkyard:
   # Back in Keycloak, as admin in the Talkyard test realm:
@@ -284,16 +274,29 @@ services:
   # Click Save. Thereafter,
   # Access Type: Change from 'public' 'confidential' ('public' is for mobile apps
   # and single page apps — they have no OIDC client app API secret)
-  # Keep the 'Standard' flow = 'code' flow enabled,
-  # do not enable 'Implicit' flow — it's not so secure.
+  # Keep the 'Standard' flow = 'code' flow enabled.
+  # Do not enable 'Implicit' flow — it's not so secure.
   #
   # ##### See if works
   # KeyCloack has this OpenID Connect demo login app you can try now,
   # if you want to:  https://www.keycloak.org/app/.
   #
-  # ##### Connect with Talkyard
-  # Change the Root URL to point to your Talkyard test site (created above)
-  # plus append:  '/-/authn/oidc/keycloak_test_alias',
+  # ##### Create a test Talkyard site
+  # Run in a shell:
+  #    s/wdio --only manual.2browsers --da --dt
+  # This creates a Talkyard test site, on localhost, and logs you in as
+  # "owen_owner", the site admin, in one browser, and member "memah"
+  # in another browser.
+  # (--da means "debug afterwards" — pauses Webdriverio, instead of exiting.
+  # --dt means use the DevTools protocol, so you won't need Selenium.)
+  #
+  # Copy the Talkyard test site url from the browser address bar,
+  # the url looks like: (as of Aug 2020)
+  #   http://e2e-test-cid-0-0-now-1298.localhost
+  #
+  # ##### Connect Keycloak with Talkyard
+  # Change Keycloak's Root URL to point to your Talkyard test site,
+  # plus, append:  '/-/authn/oidc/keycloak_test_alias',
   # will look like:
   #   http://e2e-test-cid-0-0-now-1298.localhost/-/authn/oidc/keycloak_test_alias
   # Set the Redirect URI to the above + '/callback',
@@ -317,22 +320,22 @@ services:
   #  "protocol": "oidc",
   #  "alias": "keycloak_test_alias",
   #  "displayName": "Keycloak Test",
-  #  "description": "Local Keycloak OIDC login test",
+  #  "description": "OpenID Connect login test at keycloak.localhost:8113",
   #  "enabled": true,
   #  "trustVerifiedEmail": true,
   #  "linkAccountNoLogin": false,
   #  "guiOrder": 1,
   #  "syncMode": 1,
   #  "idpAuthorizationUrl":
-  #    "http://keycloak:8113/auth/realms/ty_test_realm/protocol/openid-connect/auth",
+  #    "http://keycloak.localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/auth",
   #  "idpAccessTokenUrl":
-  #    "http://keycloak:8113/auth/realms/ty_test_realm/protocol/openid-connect/token",
+  #    "http://keycloak.localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/token",
   #  "idpUserInfoUrl":
-  #    "http://keycloak:8113/auth/realms/ty_test_realm/protocol/openid-connect/userinfo",
+  #    "http://keycloak.localhost:8113/auth/realms/ty_test_realm/protocol/openid-connect/userinfo",
   #  "idpLogoutUrl": null,
   #  "idpClientId": "ty_test_client",
   #  "idpClientSecret": "THE_SECRET_YOU_COPIED",
-  #  "idpIssuer": "http://keycloak:8113/auth/realms/ty_test_realm",
+  #  "idpIssuer": "http://keycloak.localhost:8113/auth/realms/ty_test_realm",
   #  "idpScopes": "openid"
   # }
   #
