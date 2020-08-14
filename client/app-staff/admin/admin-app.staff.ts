@@ -436,6 +436,9 @@ function OnlyForAdmins() {
 
 
 const DashboardPanel = React.createFactory<any>(function(props) {
+  // any posible config to require approval for every comment?
+  // Not yet, I think I can add that, in the upcoming Talkyard
+  //    version (in the 2nd half of next week June 1 - 7, probably)
   const [dashboardData, setDashboardData] = React.useState<AdminDashboard | null>(null);
 
   React.useEffect(() => {
@@ -454,7 +457,9 @@ const DashboardPanel = React.createFactory<any>(function(props) {
   return (
     r.div({ class: 's_A_Db' },
       r.h3({}, "Dashboard"),
-      r.p({}, "Work in progress (June, 2020). For now, disk usage info:"),
+      r.h2({}, "Site stats:"),
+      r.pre({}, dashboardData.siteStats),
+      r.h2({}, "Disk usage info:"),
 
       // kB = kilobytes, 1000 bytes.  1 KiB (uppercase K) = 1 kibi =1024 bytes.
       // MB = 1000 * 1000 byte. MiB = 1024 * 1024 bytes.
@@ -794,7 +799,18 @@ const LoginAndSignupSettings = createFactory({
                 onChange: (event) => this.setState({ oidcConfigText: event.target.value }),
                 help: undefined }),
               !!this.state.idpConfErr && r.p({}, this.state.idpConfErr),
-              !!this.state.savingOidc && r.p({}, this.state.savingOidc),
+              !!this.state.savingOidc && r.p({},
+                this.state.savingOidc, r.br(),
+                `Authn url: ` + (() => {
+                  let idp: IdentityProviderSecretConf;
+                  try {
+                    idp = JSON.parse(this.state.oidcConfigText);
+                  }
+                  catch (ex) {
+                    return '';
+                  }
+                  return `${location.origin}/-/authn/${idp.protocol}/${idp.alias}`;
+                })()),
               PrimaryButton({ onClick: () => {
                     const jsonText = this.state.oidcConfigText;
                     let json;
