@@ -17,8 +17,26 @@
 
 (function() {
 
+// How Markdown-it works:
+// Phase 1: Parse characters into tokens.
+// parseSomehting(state, ...) {  ... parse; ...  state.push(token-data) }
+// Phase 2?: Process the token lists.
+//   see:
+//     https://github.com/markdown-it/markdown-it-for-inline/blob/master/index.js
+// Phase 3: Render the tokens into html.
+// Various token renderers are invoked:
+//    parseOnebox(state
+
 // NEXT seems ok simple to create an IntLnRndr for internal link titles?
 // And [[wiki style]] links and later #[tags]?
+
+// Use this:  https://github.com/markdown-it/markdown-it-for-inline
+// DON'T write my own parser or plugin rules.
+// Error prone I think.
+
+// For whole blocks, e.g. spoiler blocks:
+// https://github.com/markdown-it/markdown-it-container
+// (but Not for inline link titles, or block link previews)
 
 var pluginId = 'LnPvRndr';  // means LinkPreviewRenderer
 
@@ -31,6 +49,25 @@ var pluginId = 'LnPvRndr';  // means LinkPreviewRenderer
 debiki.internal.oneboxMarkdownItPlugin = function(md) {
   md.block.ruler.before('paragraph', pluginId, parseOnebox);
   md.renderer.rules[pluginId] = renderOnebox;
+  md.renderer.rules.link_open = tyRenderLinkOpen;
+};
+
+
+
+function tyRenderLinkOpen(tokens, idx, options, env, self) {
+  var token = tokens[idx],
+      aIndex = token.attrIndex('href');
+
+  if (aIndex >= 0) { // vimeoRE.test(token.attrs[aIndex][1])) {
+    //var id = token.attrs[aIndex][1].match(vimeoRE)[2];
+
+    return '<div class="embed-responsive embed-responsive-16by9">\n' +
+           '  <b>Link Preview Block !!\n' +
+           '</div>\n';
+  }
+
+  // pass token to default renderer.
+  return defaultRender(tokens, idx, options, env, self);
 };
 
 
