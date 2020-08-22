@@ -68,6 +68,8 @@ type RefOrId = Ref | number;
 const enum ReviewDecision {
   // 1nnn = Accept.
   Accept = 1001,
+  InteractEdit = 1051,
+  InteractReply = 1052,
   // 3nnn = Request changes.
   // 5nnn = Reject.
   DeletePostOrPage = 5001,

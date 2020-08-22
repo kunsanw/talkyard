@@ -26,6 +26,18 @@ import scala.collection.mutable
 package object dao {
 
 
+  /**
+    *
+    * @param pageId
+    * @param memCacheOnly
+    * @param pageModified
+    * @param backlinksStale — if backlinks on this page, back to other pages,
+    *   are stale, e.g. one of those other pages got renamed,
+    *   or moved to a different access restricted category so the
+    *   backlink should disappear.
+    * @param ancestorCategoriesStale
+    * @param ppNamesStale
+    */
   case class StalePage(
     pageId: PageId,
     memCacheOnly: Boolean,
@@ -78,6 +90,8 @@ package object dao {
       *   and the database "knows" the cached html is out-of-date.
       *   Then, pass memCacheOnly = true here (so won't need to write to the db
       *   twice that the cached html is out-of-date).
+      * @param backlinksStale If backlinks on this page, back to other pages
+      *   that link to it, needs to be refreshed.
       */
     def addPageId(pageId: PageId, memCacheOnly: Boolean = false,
             pageModified: Boolean = true, backlinksStale: Boolean = false): Unit = {

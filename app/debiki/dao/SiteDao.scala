@@ -195,6 +195,14 @@ class SiteDao(
   private def thisSiteCacheKey = siteCacheKey(this.siteId)
 
 
+  def writeTxTryReuse[R](anyStuff: Option[(SiteTx, StaleStuff)])(
+          fn: (SiteTransaction, StaleStuff) => R): R =
+    anyStuff match {
+      case Some((tx, staleStuff)) => fn(tx, staleStuff)
+      case None => writeTx(fn)
+    }
+
+
   def writeTx[R](fn: (SiteTransaction, StaleStuff) => R): R = {
     writeTx()(fn)
   }

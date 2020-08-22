@@ -7687,7 +7687,7 @@ export class TyE2eTestBrowser {
           }
 
           // Only in the title text, not body text.
-          const titlePend = data.willBePendingApproval ? "(Title pending approval)\n" : '';
+          const titlePend = data.willBePendingApproval ? "Page pending approval\n" : '';
 
           if (data.matchAfter !== false && data.titleMatchAfter !== false) {
             // if (data.titleMatchAfter)

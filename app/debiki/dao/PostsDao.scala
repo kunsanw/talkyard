@@ -38,7 +38,12 @@ import math.max
 
 case class InsertPostResult(storePatchJson: JsObject, post: Post, reviewTask: Option[ReviewTask])
 
-case class ChangePostStatusResult(answerGotDeleted: Boolean)
+case class ChangePostStatusResult(
+  updatedPost: Option[Post],
+  answerGotDeleted: Boolean)
+
+case class ApprovePostResult(
+  updatedPost: Option[Post])
 
 case class LoadPostsResult(
   posts: immutable.Seq[Post],
@@ -94,6 +99,8 @@ trait PostsDao {
     refreshPageInMemCache(pageId)
 
     val storePatchJson = jsonMaker.makeStorePatch(newPost, author, showHidden = true)
+
+    // But only if approved?  Or notify staff members
     pubSub.publish(StorePatchMessage(siteId, pageId, storePatchJson, notifications),
       byId = author.id)
 
@@ -282,6 +289,17 @@ trait PostsDao {
     insertAuditLogEntry(auditLogEntry, tx)
     anyReviewTask.foreach(tx.upsertReviewTask)
     anySpamCheckTask.foreach(tx.insertSpamCheckTask)
+
+    // If staff has now read and replied to the parent pos — then resolve any
+    // mod tasks about the parent post. So they won't need to review this post twice,
+    // on the Moderation page too.
+    if (author.isStaff) {
+      bugWarnIf(anyReviewTask.isDefined || anySpamCheckTask.isDefined, "TyE05RKD5")
+      replyToPosts foreach { replyToPost =>
+        maybeReviewAcceptPostByInteracting(replyToPost, moderator = author,
+              ReviewDecision.InteractReply)(tx, staleStuff)
+      }
+    }
 
     val notifications =
       if (skipNotifications) Notifications.None
@@ -875,11 +893,24 @@ trait PostsDao {
 
       val anyNewApprovedById =
         if (postToEdit.tyype == PostType.ChatMessage) {
-          // The system user auto approves all chat messages; always use SystemUserId for chat.
+          // Auto approve chat messages. Always SystemUserId for chat.
           Some(SystemUserId)  // [7YKU24]
         }
         else if (editor.isStaff) {
-          Some(editor.id)
+          if (!postToEdit.isSomeVersionApproved) {
+            // Staff won't approve a not yet unapproved post, just by editing it.
+            // Instead, they need to click a button to explicitly approve it  [in_pg_apr]
+            // the first time (for that post).  (Or do via the Moderation page).
+            // (Partly because it'd be *complicated* to both approve and publish
+            // the post, *and* handle edits, at the same time.)
+            TESTS_MISSING
+            None
+          }
+          else {
+            // Older revision already approved and post already published.
+            // Then, continue approving it.
+            Some(editor.id)
+          }
         }
         else {
           // Let people continue editing a post that has been approved already — unless
@@ -889,6 +920,7 @@ trait PostsDao {
             None  // [TyT7UQKBA2]
           }
           else if (postToEdit.isCurrentVersionApproved) {
+            // Auto approve — let people edit their already approved posts.
             Some(SystemUserId)
           }
           else {
@@ -904,7 +936,8 @@ trait PostsDao {
           newLastApprovedEditById,
           newApprovedSource,
           newApprovedHtmlSanitized,
-          newApprovedAt) =
+          newApprovedAt,
+      ) =
         if (anyNewApprovedById.isDefined)
           (true,
           None,
@@ -1008,7 +1041,15 @@ trait PostsDao {
           AllSettings.PostRecentlyCreatedLimitMs
 
       val reviewTask: Option[ReviewTask] =    // (7ALGJ2)
-        if (editor.isStaffOrTrustedNotThreat) {
+        if (editor.isStaff) {
+          // Now staff has had a look at the post, even edited it — so resolve
+          // mod tasks about this posts. So won't be asked to review this post again,
+          // on the Moderation page.
+          maybeReviewAcceptPostByInteracting(postToEdit, moderator = editor,
+                ReviewDecision.InteractEdit)(tx, staleStuff)
+          None
+        }
+        else if (editor.isStaffOrTrustedNotThreat) {
           // Don't review late edits by trusted members — trusting them is
           // the point with the >= TrustedMember trust levels. TyTLADEETD01
           None
@@ -1102,9 +1143,8 @@ trait PostsDao {
       // who did the edits, if they "never" appear because the staff didn't notice.
       // val notfs = notfGenerator(tx).generateForReviewTask( ...)
 
-      if (!postToEdit.isSomeVersionApproved && editedPost.isSomeVersionApproved) {
-        unimplemented("Updating visible post counts when post approved via an edit", "DwE5WE28")
-      }
+      dieIf(!postToEdit.isSomeVersionApproved && editedPost.isSomeVersionApproved,
+        "TyE305RK7TP", "Staff cannot approve and publish post via an edit")
 
       if (editedPost.isCurrentVersionApproved) {
         staleStuff.addPageId(editedPost.pageId)
@@ -1233,12 +1273,24 @@ trait PostsDao {
 
     val pageIdsLinkedAfter = tx.loadPageIdsLinkedFromPage(post.pageId)
 
-    // Uncache backlinked pages. [uncache_blns]
     WOULD_OPTIMIZE // use Guava.symmetricDifference.  But not Scala's  setA.diff.setB.
     val stalePageIds =
-          (pageIdsLinkedBefore -- pageIdsLinkedAfter) ++
-            (pageIdsLinkedAfter -- pageIdsLinkedBefore)
-    staleStuff.addPageIds(stalePageIds, pageModified = false, backlinksStale = true)
+      (pageIdsLinkedBefore -- pageIdsLinkedAfter) ++
+        (pageIdsLinkedAfter -- pageIdsLinkedBefore)
+
+    // Uncache backlinked pages. [uncache_blns]
+    if (post.isTitle) {
+      // Then all linked pages need to update their backlinks to this post's page
+      // — to show the new title. But the set of links cannot have changed.
+      bugWarnIf(pageIdsLinkedAfter != pageIdsLinkedBefore,
+            "TyE305RKDJ", o"""s$siteId: Linked pages changed when editing *title*,
+              page id: ${post.pageId}""")
+      staleStuff.addPageIds(
+            pageIdsLinkedBefore, pageModified = false, backlinksStale = true)
+    }
+    else {
+      staleStuff.addPageIds(stalePageIds, pageModified = false, backlinksStale = true)
+    }
   }
 
 
@@ -1550,19 +1602,25 @@ trait PostsDao {
         : ChangePostStatusResult = {
     val result = writeTx { (tx, staleStuff) =>
       changePostStatusImpl(postNr, pageId = pageId, action, userId = userId,
-            doingReviewTask = None, tx, staleStuff)
+            tx, staleStuff)
     }
     refreshPageInMemCache(pageId)
     result
   }
 
 
+  /** Deletes, undelete, hides, unhides etc a post, and optionally, its
+    * successors.
+    *
+    * Does not change the status of any ModTask related to this post
+    * — better if such things are done only explicitly via ReviewsDao
+    * and UI buttons? [deld_post_mod_tasks]
+    */
   def changePostStatusImpl(postNr: PostNr, pageId: PageId, action: PostStatusAction,
-        userId: UserId, doingReviewTask: Option[ReviewTask], tx: SiteTransaction,
-        staleStuff: StaleStuff)
+        userId: UserId, tx: SiteTransaction, staleStuff: StaleStuff)
         : ChangePostStatusResult =  {
     import com.debiki.core.{PostStatusAction => PSA}
-    import context.security.{throwNoUnless, throwIndistinguishableNotFound}
+    import context.security.throwIndistinguishableNotFound
 
     val page = newPageDao(pageId, tx)
     if (!page.exists)
@@ -1585,11 +1643,22 @@ trait PostsDao {
         throwForbidden("DwE5JKF7", "You may not modify the whole tree")
     }
 
-    val isChangingDeletePostToDeleteTree =
-      postBefore.deletedStatus.onlyThisDeleted && action == PSA.DeleteTree
-    if (postBefore.isDeleted && !isChangingDeletePostToDeleteTree) {
-      // Hmm but trying to delete a deleted *page*, does nothing, instead of throwing an error. [5WKQRH2]
-      throwForbidden("DwE5GUK5", "This post has already been deleted")
+    if (postBefore.isDeleted) {
+      val isUnhidingPostBody = action == PSA.UnhidePost
+      val isChangingDeletePostToDeleteTree =
+            postBefore.deletedStatus.onlyThisDeleted && action == PSA.DeleteTree
+      if (isChangingDeletePostToDeleteTree) {
+        // Fine.
+      }
+      else if (isUnhidingPostBody) {
+        UNTESTED
+        // Fine — maybe staff are approving this post [apr_deld_post], and will
+        // also undelete it or any deleted page.
+      }
+      else {
+        // Hmm but trying to delete a deleted *page*, does nothing, instead of throwing an error. [5WKQRH2]
+        throwForbidden("DwE5GUK5", "This post has already been deleted")
+      }
     }
 
     var numVisibleRepliesGone = 0
@@ -1732,16 +1801,19 @@ trait PostsDao {
     dieIf(postsDeleted.nonEmpty && postsUndeleted.nonEmpty, "TyE2WKBG5")
 
     // Invalidate, or re-activate, review tasks whose posts get deleted / undeleted.
-    // See here: [4JKAM7] for when deleting pages.
+    // See here: [deld_post_mod_tasks] for when deleting pages.
     // Or no? What if Mallory posts and angry comment, then people get upset, reply and flag it?
     // Then Mallory deletes his comment. Now, better if the review tasks for those flags, are
     // still available for the staff, so they can review Mallory's deleted post.
     // So, don't do this for other posts than the one being explicitly reviewed and deleted:
+    // ?? skip this ??  do from  ReviewsDao  instead.
+    DELETE_LATER; DO_AFTER // 2021-01 delete this whole comment & out commented code block.
+    /*
     doingReviewTask foreach { task =>
       val taskPostId = task.postId getOrDie "TyE6KWA2C"
       invalidateReviewTasksForPosts(postsDeleted.filter(_.id == taskPostId), doingReviewTask, tx)
       reactivateReviewTasksForPosts(postsUndeleted.filter(_.id == taskPostId), doingReviewTask, tx)
-    }
+    } */
 
     // If this post is getting deleted because it's spam, then, update any [UPDSPTSK]
     // pending spam check task, so we can send a training sample to any spam check services.
@@ -1779,18 +1851,23 @@ trait PostsDao {
 
     BUG // should sometimes remove forum topic list from mem cache? — hmm, already done, right: [2F5HZM7]
 
-    ChangePostStatusResult(answerGotDeleted = answerGotDeleted)
+    ChangePostStatusResult(
+          updatedPost = Some(postAfter), answerGotDeleted = answerGotDeleted)
   }
 
 
   def approvePostImpl(pageId: PageId, postNr: PostNr, approverId: UserId,
-          tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
+          tx: SiteTransaction, staleStuff: StaleStuff): ApprovePostResult = {
 
     val page = newPageDao(pageId, tx)
     val pageMeta = page.meta
     val postBefore = page.parts.thePostByNr(postNr)
-    if (postBefore.isCurrentVersionApproved)
-      throwForbidden("DwE4GYUR2", s"Post nr ${postBefore.nr} already approved")
+    if (postBefore.isCurrentVersionApproved) {
+      // There's a race between the janitor thread and humans approving
+      // directly — fine.  [mod_post_race]
+      // throwForbidden("DwE4GYUR2", s"Post nr ${postBefore.nr} already approved") NO
+      return ApprovePostResult(updatedPost = None)
+    }
 
     val approver = tx.loadTheParticipant(approverId)
 
@@ -1833,13 +1910,24 @@ trait PostsDao {
       bodyHiddenAt = None,
       bodyHiddenById = None,
       bodyHiddenReason = None)
+
     tx.updatePost(postAfter)
     tx.indexPostsSoon(postAfter)
+
+    if (postBefore.isDeleted) {
+      UNTESTED
+      // Can happen e.g. if a moderator approves a post, after someone else
+      // deleted an ancestor post or maybe the post itself.  [apr_deld_post]
+      // Fine, but don't proceed with updating the page.
+      // We do want to index the post though (just above) — admins should be able
+      // to search and find also deleted things.
+      return ApprovePostResult(updatedPost = None)
+    }
+
 
     staleStuff.addPageId(pageId, memCacheOnly = true) // page version bumped below
     saveDeleteLinks(postAfter, sourceAndHtml, postAfter.createdById, tx, staleStuff)
 
-    SHOULD // delete any review tasks.
 
     // ------ The page
 
@@ -1899,6 +1987,9 @@ trait PostsDao {
     tx.saveDeleteNotifications(notifications)
 
     refreshPagesInAnyCache(Set[PageId](pageId))  ; REMOVE // <—— no longer needed, staleStuff instead
+
+    ApprovePostResult(
+          updatedPost = Some(postAfter))
   }
 
 
@@ -2002,19 +2093,18 @@ trait PostsDao {
         browserIdData: BrowserIdData): Unit = {
     writeTx { (tx, staleStuff) =>
       deletePostImpl(pageId, postNr = postNr, deletedById = deletedById,
-            doingReviewTask = None, browserIdData, tx, staleStuff)
+            browserIdData, tx, staleStuff)
     }
     refreshPageInMemCache(pageId)  ; REMOVE // auto do via [staleStuff]
   }
 
 
   def deletePostImpl(pageId: PageId, postNr: PostNr, deletedById: UserId,
-        doingReviewTask: Option[ReviewTask], browserIdData: BrowserIdData,
-        tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
+        browserIdData: BrowserIdData,
+        tx: SiteTransaction, staleStuff: StaleStuff): ChangePostStatusResult = {
     val result = changePostStatusImpl(pageId = pageId, postNr = postNr,
-      action = PostStatusAction.DeletePost(clearFlags = false), userId = deletedById,
-      doingReviewTask = doingReviewTask,
-      tx = tx, staleStuff = staleStuff)
+          action = PostStatusAction.DeletePost(clearFlags = false), userId = deletedById,
+          tx = tx, staleStuff = staleStuff)
 
     // The caller needs to: refreshPageInMemCache(pageId) — and should be done just after tx ended.
     // EDIT: That's soon not needed, use [staleStuff] instead and [rm_cache_listeners].  CLEAN_UP

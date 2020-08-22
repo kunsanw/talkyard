@@ -87,6 +87,8 @@ package object core {
 
   type NotificationId = Int
 
+  type ModDecision = ReviewDecision
+  type ModTask = ReviewTask // renaming
   type ReviewTaskId = Int
 
   type PermissionId = Int

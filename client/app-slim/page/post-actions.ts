@@ -439,6 +439,26 @@ export const PostActions = createComponent({
       r.a({ className: 'dw-a dw-a-admin icon-link-ext', href: linkToReviewPage(),
         target: '_blank' }, t.pa.Admin));
 
+    let approveOrDeleteBtns;  // [in_pg_apr]
+    if (!deletedOrCollapsed && !post.isApproved && isStaff(me)) {
+      const ModBtn = (decision: ReviewDecision, title: S, clazz: S) => {
+        return Button({ className: 's_PA_ModB ' + clazz, onClick: () => {
+          Server.moderatePostOnPage(post, decision, (storePatch: StorePatch) => {
+              console.debug(`RP: ${JSON.stringify(storePatch, undefined, 2)}`);
+            }
+          );
+        } }, title);
+      }
+      const spacePage = post.nr === BodyNr ? " page" : '';
+      approveOrDeleteBtns =
+          rFragment({},
+            ModBtn(ReviewDecision.Accept,
+                "Appprove" + spacePage, 's_PA_ModB-Apr'),
+            ModBtn(ReviewDecision.DeletePostOrPage,
+                  // (Need not repeate the word "page" here.)
+                  "Reject and delete", 's_PA_ModB-Rej'));
+    }
+
     return (
       r.div({ className: 'dw-p-as dw-as esPA', onClick: this.props.onClick },
         replyButton,
@@ -455,7 +475,8 @@ export const PostActions = createComponent({
         numLikesText,
         numUnwantedsText,
         acceptAnswerButton,
-        tagList));
+        tagList,
+        approveOrDeleteBtns));
   }
 });
 

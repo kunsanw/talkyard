@@ -556,15 +556,15 @@ trait PagesDao {
       // so all topics in the sub community will get deleted.
       // And remove the sub community from the watchbar's Communities section.
       // (And if undeleting the sub community, undelete the root category too.)
-      deletePagesImpl(pageIds, deleterId, browserIdData, doingReviewTask = None,
-            undelete = undelete)(tx, staleStuff)
+      deletePagesImpl(pageIds, deleterId, browserIdData, undelete = undelete
+            )(tx, staleStuff)
     }
     refreshPagesInAnyCache(pageIds.toSet)
   }
 
 
   def deletePagesImpl(pageIds: Seq[PageId], deleterId: UserId, browserIdData: BrowserIdData,
-        doingReviewTask: Option[ReviewTask], undelete: Boolean = false)(
+        undelete: Boolean = false)(
         tx: SiteTransaction, staleStuff: StaleStuff): Unit = {
 
     val deleter = tx.loadTheParticipant(deleterId)
@@ -603,16 +603,14 @@ trait PagesDao {
       newMeta = newMeta.copy(numPostsTotal = newMeta.numPostsTotal + 1)
 
       // Invalidate, or re-activate, review tasks whose posts now get deleted / undeleted.
-      // Also done here: [4JKAM7] when deleting posts.
+      // Also done here: [deld_post_mod_tasks] when deleting posts.
       // Actually, maybe better to *not* invalidate review tasks now when the page gets
       // deleted? Can be good to be able to review flagged posts and misbehavior.
       // Example: Mallory creates a topic and says things that make people angry. Then,
       // when some people have replied, he deletes the page? Or maybe a staff or core memeber
       // does, because the whole page is off-topic with angry comments. Now, it'd be silly
       // if all review tasks for the flags casted on Mallory's comments, disappeared.
-      // So don't:   [5RW2GR8]  CLEAN_UP maybe remove doingReviewTask param + fns below, aren't needed?
-      //                          but leave the comment & thoughts above.
-      /*
+      /* So don't:
       if (!undelete) {
         invalidateReviewTasksForPageId(pageId, doingReviewTask,tx)
       }

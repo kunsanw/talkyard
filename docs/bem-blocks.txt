@@ -193,7 +193,8 @@ s_P-Prvw        = post, previewing one's edits
 s_P-Hdn         = post, hidden
 s_P-Dd          = post, deleted
 
-esPA            = post actions (actually located outside the post (esP) there fore esPA not esP_A)
+esPA  <— No!    = post actions (actually located outside the post (esP) there fore esPA not esP_A)
+s_PA  <— yes
 
 s_PT-NN         = page type NN
 s_PL-NN         = page layout NN

@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package controllers
+package controllers   // MOVE this file to  talkyard.server.modn
 
 import com.debiki.core._
 import debiki.JsonMaker
@@ -83,6 +83,38 @@ class ModerationController @Inject()(cc: ControllerComponents, edContext: EdCont
     val couldBeUndone = request.dao.tryUndoReviewDecisionIfAuthz(taskId, request.who)
     // OkSafeJson(Json.obj("couldBeUndone" -> couldBeUndone))  CLEAN_UP remove couldBeUndone in client/app/ too.
     loadReviewTasksdReplyJson(request)
+  }
+
+
+  def moderateFromPage: Action[JsValue] = StaffPostJsonAction(maxBytes = 100) { request =>
+    import request.{dao, body}
+
+    TESTS_MISSING
+    val postId = (body \ "postId").as[PostId]
+    val postRevNr = (body \ "postRevNr").as[Int]
+    val decisionInt = (body \ "decision").as[Int]
+    val decision = ReviewDecision.fromInt(decisionInt).getOrThrowBadRequest(
+          "TyE05RKJTR3", s"Bad review decision int: $decisionInt")
+
+    throwBadRequestIf(decision != ReviewDecision.Accept &&
+          decision != ReviewDecision.DeletePostOrPage, "TyE305RKDJ3",
+          s"That decision not allowed here: $decision")
+
+    val patchJson = dao.writeTx { (tx, staleStuff) =>
+      val modResult = dao.moderatePostInstantly(postId, postRevNr = postRevNr,
+            decision, moderator = request.theRequester)
+
+      if (modResult.updatedPosts.isEmpty) {
+        val postIds = modResult.updatedPosts.map(_.id).toSet
+        dao.jsonMaker.makeStorePatchForPosts(postIds, showHidden = true, dao)
+      }
+      else {
+        // Need not update anything browser side.
+        JsNull
+      }
+    }
+
+    OkSafeJson(patchJson)
   }
 
 

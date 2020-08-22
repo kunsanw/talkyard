@@ -19,18 +19,19 @@ package object server {
     protected val logger: play.api.Logger = newLogger(getClass)
 
     protected def bugWarnIf(condition: Boolean, errorCode: String,
-          problem: => String = "") {
+          problem: => String = ""): Boolean = {
       bugWarnDieIfThen(condition, errorCode, problem, thenDo = null)
     }
 
     protected def bugWarnDieIfThen(condition: Boolean, errorCode: String,
-          problem: => String = "", thenDo: () => Unit) {
+          problem: => String = "", thenDo: () => Unit): Boolean = {
       if (!condition)
-        return
+        return false
       bugWarn(errorCode, problem)
       if (thenDo ne null) {
         thenDo()
       }
+      true
     }
 
     protected def bugWarn(errorCode: String, problem: => String = "") {

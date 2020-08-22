@@ -1679,7 +1679,11 @@ object JsonMaker {
     tags: Set[TagLabel], howRender: HowRenderPostInPage,
     renderer: RendererWithSettings): JsObject = {
 
-    val (anySanitizedHtml: Option[String], unsafeSource: Option[String], isApproved: Boolean) =
+    val (
+      anySanitizedHtml: Option[String],
+      unsafeSource: Option[String],
+      isApproved: Boolean,
+    ) = {
       if ((post.isBodyHidden || post.isDeleted) && !showHidden) {
         (None, post.approvedSource, post.approvedAt.isDefined)
       }
@@ -1691,6 +1695,7 @@ object JsonMaker {
       else {
         (post.approvedHtmlSanitized, post.approvedSource, post.approvedAt.isDefined)
       }
+    }
 
     // For now, ignore ninja edits of the very first revision, because otherwise if
     // clicking to view the edit history, it'll be empty.
@@ -1734,6 +1739,14 @@ object JsonMaker {
       "tags" -> JsArray(tags.toSeq.map(JsString)))
 
     if (post.isBodyHidden) fields :+= "isBodyHidden" -> JsTrue
+
+    if (!isApproved) {
+      // Then need to know which revision nr we'll approve, if clicking
+      // the Approve button. [in_pg_apr]
+      fields :+= "currRevNr" -> JsNumber(post.currentRevisionNr)
+      // Nice for troubleshooting?
+      fields :+= "approvedRevNr" -> JsNumberOrNull(post.approvedRevisionNr)
+    }
 
     // For now. So can edit the title without extra loading the title post's source. [5S02MR4]
     if (post.isTitle) fields :+= "unsafeSource" -> JsStringOrNull(unsafeSource)
