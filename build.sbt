@@ -28,23 +28,9 @@ ThisBuild / scalaVersion := "2.12.11"
 // scalacOptions in ThisBuild ++= Seq("-deprecation")
 
 
-/*
-val versionFileContents = {
-  // [Scala_213] Using(...) { ... }
-  val source = scala.io.Source.fromFile("version.txt")
-  try source.mkString.trim
-  finally source.close()
-} */
-
-
 val appName = "talkyard-server"
 val appVersion = CurrentWorkingDirectory.versionFileContents
 
-/*
-val appVersion = {
-  // Change from WIP (work-in-progress) to SNAPSHOT, suitable for the Java/Scala world.
-  versionFileContents.replaceAllLiterally("WIP", "SNAPSHOT")
-} */
 
 
 // Code shared between <repo-root>/app/ and <repo-root>/modules/ty-dao-rdb.
