@@ -2,7 +2,7 @@ name := "ed-core"
 
 organization := "com.debiki"
 
-version := "0.0.2-SNAPSHOT"
+version := CurrentWorkingDirectory.versionFileContents
 
 resolvers += "Scala-Tools Maven2 Repository" at "https://scala-tools.org/repo-releases"
 
