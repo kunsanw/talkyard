@@ -493,7 +493,7 @@ interface TalkyardTranslations {
     DiscDeld: string;
     PageDeld: string;
     PagePendAppr?: string;
-    TitlePendAppr: string;  // REMOVE
+    TitlePendAppr: string;
     TextPendingApproval: string;
 
     TooltipQuestClosedNoAnsw: string;
@@ -543,9 +543,9 @@ interface TalkyardTranslations {
     ManyDisagree: string;
     SomeDisagree: string;
 
-    PendAppr?: string;
-    CmtPendAppr: string;
-    CmtBelowPendAppr: (isYour) => string;
+    PendAppr?: string;    // <— use just this
+    CmtPendAppr: string;  // REMOVE
+    CmtBelowPendAppr: (isYour) => string;  // REMOVE
 
     _and: string;
 

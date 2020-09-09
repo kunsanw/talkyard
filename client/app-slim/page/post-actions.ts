@@ -441,13 +441,15 @@ export const PostActions = createComponent({
       r.a({ className: 'dw-a dw-a-admin icon-link-ext', href: linkToReviewPage(),
         target: '_blank' }, t.pa.Admin));
 
-    // Maybe would be good with  post.isRejected  instead of !isThisPageDeleted?
-    const isOrigPostPageDeleted = post.nr === BodyNr && isThisPageDeleted;
+    // Instead of this test, should be a post.approvedStatus field. [ApprovedStatus]
+    // And `post.isApproved` below will then be: `post.approvedStatus === PendingApproval`.
+    const isOrigPostAndPageDeleted = post.nr === BodyNr && isThisPageDeleted;
     // BUG  if deleting page —> mod task completed, then undeleting —>   [undel_posts]
     //   now  post.isApproved is false (was rejected),  mod task done,
     //   but mod buttons still visible :-(
     let approveOrDeleteBtns;  // [in_pg_apr]
-    if (!deletedOrCollapsed && !post.isApproved && isStaff(me) && !isOrigPostPageDeleted) {
+    if (!deletedOrCollapsed && !post.isApproved && isStaff(me)
+          && !isOrigPostAndPageDeleted) {
       const ModBtn = (decision: ReviewDecision, title: S, clazz: S) => {
         return Button({ className: 's_PA_ModB ' + clazz, onClick: () => {
           util.openDefaultStupidDialog({
@@ -458,7 +460,6 @@ export const PostActions = createComponent({
             onPrimaryClick: () => {
               // COULD create a ReactActions fn instead that does this:
               Server.moderatePostOnPage(post, decision, (storePatch: StorePatch) => {
-                console.debug(`RP: ${JSON.stringify(storePatch, undefined, 2)}`);
                 ReactActions.patchTheStore(storePatch, () => {
                   scrollAndFlashPostNr(post.nr);
                 });
@@ -470,8 +471,9 @@ export const PostActions = createComponent({
       const spacePage = post.nr === BodyNr ? " page" : '';
       approveOrDeleteBtns =
           rFragment({},
+            // English is fine — this is for staff. 0I18N.
             ModBtn(ReviewDecision.Accept,
-                "Appprove" + spacePage, 's_PA_ModB-Apr'),
+                  "Appprove" + spacePage, 's_PA_ModB-Apr'),
             ModBtn(ReviewDecision.DeletePostOrPage,
                   // (Need not repeate the word "page" here.)
                   "Reject and delete", 's_PA_ModB-Rej'));

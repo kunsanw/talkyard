@@ -81,11 +81,15 @@ Undelete posts, not just pages and categories.
 And make it possible to change from  Rejected —> Approved,
 and Approved —> Rejected,  unless got replies or Like votes already?
 Need an approvalStatus [ApprovedStatus] field?
-–> -2 = rejected by staff
-–> -1 = auto blocked by system (e.g. spam)
-–>  0 = undecided
-–>  1 = auto approed by system
-–>  2 = approved/reviewed by staff
+ -3 = rejected by staff
+ -2 = rejected by staff, approved by system  (+1 -3 = -2)
+ -1 = auto blocked by system (e.g. spam)
+  0 = undecided
+  1 = auto approed by system
+  2 = approved/reviewed by staff, but initially auto-blocked by system (-1 +3 = 2)
+  3 = approved/reviewed by staff
+Or:  0,1,2 = undec, apr, rej by sys.  4,8,16 by trusted,  core member,  32,64,128 by staff  ?
+   bits 1,2                           3,4                 5,6           7,8
 
 [flat-comments]:
 Change layout of problem type topics to traditional forum flat comments layout.
@@ -341,7 +345,8 @@ Remove Nchan. Use Rust + server-sent-events instead.  NO, just Play and WebSocke
 [notf_schedule][snooze_schedule]
 Individual prefs:
   Configure when auto-snoozing — e.g. weekends and before & after 0900-1700.
-  Get someone's-waiting-for-approval notfs, if been waiting for > X hours.
+  Get someone's-waiting-for-approval notfs, if that person has been waiting
+     for > X hours  *and* no other staff mem has reviewed yet.
   Or optionally if new member joins.
 
 [external-server-js]

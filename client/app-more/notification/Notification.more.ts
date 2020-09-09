@@ -24,7 +24,7 @@
 
 const r = ReactDOMFactories;
 
-// CR_DONE to here, continue below.
+
 export const Notification = createComponent({
   render: function() {
     const notf: Notification = this.props.notification;
@@ -40,7 +40,7 @@ export const Notification = createComponent({
         break;
       case NotificationType.IndirectReply:
         iconClass = 'icon-reply';
-        toMeClass += ' s_IndirRe';
+        toMeClass += ' s_Nf-2Me-Indr';
         break;
       case NotificationType.Mention:
         iconClass = 'icon-char';

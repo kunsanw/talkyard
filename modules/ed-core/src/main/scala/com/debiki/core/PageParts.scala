@@ -297,7 +297,7 @@ abstract class PageParts {
     post.parentNr.flatMap(postByNr)
   }
 
-
+CR_DONE // to here, continue below.
   def depthOf(postNr: PostNr): Int =
     ancestorsParentFirstOf(postNr).length
 

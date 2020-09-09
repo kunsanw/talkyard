@@ -369,8 +369,8 @@ html:not(.mouse) .dw-t > .dw-p-as .dw-a
   min-height: 17px
 
 
-// Make the post actions be 100% with, if page not approved, so the
-// Approve and Reject buttons get left aligned.
+// Make the post actions 100% with, if page not approved, so the Approve and Reject
+// buttons get left aligned.
 .dw-ar-t.s_PndApr .dw-ar-p + .esPA
   width: 100%;
   // or:  float: none; — but then looks weird because: margin-bottom [MTBMGTP] oh well.
@@ -389,7 +389,7 @@ html:not(.mouse) .dw-t > .dw-p-as .dw-a
 
 .s_PA_ModB-Apr
   background: hsl($acceptHue, 100%, 89%);
-  margin-left: $avatarSpace;
+  margin-left: $avatarSpace;  // should skip on mobile?
   &:hover
     background: hsl($acceptHue, 100%, 80%);
 

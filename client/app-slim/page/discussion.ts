@@ -632,7 +632,7 @@ const RootPostAndComments = createComponent({
 
     const notYetApprovedMaybeDeletedInfo = rootPost.isApproved ? false :
          r.div({ className: 'esPendingApproval' },
-           (page.pageDeletedAtMs ? t.d.PageDeld : t.d.TextPendingApproval));
+           page.pageDeletedAtMs ? t.d.PageDeld : t.d.TextPendingApproval);
 
     const deletedCross = !page.pageDeletedAtMs ? null :
         r.div({ className: 's_Pg_DdX' });

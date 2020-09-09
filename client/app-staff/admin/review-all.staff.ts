@@ -335,7 +335,7 @@ const ReviewTask = createComponent({
       let whatWasDone: string;
       switch (reviewTask.decision || this.state.justDecided) {
         case ReviewDecision.Accept: whatWasDone = " Accepted"; break;
-        case ReviewDecision.InteractEdit: whatWasDone = " Seems fine: Edited "; break;
+        case ReviewDecision.InteractEdit: whatWasDone = " Seems fine: Edited"; break;
         case ReviewDecision.InteractReply: whatWasDone = " Seems fine: Replied to"; break;
         case ReviewDecision.DeletePostOrPage: whatWasDone = " Deleted"; break;
       }
