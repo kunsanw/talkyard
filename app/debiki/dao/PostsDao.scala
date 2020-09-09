@@ -1660,7 +1660,6 @@ trait PostsDao {
         throwForbidden("DwE5JKF7", "You may not modify the whole tree")
     }
 
-CR_DONE // to here, continue below!
     if (postBefore.isDeleted) {
       val isUnhidingPostBody = action == PSA.UnhidePost
       val isChangingDeletePostToDeleteTree =
@@ -1862,7 +1861,7 @@ CR_DONE // to here, continue below!
       updatePagePopularity(page.parts, tx)
     }
 
-    staleStuff.addPageId(page.id, memCacheOnly = true)
+    staleStuff.addPageId(page.id, memCacheOnly = true)  // page version bumped above
     tx.updatePageMeta(newMeta, oldMeta = oldMeta, markSectionPageStale)
 
     // In the future: if is a forum topic, and we're restoring the OP, then bump the topic.
@@ -1882,9 +1881,10 @@ CR_DONE // to here, continue below!
     val pageMeta = page.meta
     val postBefore = page.parts.thePostByNr(postNr)
     if (postBefore.isCurrentVersionApproved) {
-      // There's a race between the janitor thread and humans approving
-      // directly — fine.  [mod_post_race]
-      // throwForbidden("DwE4GYUR2", s"Post nr ${postBefore.nr} already approved") NO
+      // There're races: Posts approved at the same time by different people,
+      // or (a bit weird) by the same person once via the Moderation page with
+      // an undo timeout, and then again directly via the Approve buttons
+      // below the posts. That's all fine.  [mod_post_race]
       return ApprovePostResult(updatedPost = None)
     }
 
@@ -1934,7 +1934,7 @@ CR_DONE // to here, continue below!
     tx.indexPostsSoon(postAfter)
 
     if (postBefore.isDeleted) {
-      UNTESTED
+      UNTESTED  // [4MT05MKRT]
       // Can happen e.g. if a moderator approves a post, after someone else
       // deleted an ancestor post or maybe the post itself.  [apr_deld_post]
       // Fine, but don't proceed with updating the page.
@@ -2132,7 +2132,7 @@ CR_DONE // to here, continue below!
           tx = tx, staleStuff = staleStuff)
 
     BUG; SHOULD // delete notfs or mark deleted?  [notfs_bug]  [nice_notfs]
-    // But don't delete any review tasks — good if staff reviews, if a new member
+    // But don't delete any mod tasks — good if staff reviews, if a new member
     // posts something trollish, people read/reply/react, then hen deletes hens post.
     // Later, if undeleting, then restore the notfs? [undel_posts]
 
@@ -2165,7 +2165,7 @@ CR_DONE // to here, continue below!
                 notfType = NotificationType.OneLikeVote))
               */
 
-      updateVoteCounts(post, tx)
+      updatePageAndPostVoteCounts(post, tx)
       updatePagePopularity(newPageDao(pageId, tx).parts, tx)
       addUserStats(UserStats(post.createdById, numLikesReceived = -1, mayBeNegative = true))(tx)
       addUserStats(UserStats(voterId, numLikesGiven = -1, mayBeNegative = true))(tx)
@@ -2184,7 +2184,9 @@ CR_DONE // to here, continue below!
           user: $userIdData, vote type: $voteType""")
       }
       */
-      staleStuff.addPageId(pageId)
+
+      // Page version in db bumped by updatePageAndPostVoteCounts() above.
+      staleStuff.addPageId(pageId, memCacheOnly = true)
     }
   }
 
@@ -2243,7 +2245,7 @@ CR_DONE // to here, continue below!
 
       tx.updatePostsReadStats(pageId, postsToMarkAsRead, readById = voterId,
         readFromIp = voterIp)
-      updateVoteCounts(post, tx)
+      updatePageAndPostVoteCounts(post, tx)
       updatePagePopularity(page.parts, tx)
       addUserStats(UserStats(post.createdById, numLikesReceived = 1))(tx)
       addUserStats(UserStats(voterId, numLikesGiven = 1))(tx)
@@ -2271,7 +2273,7 @@ CR_DONE // to here, continue below!
         }
       }
 
-      // Page version in db updated by updateVoteCounts() above.
+      // Page version in db updated by updatePageAndPostVoteCounts() above.
       staleStuff.addPageId(pageId, memCacheOnly = true)
     }
   }
@@ -2811,7 +2813,7 @@ CR_DONE // to here, continue below!
   }
 
 
-  private def updateVoteCounts(post: Post, tx: SiteTransaction): Unit = {
+  private def updatePageAndPostVoteCounts(post: Post, tx: SiteTransaction): Unit = {
     dieIf(post.nr < PageParts.BodyNr, "TyE4WKAB02")
     val actions = tx.loadActionsDoneToPost(post.pageId, postNr = post.nr)
     val readStats = tx.loadPostsReadStats(post.pageId, Some(post.nr))

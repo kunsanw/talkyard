@@ -354,6 +354,12 @@ function runAllE2eTests {
   # new member posts new reply. Modya approves from mod page, Mons replies & edits.
   # new member posts new reply. Modya rejects from mod page, Mons replies & edits.
 
+  #$r s/wdio --only modn-appr-deleted-posts.2browsers $args   [apr_deld_post]
+  # Delete posts waiting for approval,  then approve one, undelete.
+  # Reject one — cannot undelete it.
+  # Undo reject, and undelete — then, can approve?
+  # Delete whole page. Undelete page. Then can approve / reject afterwards.
+
   #$r s/wdio --only mod-task-emails-approve-before.2browsers $args
   # new member posts new topic, mentions Alice and Adam & Memah.
   #    Alice & Adam get mod task emails: approve-before.
