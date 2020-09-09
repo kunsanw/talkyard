@@ -207,7 +207,12 @@ case class NotfHtmlRenderer(siteDao: SiteDao, anyOrigin: Option[String]) {
     val ellipsis = (postText.length > maxLenBeforeEscapes) ? "..." | ""
     val html = Text(postText.take(maxLenBeforeEscapes) + ellipsis)
 
-    val (whatHappened, dotOrComma, inPostWrittenBy, e2eClass) = notf.notfType match {
+    val (
+      whatHappened,
+      dotOrComma,
+      inPostWrittenBy,
+      cssE2eTestClass,
+    ) = notf.notfType match {
       case NotificationType.Message =>
         ("You have been sent a personal message", ",", "from", "e_NfEm_DirMsg")
       case NotificationType.Mention =>
@@ -215,7 +220,7 @@ case class NotfHtmlRenderer(siteDao: SiteDao, anyOrigin: Option[String]) {
       case NotificationType.DirectReply =>
         ("You have a reply", ",", "written by", "e_NfEm_Re")
       case NotificationType.IndirectReply =>
-        ("You have an indirect reply", ",", "written by", "e_NfEm_Re")
+        ("A new reply in a thread by you", ",", "written by", "e_NfEm_IndRe")
       case NotificationType.NewPost =>
         if (post.nr == PageParts.BodyNr)
           ("A new topic has been started", ",", "by", "e_NfEm_NwPg")
@@ -251,7 +256,7 @@ case class NotfHtmlRenderer(siteDao: SiteDao, anyOrigin: Option[String]) {
           s"$itIsShownOrHidden. It was posted by", "e_NfEm_ModTsk")
     }
 
-    <p class={e2eClass}>
+    <p class={cssE2eTestClass}>
       { whatHappened }, <a href={url}>here</a>, on page "<i>{pageTitle}</i>"{dotOrComma}
       { inPostWrittenBy } <i>{byUserName}</i>, on {date}:
     </p>

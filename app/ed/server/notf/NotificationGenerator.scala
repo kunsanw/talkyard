@@ -20,6 +20,7 @@ package ed.server.notf
 import com.debiki.core.Prelude._
 import com.debiki.core._
 import debiki._
+import debiki.Globals.isDevOrTest
 import debiki.EdHttp.throwForbiddenIf
 import ed.server.notf.NotificationGenerator._
 import scala.collection.{immutable, mutable}
@@ -97,12 +98,12 @@ case class NotificationGenerator(
       for (staffUser <- staffUsers) {
         avoidDuplEmailToUserIds += staffUser.id
         notfsToCreate += Notification.NewPost(
-          NotificationType.NewPostReviewTask,
-          id = bumpAndGetNextNotfId(),
-          createdAt = newPost.createdAt,
-          uniquePostId = newPost.id,
-          byUserId = newPost.createdById,
-          toUserId = staffUser.id)  // won't send normal notfs too?
+              NotificationType.NewPostReviewTask,
+              id = bumpAndGetNextNotfId(),
+              createdAt = newPost.createdAt,
+              uniquePostId = newPost.id,
+              byUserId = newPost.createdById,
+              toUserId = staffUser.id)
       }
     }
 
@@ -118,9 +119,9 @@ case class NotificationGenerator(
     // this post (see above). Do however create notfs — it's nice to have any notification
     // about e.g. a @mention of oneself, in the mentions list, also if one approved
     // that post, oneself.
-    val oldNotfsToStaff = tx.loadNotificationsAboutPost(newPost.id, NotificationType.NewPostReviewTask)
-    avoidDuplEmailToUserIds ++= oldNotfsToStaff.map(_.toUserId)  ; BUG // doesn't work?
-          // sends me a 2nd email anywa
+    val oldNotfsToStaff = tx.loadNotificationsAboutPost(
+          newPost.id, NotificationType.NewPostReviewTask)
+    avoidDuplEmailToUserIds ++= oldNotfsToStaff.map(_.toUserId)
 
     anyAuthor = Some(tx.loadTheParticipant(newPost.createdById))
 
@@ -132,12 +133,10 @@ case class NotificationGenerator(
     }
 
     val ancestorsParentFirst = page.parts.ancestorsParentFirstOf(newPost)
-    val anyParent = page.parts.parentOf(newPost)
-    dieIf(ancestorsParentFirst.headOption != anyParent, "TyE395RSKT")
-
-    // Direct and indirect reply notification.
     val anyParentPost = ancestorsParentFirst.headOption
+    dieIf(isDevOrTest && anyParentPost != page.parts.parentOf(newPost), "TyE395RSKT")
 
+    // For direct and indirect reply notifications.
     def maybeGenReplyNotf(notfType: NotificationType, ancestorsCloseFirst: Seq[Post])
           : Unit = {
       for {
@@ -146,10 +145,6 @@ case class NotificationGenerator(
         if approverId != replyingToPost.createdById // the approver has already read newPost
         replyingToUser <- tx.loadParticipant(replyingToPost.createdById)
       } {
-        val isParent = anyParentPost.is(replyingToPost)
-        val __notfType =
-              if (isParent) NotificationType.DirectReply
-              else NotificationType.IndirectReply
         // (If the replying-to-post is by a group (currently cannot happen), and someone in the group
         // replies to that group, then hen might get a notf about hens own reply. Fine, not much to
         // do about that.)
@@ -158,9 +153,10 @@ case class NotificationGenerator(
       }
     }
 
-    // Direct replies have highest precedence.
-    // Say a post is a direct reply, and also @mentions the one it replies to
-    // — then we'll generate a direct reply notf only.
+    // Direct replies.
+    // These notifications have highest precedence. Let's say there's a direct reply,
+    // which also @mentions the one it replies to — then we'll generate a direct
+    // reply notf only, no @mention notf.
     maybeGenReplyNotf(NotificationType.DirectReply, anyParentPost.toSeq)
 
     def notfCreatedAlreadyTo(userId: UserId) =
@@ -210,8 +206,8 @@ case class NotificationGenerator(
 
     // Indirect replies.
     // If the post @mentions some of those indirectly replied to, then we've won't
-    // generate any indirect reply notfs to theme — they'll get a Mention
-    // notf instead (generated above).
+    // generate any indirect reply notfs to them — they'll get a Mention
+    // notf only (generated above).
     maybeGenReplyNotf(NotificationType.IndirectReply, ancestorsParentFirst drop 1)
 
     // People watching this topic or category
@@ -746,7 +742,8 @@ case class NotificationGenerator(
       if user.id != post.createdById
     } {
       // This is about the new (from the notf recipient's point of view) post,
-      // so the notf is from the post author — also if someone else added the tag.
+      // so the notf is from the post author, not from the one who added the tag
+      // (unless hen is the author).
       makeAboutPostNotfs(
             NotificationType.PostTagged, post,
             inCategoryId = pageMeta.flatMap(_.categoryId),

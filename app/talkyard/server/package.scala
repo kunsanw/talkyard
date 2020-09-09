@@ -7,6 +7,7 @@ package object server {
 
   val ProdConfFilePath = "/opt/talkyard/conf/play-framework.conf"
 
+  def isDevOrTest: Boolean = Globals.isDevOrTest
 
   // "tysvapp":  "ty" = Talkyard, "sv" = server, "app" = application.
   // (Later, more logging?:  tysvweb = web server logs,

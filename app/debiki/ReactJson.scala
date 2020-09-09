@@ -1451,8 +1451,8 @@ object JsonMaker {
         if (notf.seenAt.isEmpty) notf.tyype match {
           case DirectReply | Mention | Message | OneLikeVote =>
             UX // Later, give Like votes their own happy looking color? [like_notf_ico]
-            // For now, share info-blud & color with NewPost — an okay nice
-            // light blue color, doesn't look urgent.
+            // And if there're no direct replies / messages / mentions, then,
+            // show that color instead of the more urgent direct-reply-blue?
             numTalkToMe += 1
           case NewPost | IndirectReply =>
             numTalkToOthers += 1

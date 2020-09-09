@@ -195,9 +195,7 @@ trait UserDao {
         throwForbidden("TyE4KBRW2", errorMessage)
       }
 
-      lazy val site = tx.loadSite() getOrDie "TyE30MRALM4"
-      lazy val siteOrigin = globals.theOriginOf(site)
-      lazy val siteHostname = globals.theHostnameOf(site)
+      lazy val (site, siteOrigin, siteHostname) = theSiteOriginHostname(tx)
 
       // Sometimes need to do some more things. [2BRUI8]
       import EditUserAction._
@@ -211,8 +209,8 @@ trait UserDao {
           tx.updateUserEmailAddress(addrUpdated)
 
         case SetApproved if memberAfter.canReceiveEmail =>
-          // Would be weird with a notification item in one's notf list about this?
-          // Better to just send an email? So, therefore:
+          // Just send an email — no need to create any notification and show in the
+          // new member's notification list, right.  TyTE2E05WKF2
           emailsToSend.append(Email(
                 EmailType.YourAccountApproved,
                 createdAt = tx.now,
@@ -1541,13 +1539,12 @@ trait UserDao {
       // Now, when email verified, perhaps time to start sending summary emails.
       tx.reconsiderSendingSummaryEmailsTo(user.id)
 
+      // Notify staff if this new member now is waiting for approval. TyTE2E502AHL4
       COULD // add individual prefs about these notfs.  [notf_schedule][snooze_schedule]
       // Need not notify *all* staff members — maybe just one or two. [nice_notfs]
       val settings = getWholeSiteSettings(Some(tx))
       if (settings.userMustBeApproved) {
-        val site = tx.loadSite() getOrDie "TyE30MRALM4"
-        val siteOrigin = globals.theOriginOf(site)
-        val siteHostname = globals.theHostnameOf(site)
+        val (site, siteOrigin, siteHostname) = theSiteOriginHostname(tx)
         val allAdmins = tx.loadAdmins()
         allAdmins.filter(_.canReceiveEmail) foreach { admin =>
           emailsToSend.append(Email(

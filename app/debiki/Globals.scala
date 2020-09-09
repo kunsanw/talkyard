@@ -675,9 +675,12 @@ class Globals(  // RENAME to TyApp? or AppContext? TyAppContext? variable name =
     s"$scheme://${siteByPubIdHostnamePort(pubId)}"
 
   def siteByIdOrigin(siteId: SiteId): String =
-    s"$scheme://${siteByIdHostname(siteId)}"  // port?
+    s"$scheme://${siteByIdHostnamePort(siteId)}"
 
-  def siteByIdHostname(siteId: SiteId): String =
+  // [Scala_3]  can replace the two below with just one:  `siteId: SiteId | PubSiteId`.
+  // And the two ...By..Origin above too.
+
+  def siteByIdHostnamePort(siteId: SiteId): String =
     s"$SiteByIdHostnamePrefix$siteId.$baseDomainWithPort"
 
   def siteByPubIdHostnamePort(pubId: PubSiteId): String =

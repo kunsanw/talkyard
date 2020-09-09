@@ -24,7 +24,7 @@
 
 const r = ReactDOMFactories;
 
-
+// CR_DONE to here, continue below.
 export const Notification = createComponent({
   render: function() {
     const notf: Notification = this.props.notification;

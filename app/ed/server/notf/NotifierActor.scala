@@ -352,16 +352,6 @@ class NotifierActor (val systemDao: SystemDao, val siteDaoFactory: SiteDaoFactor
 
     // Always use the same subject line, even if only 1 comment, so will end up in the same
     // email thread. Include site name, so simpler for people to find the email.
-      /*
-    val subject: String =
-      if (notfs.exists(_.tyype == NotificationType.NewPostReviewTask)) {
-        // This might also include auto approved posts, which don't need any review.
-        // Use this title anyway.
-        s"[$siteName] New posts waiting for you to review"
-      }
-      else {
-        s"[$siteName] You have replies to posts of yours"
-      }*/
     val subject: String = {
         val newWhat = ArrayBuffer[String]()
         if (notfRenderResult.newModTasks) {

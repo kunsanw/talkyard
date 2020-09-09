@@ -38,7 +38,7 @@ object Notifications {
 
 
 
-sealed abstract class NotificationType(val IntValue: Int) {
+sealed abstract class NotificationType(val IntValue: Int) {  RENAME // just NotfType, shorter
   def toInt: Int = IntValue
   def isAboutReviewTask = false
 }
