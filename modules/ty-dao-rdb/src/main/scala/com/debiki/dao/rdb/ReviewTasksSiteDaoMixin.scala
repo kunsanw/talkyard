@@ -44,49 +44,6 @@ trait ReviewTasksSiteDaoMixin extends SiteTransaction {
 
 
   override def upsertReviewTask(reviewTask: ReviewTask) {
-    CR_DONE /* CLEAN_UP // now with Postgres >= 9.5, use its built-in upsert.
-    val updateStatement = """
-      update review_tasks3 set
-        reasons = ?,
-        created_by_id = ?,
-        created_at = ?,
-        created_at_rev_nr = ?,
-        more_reasons_at = ?,
-        completed_at = ?,
-        decided_at_rev_nr = ?,
-        decided_by_id = ?,
-        invalidated_at = ?,
-        decided_at = ?,
-        decision = ?,
-        user_id = ?,
-        page_id = ?,
-        post_id = ?,
-        post_nr = ?
-      where site_id = ? and id = ?
-      """
-    val updateValues = List[AnyRef](
-      ReviewReason.toLong(reviewTask.reasons).asAnyRef,
-      reviewTask.createdById.asAnyRef,
-      reviewTask.createdAt,
-      reviewTask.createdAtRevNr.orNullInt,
-      reviewTask.moreReasonsAt.orNullTimestamp,
-      reviewTask.completedAt.orNullTimestamp,
-      reviewTask.decidedAtRevNr.orNullInt,
-      reviewTask.decidedById.orNullInt,
-      reviewTask.invalidatedAt.orNullTimestamp,
-      reviewTask.decidedAt.orNullTimestamp,
-      reviewTask.decision.map(_.toInt).orNullInt,
-      reviewTask.maybeBadUserId.asAnyRef,
-      reviewTask.pageId.orNullVarchar,
-      reviewTask.postId.orNullInt,
-      reviewTask.postNr.orNullInt,
-      siteId.asAnyRef,
-      reviewTask.id.asAnyRef)
-
-    val found = runUpdateSingleRow(updateStatement, updateValues)
-    if (found)
-      return */
-
     val statement = """
       insert into review_tasks3(
         site_id,

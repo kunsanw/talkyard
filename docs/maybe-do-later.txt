@@ -76,7 +76,7 @@ Let people create accounts without specifying any email address. Like at Reddit.
 For some reason I disabled Akismet (why? when refactoring to save time?). Enable it again.
 
 
-[undel_posts][62AKDN46]
+[undel_posts] [62AKDN46] [apr_deld_post] [apr_movd_orig_post]
 Undelete posts, not just pages and categories.
 And make it possible to change from  Rejected —> Approved,
 and Approved —> Rejected,  unless got replies or Like votes already?

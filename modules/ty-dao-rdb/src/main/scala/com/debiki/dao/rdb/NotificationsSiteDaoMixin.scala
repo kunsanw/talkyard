@@ -77,7 +77,7 @@ trait NotificationsSiteDaoMixin extends SiteTransaction {
         values += postNotf.byUserId.asAnyRef
         values += postNotf.toUserId.asAnyRef
         values += postNotf.emailId.orNullVarchar
-        values += postNotf.emailStatus.toInt.asAnyRef  // [306RDL@4]
+        values += postNotf.emailStatus.toInt.asAnyRef  // [306RDLA4]
         values += postNotf.seenAt.orNullTimestamp
     }
 

@@ -87,13 +87,13 @@ describe("notfs-like-votes.2browsers.test.ts  TyTE2E703KDH", () => {
   });
 
   let email: EmailSubjectBody;
-  let likeLink: S;
+  let likeLinkOne: S;
 
   it("Michael gets a Like vote notf email", () => {
     email = server.waitUntilLastEmailMatches(site.id, michael.emailAddress,
             ['e_NfEm_PgLikeVt', maria.username, site.origin])
             .matchedEmail;
-    likeLink = utils.findFirstLinkToUrlIn(site.origin, email.bodyHtmlText);
+    likeLinkOne = utils.findFirstLinkToUrlIn(site.origin, email.bodyHtmlText);
   });
 
   it("... about the orig post", () => {
@@ -123,12 +123,15 @@ describe("notfs-like-votes.2browsers.test.ts  TyTE2E703KDH", () => {
     owensBrowser.topic.toggleLikeVote(c.FirstReplyNr);
   });
 
+  let likeLinkTwo: S;
+
   it("Michael gets a notf email about the Like vote of his reply", () => {
     email = server.waitUntilLastEmailMatches(
             site.id, michael.emailAddress,
             ['e_NfEm_PoLikeVt', owen.username, site.origin])
             .matchedEmail;
     assert.includes(email.bodyHtmlText, `#post-${c.FirstReplyNr}`);
+    likeLinkTwo = utils.findFirstLinkToUrlIn(site.origin, email.bodyHtmlText);
   });
 
   it("... but just that one Like vote", () => {
@@ -162,6 +165,25 @@ describe("notfs-like-votes.2browsers.test.ts  TyTE2E703KDH", () => {
   });
 
   it(`He sees his topic and reply both got Like voted`, () => {
+    michaelsBrowser.topic.isPostLiked(c.BodyNr, { byMe: false });
+    michaelsBrowser.topic.isPostLiked(c.FirstReplyNr, { byMe: false });
+  });
+
+  it(`Michael goes to the homepage`, () => {
+    michaelsBrowser.go2('/');
+    michaelsBrowser.forumTopicList.waitForTopics();
+  });
+
+  it(`... clicks the link in the last like notf email`, () => {
+    michaelsBrowser.go2(likeLinkTwo);
+  });
+
+  it(`... brings him to his topic, the like voted reply`, () => {
+    michaelsBrowser.waitUntilUrlIs(michaelsPageUrl + `#post-${c.FirstReplyNr}`);
+    michaelsBrowser.assertPageTitleMatches(forum.topics.byMichaelCategoryA.title);
+  });
+
+  it(`... he sees the two like votes`, () => {
     michaelsBrowser.topic.isPostLiked(c.BodyNr, { byMe: false });
     michaelsBrowser.topic.isPostLiked(c.FirstReplyNr, { byMe: false });
   });

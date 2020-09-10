@@ -5378,14 +5378,16 @@ export class TyE2eTestBrowser {
       },
 
       assertPostNeedsApprovalBodyVisible: (postNr: PostNr) => {
+        // Test visible = true first, else, race. [is_visible_1st]
         assert(this.topic._hasPendingModClass(postNr));
         assert(!this.topic._hasUnapprovedClass(postNr));
         assert(this.topic._isBodyVisible(postNr));
       },
 
       assertPostNeedsApprovalBodyHidden: (postNr: PostNr) => {
-        assert(!this.topic._hasPendingModClass(postNr));
+        // Test visible = true first, else, race. [is_visible_1st]
         assert(this.topic._hasUnapprovedClass(postNr));
+        assert(!this.topic._hasPendingModClass(postNr));
         assert(!this.topic._isBodyVisible(postNr));
       },
 
@@ -5406,6 +5408,7 @@ export class TyE2eTestBrowser {
       },
 
       isPostNotPendingApproval: (postNr: PostNr) => {
+        // Test visible = true first, else, race. [is_visible_1st]
         return this.topic._isBodyVisible(postNr) &&
             !this.topic._hasUnapprovedClass(postNr) &&
             !this.topic._hasPendingModClass(postNr);

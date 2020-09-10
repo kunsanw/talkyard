@@ -88,13 +88,17 @@ object TrustLevel {
 
 
 
+/** How likely someone is to cause troubles, e.g. post toxic comments
+  * or start a flame war.
+  */
 sealed abstract class ThreatLevel(val IntVal: Int) {
   def toInt: Int = IntVal
   def isSevereOrWorse: Boolean = toInt >= SevereThreat.toInt
   def isThreat: Boolean = toInt >= MildThreat.toInt
 }
 
-object ThreatLevel {  RENAME // to RiskLevel?  s/Threat/Risk/g
+
+object ThreatLevel {
 
   case object SuperSafe extends ThreatLevel(1)
 

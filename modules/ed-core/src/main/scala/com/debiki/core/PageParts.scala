@@ -302,15 +302,13 @@ CR_DONE // to here, continue below.
     ancestorsParentFirstOf(postNr).length
 
 
-  /** Starts with postNr's parent. Dies if cycle. */
+  /** The post must exist. */
   def ancestorsParentFirstOf(postNr: PostNr): immutable.Seq[Post] = {
-    postByNr(postNr) match {
-      case None => Nil
-      case Some(p) => ancestorsParentFirstOf(p)
-    }
+    ancestorsParentFirstOf(thePostByNr(postNr))
   }
 
 
+  /** Starts with postNr's parent. Dies if cycle. */
   def ancestorsParentFirstOf(post: Post): immutable.Seq[Post] = {
     val ancestors = mutable.ArrayBuffer[Post]()
     var curPost: Option[Post] = Some(post)
@@ -345,6 +343,7 @@ CR_DONE // to here, continue below.
     }
 
     val firstPost = thePostByNr(postNrs.head)
+    WOULD_OPTIMIZE // don't use lists here
     var commonAncestorNrs: Seq[PostNr] =
           firstPost.nr :: ancestorsParentFirstOf(firstPost.nr).map(_.nr).toList
     for (nextPostNr <- postNrs.tail) {

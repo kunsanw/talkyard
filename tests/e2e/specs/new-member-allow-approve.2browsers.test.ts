@@ -281,7 +281,7 @@ describe("new member, allow, approve posts:  TyT4AKBJ20", () => {  // RENAME ths
     owensBrowser.adminArea.review.waitForServerToCarryOutDecisions();
   });
 
-  // Maria gets a notf email!  TyTE2E062KR
+  // Should Maria get a notf email that her reply now is approved?  TyTE2E062KR
 
   it("Then Michael sees that reply, but not any others", () => {
     michaelsBrowser.topic.refreshUntilPostNotPendingApproval(4);
@@ -344,7 +344,8 @@ describe("new member, allow, approve posts:  TyT4AKBJ20", () => {  // RENAME ths
 
 
 
-  // Maria gets notf emails!  TyTE2E062KR
+  // Should Maria get notfified via email that Owen approved her post?  TyTE2E062KR
+  // Or is that too chatty?
 
   // Maja allowed
   // -------------------------------------

@@ -515,14 +515,13 @@ var t_en_US: TalkyardTranslations = t = {
     ThisPageDeleted: "This page has been deleted",
     CatDeldPageToo: "Category deleted, so this page was deleted too",
 
-    // UX  SHOULD  change to just: Pending approval and  Page pending approval  PagePendAppr?
     ThreadDeld: "Thread deleted",
     CmntDeld: "Comment deleted",
     PostDeld: "Post deleted",
     DiscDeld: "Discussion deleted",
     PageDeld: "Page deleted",
     PagePendAppr: "Page pending approval",
-    TitlePendAppr: "Title pending approval",  // REMOVE
+    TitlePendAppr: "Title pending approval",  // if only the title edited
     TextPendingApproval: "Text pending approval",
 
     TooltipQuestClosedNoAnsw: "This question has been closed without any accepted answer.",

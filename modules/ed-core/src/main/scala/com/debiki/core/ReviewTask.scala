@@ -23,9 +23,9 @@ import scala.collection.immutable
 
 
 /**
-  * @param postAfter — if the moderation decision affected the post, e.g. now
-  *  it's approved and un-hidden, or got deleted.
-  * @param authorAfter — if the mod decision affected the post *author*,
+  * @param updatedPosts — if the moderation decision affected some posts, e.g.
+  *  a post got approved and un-hidden, or it got deleted.
+  * @param updatedAuthor — if the mod decision affected the post *author*,
   *  e.g. hens [[ThreatLevel]] changed.
   */
 case class ModResult(
@@ -60,14 +60,19 @@ object ReviewDecision {
   // 1nnn = Accept
   case object Accept extends ReviewDecision(1001)
 
+  // Need more granularity:   [apr_movd_orig_post]
   // AcceptNewPost
+  // RejectNewPost
+  // AcceptNewPage
+  // RejectNewPage
   // AcceptEdits
+  // RejectEdits
 
-  //case object CascadeAccepted extends ReviewDecision(1011)
 
   /** If staff edits a new post, but doesn't delete it — let's handle that
-    * as accepting it as okeay. But remember this was via an edit,
-    * a bit more informal than clicking Accept on the Moderation page.
+    * as accepting it. But remember this was via an edit —
+    * that's more informal (maybe even a tiny bit error / mistake prone)
+    * than clicking Accept on the Moderation page.
     */
   case object InteractEdit extends ReviewDecision(1051)
 
@@ -81,13 +86,13 @@ object ReviewDecision {
   // 3nnn = Request changes.
   // ... later ...
 
+  // nnnn = postpone until later somehow? Maybe a reminder the next day
+
+
   // 5nnn = Reject.
   private val FirstBadId = 5000
   case object DeletePostOrPage extends ReviewDecision(5001)
 
-  // Better:
-  // RejectDeleteNewPost  — post nr shows if is whole page (nr == BodyNr)
-  // RejectEdits
 
 
   def fromInt(value: Int): Option[ReviewDecision] = Some(value match {
@@ -194,6 +199,11 @@ case class ReviewTask(  //  RENAME to ModTask
   /** If the review decision has been carried out, or if the review task became obsolete. */
   def doneOrGone: Boolean = completedAt.isDefined || invalidatedAt.isDefined
 
+  /** But what if new topic started, and staff moves the orig post to
+    * a different topic where it instead becomes a reply/ Before approving it?
+    * For now, don't allow moving not-yet-approved orig posts then. [apr_movd_orig_post]
+    * Related to [apr_deld_post].
+    */
   def isForBothTitleAndBody: Boolean = pageId.isDefined
 
   def mergeWithAny(anyOldTask: Option[ReviewTask]): ReviewTask = {

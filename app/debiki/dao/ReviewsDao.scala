@@ -21,6 +21,7 @@ import com.debiki.core._
 import com.debiki.core.Prelude._
 import com.debiki.core.EditedSettings.MaxNumFirstPosts
 import debiki.EdHttp._
+import debiki.Globals.isDevOrTest
 import java.{util => ju}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{mutable, immutable}
@@ -417,16 +418,36 @@ trait ReviewsDao {   // RENAME to ModerationDao,  MOVE to  talkyard.server.modn
   }
 
 
+  private def isPageModTask(post: Post, modTasks: Seq[ModTask]): Boolean = {
+    BUG // need to know if the moderator's intention is to delete the whole page,
+    // and which page — or just the post.
+    // Need a new  ModDecision type. [apr_movd_orig_post]
+    // Example:  A "bad" orig post resulted in a meaningful discussion —
+    // staff only want to remove the orig post, not the whole topic.
+    // Example: One mod moves an orig post to different topic, is now a reply.
+    // But then another mod reject-deletes the previously orig post —
+    // now, this shouldn't delete the page the post got moved to,
+    // just because the mod tasks were initially about a new page.
+
+    val taskIsForBothTitleAndBody = modTasks.headOption.exists(_.isForBothTitleAndBody)
+    dieIf(modTasks.exists(_.isForBothTitleAndBody != taskIsForBothTitleAndBody),
+      "TyE603AKDHHW26")
+
+    def isNewPostModTask = modTasks.headOption.exists(
+          _.reasons.contains(ReviewReason.NewPost))
+    unimplIf(isDevOrTest && post.isOrigPost && isNewPostModTask &&
+          !taskIsForBothTitleAndBody, "Orig post moved before approved? [TyE406MRKTD2]")
+
+    taskIsForBothTitleAndBody
+  }
+
 
   private def approveAndPublishPost(post: Post, decidedById: UserId,
         tasksToAccept: Seq[ModTask], pageIdsToRefresh: mutable.Set[PageId])
         (tx: SiteTx, staleStuff: StaleStuff): ModResult = {
 
     dieIf(tasksToAccept.isEmpty, "TyE306RKTD5")
-
-    val taskIsForBothTitleAndBody = post.nr == BodyNr
-    dieIf(tasksToAccept.exists(_.isForBothTitleAndBody != taskIsForBothTitleAndBody),
-          "TyE603AKDHHW26")
+    val taskIsForBothTitleAndBody = isPageModTask(post, tasksToAccept)
 
     if (post.isDeleted) {
       // Approve the post anyway  [apr_deld_post] — maybe gets undeleted
@@ -470,10 +491,7 @@ trait ReviewsDao {   // RENAME to ModerationDao,  MOVE to  talkyard.server.modn
         browserIdData: BrowserIdData)
         (tx: SiteTx, staleStuff: StaleStuff): ModResult = {
 
-    // For now:
-    val taskIsForBothTitleAndBody = post.nr == BodyNr
-    dieIf(modTasks.exists(_.isForBothTitleAndBody != taskIsForBothTitleAndBody),
-          "TyE0KRH25R")
+    val taskIsForBothTitleAndBody = isPageModTask(post, modTasks)
 
     dieIf(modTasks.exists(_.postId isSomethingButNot post.id), "TyE50WKDL6")
 
