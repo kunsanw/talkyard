@@ -1263,8 +1263,14 @@ case class SitePatcher(globals: debiki.Globals) {
         tx.insertInvite(invite)
       }
 
+      // For now, skip emails — aren't exported, and referencing them
+      // would cause pk errors.  [4023SRKG5]
       tx.saveDeleteNotifications(
-        Notifications(toCreate = siteData.notifications))
+            Notifications(toCreate = siteData.notifications.map {
+              case n: Notification.NewPost =>
+                if (n.emailId.isEmpty) n
+                else n.copy(emailId = None, emailStatus = NotfEmailStatus.Skipped)
+            }))
 
       siteData.pages foreach { pageMeta =>
         //val newId = transaction.nextPageId()

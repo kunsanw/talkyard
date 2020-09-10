@@ -429,14 +429,21 @@ trait ReviewsDao {   // RENAME to ModerationDao,  MOVE to  talkyard.server.modn
     // now, this shouldn't delete the page the post got moved to,
     // just because the mod tasks were initially about a new page.
 
-    val taskIsForBothTitleAndBody = modTasks.headOption.exists(_.isForBothTitleAndBody)
-    dieIf(modTasks.exists(_.isForBothTitleAndBody != taskIsForBothTitleAndBody),
-      "TyE603AKDHHW26")
+    val taskIsForBothTitleAndBody = modTasks.exists(_.isForBothTitleAndBody)
+    dieIf(isDevOrTest && modTasks.exists(
+          _.isForBothTitleAndBody != taskIsForBothTitleAndBody), "TyE603AKDHHW26")
 
+    // Won't work if 1) System auto approves a post, and 2) later notices
+    // it's spam (after having asked external services) and adds a mod task
+    // about that, and staff deletes the post.
+    // Then, if it's a new page, the mod task will have pageId = None
+    // — the page won't get deleted, only the orig post (not the title, or replies).
+    /*
     def isNewPostModTask = modTasks.headOption.exists(
           _.reasons.contains(ReviewReason.NewPost))
     unimplIf(isDevOrTest && post.isOrigPost && isNewPostModTask &&
           !taskIsForBothTitleAndBody, "Orig post moved before approved? [TyE406MRKTD2]")
+          */
 
     taskIsForBothTitleAndBody
   }
