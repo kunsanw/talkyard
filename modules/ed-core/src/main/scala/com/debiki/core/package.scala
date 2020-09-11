@@ -30,6 +30,8 @@ import scala.util.{Failure, Success, Try}
 
 package object core {
 
+  def isDevOrTest: Boolean = Prelude.isDevOrTest
+  def isProd: Boolean = Prelude.isProd
 
   // "Vector" is so very long, for such a good & please-use-frequently collection.
   type Vec[+A] = scala.collection.immutable.Vector[A]

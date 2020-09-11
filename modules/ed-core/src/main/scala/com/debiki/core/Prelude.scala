@@ -43,6 +43,7 @@ object Prelude {   CLEAN_UP; RENAME // to BugDie and re-export the interesting
   def setIsProdForever(prod: Boolean): Unit = {
     dieIf(hasSet && prod != _isProd, "TyE502ARKT4")
     _isProd = prod
+    hasSet = true
   }
 
   private var _isProd = true

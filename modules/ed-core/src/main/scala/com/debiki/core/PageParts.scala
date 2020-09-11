@@ -332,7 +332,7 @@ abstract class PageParts {
   }
 
 
-  def findCommonAncestorNr(postNrs: Seq[PostNr]): PostNr = { //zzz
+  def findCommonAncestorNr(postNrs: Seq[PostNr]): PostNr = {
     TESTS_MISSING
     if (postNrs.isEmpty || postNrs.contains(PageParts.NoNr))
       return PageParts.NoNr
