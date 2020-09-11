@@ -493,7 +493,9 @@ interface TalkyardTranslations {
     DiscDeld: string;
     PageDeld: string;
     PagePendAppr?: string;
+    // If only the title edited:
     TitlePendAppr: string;
+    // If the page body, not title, edited:
     TextPendingApproval: string;
 
     TooltipQuestClosedNoAnsw: string;

@@ -77,6 +77,7 @@ object Globals extends TyLogging {
 
   val CreateSiteHostnameConfValName = "talkyard.createSiteHostname"
 
+  CLEAN_UP; REMOVE //  Now placed in  core  instead -------
   def isProd: Boolean = _isProd
 
   def isDevOrTest: Boolean = !isProd
@@ -92,6 +93,7 @@ object Globals extends TyLogging {
 
   private var _isProd = true
   private var hasSet = false
+  // ------------------------------------------------------
 }
 
 

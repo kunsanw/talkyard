@@ -326,14 +326,15 @@ trait ReviewsDao {   // RENAME to ModerationDao,  MOVE to  talkyard.server.modn
     modTasks foreach { t =>
       dieIf(t.doneOrGone, "TyE50WKDL45", s"Mod task done or gone: $t")
       // Cannot change decisions already made.
+      // OR maybe allow that, if it's one's own earlier decision, not yet carried out?
       dieIf(t.decision isSomethingButNot decision, "TyE305RKDHB",
             s"Mod task decision != $decision, task: $t")
       // No tasks already decided but by the wrong moderators.
       dieIf(t.decidedById isSomethingButNot decidedById, "TyE602AKS4",
-        s"Mod task decision != $decision, task: $t")
+            s"Mod task decided by != $decidedById, task: $t")
       // No mod tasks about the wrong posts.
       dieIf(t.postId isNot post.id, "TyE7KT35T64",
-            s"Mod task post id != post.id, task: $t")
+            s"Mod task post id != post.id = ${post.id}, task: $t")
       // However, t.pageId or t.postNr being different from post.pageId and nr,
       // can be fine, e.g. if the post got moved to a different page.
     }
@@ -345,20 +346,16 @@ trait ReviewsDao {   // RENAME to ModerationDao,  MOVE to  talkyard.server.modn
           // Otherwise could be some forever un-doable mod tasks! [apr_deld_post]
         }
 
-        // // Remove? Only do if hidden or not yet approved? -----
-        // pageIdsToRefresh.add(post.pageId) ; REMOVE  // [staleStuff]
-        // staleStuff.addPageId(post.pageId)
-        // // ----------------------------------------------------
-
         // We're in a background thread and have forgotten the browser id data.
         // Could to load it from an earlier audit log entry, ... but maybe it's been deleted?
-        // Edit: But now this also gets called from moderatePostInstantly().
+        // Edit: But now this also gets called from moderatePostInstantly()
+        // and maybeReviewAcceptPostByInteracting().
         // Oh well, not important. For now:
         val browserIdData = BrowserIdData.Forgotten
 
-        import ReviewDecision._
+    import ReviewDecision._
 
-        val result: ModResult = decision match {
+    val result: ModResult = decision match {
           case Accept if !post.isCurrentVersionApproved =>
             approveAndPublishPost(post, decidedById = decidedById, tasksToAccept = modTasks,
                   pageIdsToRefresh)(tx, staleStuff)

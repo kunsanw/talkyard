@@ -297,7 +297,7 @@ abstract class PageParts {
     post.parentNr.flatMap(postByNr)
   }
 
-CR_DONE // to here, continue below.
+
   def depthOf(postNr: PostNr): Int =
     ancestorsParentFirstOf(postNr).length
 
@@ -320,15 +320,19 @@ CR_DONE // to here, continue below.
       numLaps += 1
       val theCurPost = curPost.get
       // To mostly avoid O(n^2) time, don't check for cycles so very often. [On2]
-      dieIf((numLaps % 1000) == 0 && ancestors.exists(_.nr == theCurPost.nr),
-        "EsE7YKW2", s"Post cycle on page $pageId around post nr ${theCurPost.nr}")
+      if ((numLaps % 1000) == 0) {
+        val cycleFound = ancestors.exists(_.nr == theCurPost.nr)
+        SHOULD // use bugWarn instead
+        dieIf(cycleFound, "TyEPOSTCYCL",
+              s"Post cycle on page $pageId around post nr ${theCurPost.nr}")
+      }
       ancestors.append(theCurPost)
     }
     ancestors.to[immutable.Seq]
   }
 
 
-  def findCommonAncestorNr(postNrs: Seq[PostNr]): PostNr = {
+  def findCommonAncestorNr(postNrs: Seq[PostNr]): PostNr = { //zzz
     TESTS_MISSING
     if (postNrs.isEmpty || postNrs.contains(PageParts.NoNr))
       return PageParts.NoNr

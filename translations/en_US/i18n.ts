@@ -521,7 +521,7 @@ var t_en_US: TalkyardTranslations = t = {
     DiscDeld: "Discussion deleted",
     PageDeld: "Page deleted",
     PagePendAppr: "Page pending approval",
-    TitlePendAppr: "Title pending approval",  // if only the title edited
+    TitlePendAppr: "Title pending approval",
     TextPendingApproval: "Text pending approval",
 
     TooltipQuestClosedNoAnsw: "This question has been closed without any accepted answer.",
