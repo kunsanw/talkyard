@@ -89,6 +89,7 @@ object Globals extends TyLogging {
   def setIsProdForever(isIt: Boolean): Unit = {
     dieIf(hasSet && isIt != _isProd, "EdE2PWVU07")
     _isProd = isIt
+    com.debiki.core.Prelude.setIsProdForever(isIt)
   }
 
   private var _isProd = true

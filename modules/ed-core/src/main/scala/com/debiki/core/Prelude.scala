@@ -28,7 +28,25 @@ import scala.util.matching.Regex
 import scala.collection.immutable
 
 
-object Prelude {
+object Prelude {   CLEAN_UP; RENAME // to BugDie and re-export the interesting
+  // things from core package obj?
+  // E.g. export  isProd and dieIf etc, but not setIsProdForever().
+
+  def isProd: Boolean = _isProd
+  def isDevOrTest: Boolean = !isProd
+
+  /** One cannot change from Prod to Dev or Test, or from Dev or Test to Prod,
+    * so we can safely remember isProd, forever.
+    * (However, is-Dev and is-Test might change, depending on what
+    * commands one types in the Scala cli.)
+    */
+  def setIsProdForever(prod: Boolean): Unit = {
+    dieIf(hasSet && prod != _isProd, "TyE502ARKT4")
+    _isProd = prod
+  }
+
+  private var _isProd = true
+  private var hasSet = false
 
 
   // Logs an error in release mode, but throws an AssertionError in debug

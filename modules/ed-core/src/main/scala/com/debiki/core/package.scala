@@ -30,22 +30,6 @@ import scala.util.{Failure, Success, Try}
 
 package object core {
 
-  def isProd: Boolean = _isProd
-  def isDevOrTest: Boolean = !isProd
-
-  /** One cannot change from Prod to Dev or Test, or from Dev or Test to Prod,
-    * so we can safely remember isProd, forever.
-    * (However, is-Dev and is-Test might change, depending on what
-    * commands one types in the Scala cli.)
-    */
-  def setIsProdForever(prod: Boolean): Unit = {
-    dieIf(hasSet && prod != _isProd, "TyE502ARKT4")
-    _isProd = prod
-  }
-
-  private var _isProd = true
-  private var hasSet = false
-
 
   // "Vector" is so very long, for such a good & please-use-frequently collection.
   type Vec[+A] = scala.collection.immutable.Vector[A]
